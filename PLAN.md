@@ -1,5 +1,5 @@
 # Project Implementation Plan
-## Local EC2 Replica Using OpenStack (DevStack)
+## Local EC2 Replica Using DevStack
 ### Machine: Acer TravelMate P215-53 | Ubuntu 24.04 LTS | 8GB RAM | 16 CPU | WiFi
 
 ---
@@ -812,7 +812,7 @@ openstack security group rule list web-server
 - [ ] **3.2.5** Both images (CirrOS + Ubuntu) show `active` in Glance
 - [ ] **3.3.3** Private network `192.168.100.0/24` created and active
 - [ ] **3.4.4** Router connected to both public and private-subnet
-- [ ] **3.5.3** Key pair `project-key` registered in OpenStack
+- [ ] **3.5.3** Key pair `project-key` registered in DevStack
 - [ ] **3.5.4** `project-key.pem` file exists, mode 600, contains private key
 - [ ] **3.6.6** Security groups `ssh-only` (SSH+ICMP) and `web-server` (SSH+HTTP+HTTPS+ICMP) created
 - [ ] Screenshots #2, #3, #4, #5 taken
@@ -822,7 +822,7 @@ openstack security group rule list web-server
 ---
 
 # PHASE 4 — EC2 Feature Implementation & Demo
-> **Goal:** Exercise every major EC2 feature using OpenStack. Each sub-step is a demo-able feature.
+> **Goal:** Exercise every major EC2 feature using DevStack. Each sub-step is a demo-able feature.
 
 ---
 
@@ -1170,8 +1170,8 @@ ssh -i /opt/stack/project-key.pem ubuntu@$WEB_FIP
 
 # Inside the Ubuntu VM:
 sudo apt update && sudo apt install -y nginx
-echo "<h1>Welcome to My OpenStack Cloud!</h1>
-<p>This VM is running on a local EC2 replica built with OpenStack DevStack.</p>
+echo "<h1>Welcome to My DevStack Cloud!</h1>
+<p>This VM is running on a local EC2 replica built with DevStack.</p>
 <p>Host: $(hostname) | IP: $(hostname -I)</p>" | sudo tee /var/www/html/index.html
 sudo systemctl enable nginx
 sudo systemctl start nginx
@@ -1590,7 +1590,7 @@ openstack server delete perf-vm-01 perf-vm-02 perf-vm-03
 | Ubuntu instance launch time | ___ seconds |
 | RAM used (idle, no VMs) | ___ GB |
 | RAM used (3 CirrOS VMs) | ___ GB |
-| Disk used by OpenStack | ___ GB |
+| Disk used by DevStack | ___ GB |
 | Max concurrent VMs tested | ___ |
 
 ---
@@ -1766,7 +1766,7 @@ User clicks "Launch Instance"
 
 ---
 
-## Step 7.3 — AWS vs OpenStack Comparison Table
+## Step 7.3 — AWS vs DevStack Comparison Table
 
 ### Sub-step 7.3.1 — Feature comparison for report
 
@@ -1792,7 +1792,7 @@ User clicks "Launch Instance"
 
 ### Sub-step 7.3.2 — Architecture comparison for report
 
-| Aspect | AWS EC2 | This Project (OpenStack) |
+| Aspect | AWS EC2 | This Project (DevStack) |
 |---|---|---|
 | Hypervisor | KVM (AWS Nitro) | KVM (open source) |
 | Networking | AWS VPC (proprietary) | Neutron + LinuxBridge |
@@ -1845,7 +1845,7 @@ ec2-local-cloud/
 cd /home/khalid/ec2-local-cloud
 git init
 git add PROJECT_REQUIREMENTS.md INSTALLATION.md PLAN.md configs/
-git commit -m "Final semester project: Local EC2 replica using OpenStack DevStack"
+git commit -m "Final semester project: Local EC2 replica using DevStack"
 ```
 - Do NOT commit the `screenshots/` folder if file sizes are large
 
@@ -1855,7 +1855,7 @@ git commit -m "Final semester project: Local EC2 replica using OpenStack DevStac
 
 - [ ] **7.1** All 20 screenshots taken and named correctly
 - [ ] **7.2** Architecture diagram and data flow diagram drawn/included
-- [ ] **7.3** AWS vs OpenStack comparison tables completed
+- [ ] **7.3** AWS vs DevStack comparison tables completed
 - [ ] **7.4** Project folder organized and clean
 - [ ] Report written using screenshots as evidence
 - [ ] Presentation slides reference screenshots and diagrams
