@@ -1,11 +1,11 @@
 # Local EC2 Replica — Final Semester Project
-### Platform: OpenStack via DevStack | OS: Ubuntu | Scale: Single Node
+### Platform: DevStack (OpenStack Dalmatian) | OS: Ubuntu 24.04 LTS | Scale: Single Node
 
 ---
 
 ## Project Overview
 
-This project builds a local cloud computing environment that replicates the core features of **Amazon EC2 (Elastic Compute Cloud)** using **OpenStack** deployed through **DevStack** on a single physical machine. The system allows users to launch, manage, and terminate virtual machines through both a web dashboard and a command-line interface — mirroring the real-world cloud experience.
+This project builds a local cloud computing environment that replicates the core features of **Amazon EC2 (Elastic Compute Cloud)** using **DevStack** — the official single-node OpenStack installer — on a single physical machine. DevStack installs and configures all OpenStack services (Nova, Neutron, Glance, Cinder, Keystone, Horizon) automatically, giving a fully functional private cloud without needing multiple servers. The system allows users to launch, manage, and terminate virtual machines through both a web dashboard and a command-line interface — mirroring the real-world cloud experience.
 
 ---
 
@@ -37,20 +37,22 @@ This project builds a local cloud computing environment that replicates the core
 | Software | Version | Purpose |
 |----------|---------|---------|
 | Ubuntu | 24.04 LTS (Noble) ✅ | Host Operating System |
-| DevStack | stable/2024.2 (Dalmatian) | OpenStack installer/orchestrator |
-| Python | 3.10+ | OpenStack backend language |
-| KVM / QEMU | Latest from apt | Hypervisor for VMs |
-| libvirt | Latest from apt | Virtualization management |
-| Open vSwitch | Latest | Virtual networking |
-| Git | 2.x | Cloning DevStack |
-| MySQL | 8.x | OpenStack database backend |
-| RabbitMQ | 3.x | Message queue between services |
-| Apache2 | 2.4.x | Horizon dashboard web server |
-| Memcached | Latest | Token/session caching |
+| DevStack | stable/2024.2 (Dalmatian) | Single-node OpenStack installer — chosen over manual OpenStack for speed and simplicity |
+| Python | 3.12 (Ubuntu 24.04 default) | OpenStack services are written in Python |
+| KVM / QEMU | Latest from apt | Hypervisor that runs the virtual machines |
+| libvirt | Latest from apt | API layer between Nova and KVM |
+| LinuxBridge | Kernel built-in | Virtual networking — used instead of OVS for WiFi compatibility |
+| Git | 2.x | DevStack clones all OpenStack service repos during install |
+| MySQL | 8.x | Stores all OpenStack service state (instances, volumes, images metadata) |
+| RabbitMQ | 3.x | Message queue — Nova, Neutron, Cinder communicate through it |
+| Apache2 | 2.4.x | Serves the Horizon dashboard and Keystone API |
+| Memcached | Latest | Caches Keystone tokens to reduce auth overhead |
 
 ---
 
-## OpenStack Services (EC2 Feature Map)
+## DevStack Services Installed (EC2 Feature Map)
+
+> DevStack installs and manages all of these as systemd units (`devstack@nova-api`, etc.).
 
 | OpenStack Service | Service Code | EC2 / AWS Equivalent | Description |
 |---|---|---|---|
@@ -168,8 +170,8 @@ This project builds a local cloud computing environment that replicates the core
 - System must support at least 3 simultaneous running instances
 
 ### NFR-02: Availability
-- All OpenStack services must auto-recover via systemd if they crash
-- Stack must survive a `rejoin-stack.sh` restart after host reboot
+- All DevStack services must auto-recover via systemd if they crash
+- Stack must survive a `./rejoin-stack.sh` restart after host reboot without re-running `./stack.sh`
 
 ### NFR-03: Security
 - All service communication uses token-based authentication via Keystone
@@ -236,25 +238,28 @@ ec2-local-cloud/
 
 ## Comparison: This Project vs Real AWS EC2
 
-| Feature | AWS EC2 | This Project (OpenStack) |
+| Feature | AWS EC2 | This Project (DevStack) |
 |---|---|---|
-| Compute Engine | Xen / KVM (proprietary) | KVM (open source) |
-| Image Store | S3-backed AMIs | Glance (local disk) |
-| Networking | AWS VPC | Neutron + Open vSwitch |
-| Block Storage | EBS (NVMe SSD) | Cinder (local disk LVM) |
+| Installer / Platform | AWS proprietary | **DevStack** (single-node OpenStack installer) |
+| Compute Engine | KVM (AWS Nitro) | Nova + KVM (open source) |
+| Image Store | S3-backed AMIs | Glance (stored on local disk) |
+| Networking | AWS VPC | Neutron + **LinuxBridge** (WiFi-compatible) |
+| Block Storage | EBS (NVMe SSD) | Cinder (local disk, LVM backend) |
 | Identity | IAM | Keystone |
-| Dashboard | AWS Console | Horizon |
-| CLI | AWS CLI | OpenStack CLI |
-| Scale | Global, millions of nodes | Single machine |
-| HA | Built-in redundancy | None (single node) |
-| Cost | Pay-per-use | Free (your hardware) |
+| Dashboard | AWS Management Console | Horizon |
+| CLI | AWS CLI (`aws`) | OpenStack CLI (`openstack`) |
+| Scale | Global, millions of nodes | Single machine (your laptop) |
+| HA / Redundancy | Multi-AZ, automatic failover | None — single node |
+| Setup time | Instant (managed service) | ~1 hour (`./stack.sh`) |
+| Cost | Pay-per-use | Free (your own hardware) |
 
 ---
 
 ## Team / Author
 
-- **Project Title:** Local Cloud Infrastructure — EC2 Replica Using OpenStack
-- **Platform:** DevStack on Ubuntu 22.04
+- **Project Title:** Local Cloud Infrastructure — EC2 Replica Using DevStack
+- **Platform:** DevStack stable/2024.2 (Dalmatian) on Ubuntu 24.04 LTS
+- **Machine:** Acer TravelMate P215-53 | 8GB RAM | 16 CPU | WiFi
 - **Semester:** Final Semester
 - **Course:** Cloud Computing / Distributed Systems
 
