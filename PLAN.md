@@ -419,7 +419,7 @@ This is your host IP address: 10.200.194.146
 Horizon is now available at http://10.200.194.146/dashboard
 Keystone is serving at http://10.200.194.146/identity/
 The default users are: admin and demo
-The password: Admin@OpenStack1
+The password: Admin1234OpenStack
 ```
 
 ### Sub-step 2.4.5 — What to do if stack.sh fails
@@ -510,7 +510,7 @@ URL: http://10.200.194.146/dashboard
 |-------|-------|
 | Domain | Default |
 | Username | admin |
-| Password | Admin@OpenStack1 |
+| Password | Admin1234OpenStack |
 
 ### Sub-step 2.6.3 — Confirm the overview page loads
 - You should see the **Project Overview** with usage stats (0 instances, 0 VCPUs used, etc.)
