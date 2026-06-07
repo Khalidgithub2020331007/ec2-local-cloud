@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ovn-sbctl show *)",
+      "Bash(ovn-sbctl list *)"
+    ]
+  }
+}
