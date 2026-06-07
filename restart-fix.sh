@@ -24,7 +24,11 @@ sudo sysctl -w net.ipv4.conf.wlp0s20f3.accept_local=1
 sudo sysctl -w net.ipv4.ip_forward=1
 
 # ── Step 3: OVN chassis + OVS manager fix ────────────────────────────────────
-# Without this: instances fail to launch ("no OVN chassis for host")
+# unstack.sh stops OVS; must restart it before any ovs-vsctl commands
+sudo systemctl start openvswitch-switch
+sudo ovs-vsctl --may-exist add-br br-ex
+sudo ovs-vsctl set open . external-ids:ovn-bridge-mappings=public:br-ex
+# Without ovn-remote/encap: instances fail to launch ("no OVN chassis for host")
 # Without set-manager: os-vif can't plug VIFs into br-int
 sudo ovs-vsctl set open . external-ids:ovn-remote=tcp:${CURRENT_IP}:6642
 sudo ovs-vsctl set open . external-ids:ovn-encap-type=geneve
@@ -39,15 +43,61 @@ sudo ip addr add 10.200.195.129/26 dev br-ex 2>/dev/null || true
 sudo ip route del 10.200.195.128/26 dev br-ex 2>/dev/null || true
 
 # ── Step 5: OVN metadata agent ───────────────────────────────────────────────
-# Not managed by systemd in DevStack. Without it, instances can't reach
-# 169.254.169.254 and sshd won't start after boot.
-pkill -f neutron-ovn-metadata-agent 2>/dev/null || true
-sleep 2
-/opt/stack/data/venv/bin/neutron-ovn-metadata-agent \
-    --config-file /etc/neutron/neutron.conf \
-    --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
-    --config-file /etc/neutron/neutron_ovn_metadata_agent.ini \
-    > /tmp/ovn-metadata.log 2>&1 &
+# DevStack never generated neutron_ovn_metadata_agent.ini — create it and run
+# the agent as a systemd service (matching the pattern of devstack@q-meta).
+# Privsep (oslo_privsep) requires the agent to run as the stack user; running
+# as khalid causes FailedToDropPrivileges and no network namespaces are created.
+
+OVN_META_CONF=/etc/neutron/neutron_ovn_metadata_agent.ini
+sudo tee "$OVN_META_CONF" > /dev/null <<EOF
+[DEFAULT]
+debug = True
+nova_metadata_host = ${CURRENT_IP}
+metadata_workers = 2
+state_path = /opt/stack/data/neutron
+
+[agent]
+root_helper = sudo /opt/stack/data/venv/bin/neutron-rootwrap /etc/neutron/rootwrap.conf
+root_helper_daemon = sudo /opt/stack/data/venv/bin/neutron-rootwrap-daemon /etc/neutron/rootwrap.conf
+
+[ovs]
+ovsdb_connection = tcp:127.0.0.1:6640
+
+[ovn]
+ovn_sb_connection = tcp:${CURRENT_IP}:6642
+EOF
+
+sudo tee /etc/systemd/system/devstack@q-ovn-metadata-agent.service > /dev/null <<'EOF'
+[Unit]
+Description = Devstack devstack@q-ovn-metadata-agent.service
+
+[Service]
+ExecReload = /usr/bin/kill -HUP $MAINPID
+TimeoutStopSec = 300
+KillMode = process
+ExecStart = /opt/stack/data/venv/bin/neutron-ovn-metadata-agent --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugins/ml2/ml2_conf.ini --config-file /etc/neutron/neutron_ovn_metadata_agent.ini
+User = stack
+Environment = "PATH=/bin:/opt/stack/data/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/sbin"
+
+[Install]
+WantedBy = multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart devstack@q-ovn-metadata-agent.service
+sleep 3
+sudo systemctl is-active devstack@q-ovn-metadata-agent.service && echo "OVN metadata agent: OK" || echo "OVN metadata agent: FAILED — check: journalctl -u devstack@q-ovn-metadata-agent"
+
+# ── Step 5b: Restart services that may have failed after HOST_IP change ──────
+# c-sch/c-vol/n-sch can get stuck connecting to a stale RabbitMQ IP after drift.
+# Their configs already have the correct IP; a restart is enough to clear failed state.
+for svc in devstack@c-sch devstack@c-vol devstack@n-sch; do
+    if ! sudo systemctl is-active --quiet "$svc"; then
+        echo "Restarting $svc (was not active)..."
+        sudo systemctl restart "$svc"
+    fi
+done
+sleep 3
 
 # ── Step 6: Verify ───────────────────────────────────────────────────────────
 sleep 5
