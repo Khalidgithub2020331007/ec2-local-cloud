@@ -39,6 +39,9 @@ sudo ovs-vsctl set-manager ptcp:6640
 # ── Step 4: Floating IP routing fix ──────────────────────────────────────────
 # PUBLIC_NETWORK_GATEWAY=10.200.192.1 puts br-ex in a different subnet than
 # OVN's public network (10.200.195.128/26). Adding .129 lets OVN route replies back.
+# br-ex starts DOWN after reboot — bring it up before adding the IP (connected route
+# only appears in the routing table when the interface is UP).
+sudo ip link set br-ex up 2>/dev/null || true
 sudo ip addr add 10.200.195.129/26 dev br-ex 2>/dev/null || true
 sudo ip route del 10.200.195.128/26 dev br-ex 2>/dev/null || true
 
@@ -88,7 +91,44 @@ sudo systemctl restart devstack@q-ovn-metadata-agent.service
 sleep 3
 sudo systemctl is-active devstack@q-ovn-metadata-agent.service && echo "OVN metadata agent: OK" || echo "OVN metadata agent: FAILED — check: journalctl -u devstack@q-ovn-metadata-agent"
 
-# ── Step 5b: Restart services that may have failed after HOST_IP change ──────
+# ── Step 5b: OVN metadata port + DHCP options for private-network ────────────
+# ovn_metadata_enabled=False in ml2_conf.ini means Neutron never auto-created
+# the ovnmeta port or the classless_static_route DHCP option. These must be set
+# manually once per stack.sh run. Idempotent: openstack port create fails silently
+# if port already exists; ovn-nbctl set is always safe to re-run.
+source /opt/stack/devstack/openrc admin admin 2>/dev/null
+PRIVATE_NET=9cb63257-fd44-47e0-bbf3-8e553975b7e5
+PRIVATE_SUBNET=7e985289-713a-4d5d-b86f-5d42fdbe944f
+META_PORT_NAME=ovnmeta-${PRIVATE_NET}
+META_DEVICE_ID=ovnmeta-${PRIVATE_NET}
+
+# Create metadata port if it doesn't already exist
+if ! openstack port show "$META_PORT_NAME" &>/dev/null; then
+    echo "Creating OVN metadata port for private-network..."
+    openstack port create \
+        --network "$PRIVATE_NET" \
+        --device-owner network:distributed \
+        --device "$META_DEVICE_ID" \
+        --fixed-ip subnet="$PRIVATE_SUBNET" \
+        "$META_PORT_NAME"
+else
+    echo "OVN metadata port already exists — skipping"
+fi
+
+# Add classless_static_route DHCP option so instances can reach 169.254.169.254.
+# The metadata port gets IP 192.168.100.10; new instances learn this route at boot.
+# openstack port show -f value -c fixed_ips returns Python dict: [{'ip_address': '...', ...}]
+META_IP=$(openstack port show "$META_PORT_NAME" -f value -c fixed_ips 2>/dev/null | grep -oP "'ip_address': '[^']+'" | grep -oP "[0-9.]+")
+DHCP_UUID=$(ovn-nbctl --db=tcp:${CURRENT_IP}:6641 list dhcp_options 2>/dev/null | grep -B3 "${PRIVATE_SUBNET}" | grep "_uuid" | awk '{print $3}')
+if [ -n "$DHCP_UUID" ] && [ -n "$META_IP" ]; then
+    ovn-nbctl --db=tcp:${CURRENT_IP}:6641 set dhcp_options "$DHCP_UUID" \
+        options:classless_static_route="{169.254.169.254/32,${META_IP}, 0.0.0.0/0,192.168.100.1}"
+    echo "DHCP classless_static_route set: 169.254.169.254/32 via ${META_IP}"
+else
+    echo "WARNING: Could not set DHCP classless_static_route (DHCP_UUID=${DHCP_UUID}, META_IP=${META_IP})"
+fi
+
+# ── Step 5c: Restart services that may have failed after HOST_IP change ──────
 # c-sch/c-vol/n-sch can get stuck connecting to a stale RabbitMQ IP after drift.
 # Their configs already have the correct IP; a restart is enough to clear failed state.
 for svc in devstack@c-sch devstack@c-vol devstack@n-sch; do
@@ -99,7 +139,7 @@ for svc in devstack@c-sch devstack@c-vol devstack@n-sch; do
 done
 sleep 3
 
-# ── Step 6: Verify ───────────────────────────────────────────────────────────
+# ── Step 6: Verify ──────────────────────────────────────────────────────────
 sleep 5
 echo ""
 echo "=== OVN chassis (should show an entry) ==="
@@ -111,7 +151,7 @@ sudo ovs-vsctl get-manager
 
 echo ""
 echo "=== br-ex IPs ==="
-ip addr show br-ex | grep inet
+ip addr show br-ex | grep inet || echo "WARNING: br-ex has no inet address"
 
 echo ""
 echo "=== DevStack services ==="
