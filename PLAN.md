@@ -1853,10 +1853,10 @@ git commit -m "Final semester project: Local EC2 replica using DevStack"
 
 ## Phase 7 Checklist
 
-- [ ] **7.1** All 20 screenshots taken and named correctly
-- [ ] **7.2** Architecture diagram and data flow diagram drawn/included
-- [ ] **7.3** AWS vs DevStack comparison tables completed
-- [ ] **7.4** Project folder organized and clean
+- [x] **7.1** All 20 screenshots taken and named correctly
+- [x] **7.2** Architecture diagram and data flow diagram drawn/included
+- [x] **7.3** AWS vs DevStack comparison tables completed
+- [x] **7.4** Project folder organized and clean
 - [ ] Report written using screenshots as evidence
 - [ ] Presentation slides reference screenshots and diagrams
 
@@ -1934,10 +1934,10 @@ git commit -m "Final semester project: Local EC2 replica using DevStack"
 ## Phase 7 — Documentation
 | Sub-step | Task | Done |
 |----------|------|------|
-| 7.1 | All 20 screenshots collected | ☐ |
-| 7.2 | Architecture diagram complete | ☐ |
-| 7.3 | Comparison tables complete | ☐ |
-| 7.4 | Project folder organized | ☐ |
+| 7.1 | All 20 screenshots collected | ✅ |
+| 7.2 | Architecture diagram complete | ✅ |
+| 7.3 | Comparison tables complete | ✅ |
+| 7.4 | Project folder organized | ✅ |
 
 ---
 
