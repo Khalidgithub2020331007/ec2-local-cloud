@@ -1857,6 +1857,8 @@ git commit -m "Final semester project: Local EC2 replica using DevStack"
 - [x] **7.2** Architecture diagram and data flow diagram drawn/included
 - [x] **7.3** AWS vs DevStack comparison tables completed
 - [x] **7.4** Project folder organized and clean
+- [x] **7.5** COMMANDS_CHEATSHEET.md created (full CLI quick reference)
+- [x] **7.6** DEMO_SCRIPT.md created (presentation walkthrough with fallback steps)
 - [ ] Report written using screenshots as evidence
 - [ ] Presentation slides reference screenshots and diagrams
 
@@ -1869,67 +1871,67 @@ git commit -m "Final semester project: Local EC2 replica using DevStack"
 ## Phase 1 — Environment Preparation
 | Sub-step | Task | Done |
 |----------|------|------|
-| 1.1.4 | apt upgrade, no pending updates | ☐ |
-| 1.2.1 | git, python3, build tools installed | ☐ |
-| 1.2.2 | kvm-ok confirmed | ☐ |
-| 1.2.3 | bridge-utils, iptables installed | ☐ |
-| 1.2.4 | User added to kvm + libvirt groups | ☐ |
-| 1.3.4 | Docker stopped, disabled, no processes | ☐ |
-| 1.3.3 | iptables flushed | ☐ |
-| 1.4.7 | 8GB swap active, permanent, swappiness=10 | ☐ |
-| 1.5.5 | stack user created, passwordless sudo works | ☐ |
+| 1.1.4 | apt upgrade, no pending updates | ✅ |
+| 1.2.1 | git, python3, build tools installed | ✅ |
+| 1.2.2 | kvm-ok confirmed | ✅ |
+| 1.2.3 | bridge-utils, iptables installed | ✅ |
+| 1.2.4 | User added to kvm + libvirt groups | ✅ |
+| 1.3.4 | Docker stopped, disabled, no processes | ✅ |
+| 1.3.3 | iptables flushed | ✅ |
+| 1.4.7 | 8GB swap active, permanent, swappiness=10 | ✅ |
+| 1.5.5 | stack user created, passwordless sudo works | ✅ |
 
 ## Phase 2 — DevStack Installation
 | Sub-step | Task | Done |
 |----------|------|------|
-| 2.1.2 | Internet accessible from stack user | ☐ |
-| 2.2.2 | DevStack stable/2024.2 cloned, correct branch | ☐ |
-| 2.3.2 | HOST_IP=10.200.194.146 verified | ☐ |
-| 2.3.3 | FLAT_INTERFACE=wlp0s20f3 verified | ☐ |
-| 2.4.4 | stack.sh completed, success message seen | ☐ |
-| 2.5.2 | All 12 services active | ☐ |
-| 2.5.3 | All 5 APIs respond | ☐ |
-| 2.6.3 | Horizon loads in browser | ☐ |
-| 2.6.5 | Screenshot #1 taken | ☐ |
+| 2.1.2 | Internet accessible from stack user | ✅ |
+| 2.2.2 | DevStack stable/2024.2 cloned, correct branch | ✅ |
+| 2.3.2 | HOST_IP=10.200.194.146 verified | ✅ |
+| 2.3.3 | FLAT_INTERFACE=wlp0s20f3 verified | ✅ |
+| 2.4.4 | stack.sh completed, success message seen | ✅ |
+| 2.5.2 | All 12 services active | ✅ |
+| 2.5.3 | All 5 APIs respond | ✅ |
+| 2.6.3 | Horizon loads in browser | ✅ |
+| 2.6.5 | Screenshot #1 taken | ✅ |
 
 ## Phase 3 — Core Infrastructure
 | Sub-step | Task | Done |
 |----------|------|------|
-| 3.1.4 | 4 flavors (tiny/small/medium/large) | ☐ |
-| 3.2.5 | CirrOS + Ubuntu images active in Glance | ☐ |
-| 3.3.3 | private-network + private-subnet created | ☐ |
-| 3.4.4 | main-router connected to public + private | ☐ |
-| 3.5.4 | project-key.pem file exists, mode 600 | ☐ |
-| 3.6.6 | ssh-only + web-server security groups created | ☐ |
+| 3.1.4 | 4 flavors (tiny/small/medium/large) | ✅ |
+| 3.2.5 | CirrOS + Ubuntu images active in Glance | ✅ |
+| 3.3.3 | private-network + private-subnet created | ✅ |
+| 3.4.4 | main-router connected to public + private | ✅ |
+| 3.5.4 | project-key.pem file exists, mode 600 | ✅ |
+| 3.6.6 | ssh-only + web-server security groups created | ✅ |
 
 ## Phase 4 — EC2 Features
 | Sub-step | Task | Done |
 |----------|------|------|
-| 4.1.4 | Instance ACTIVE, console log shows boot | ☐ |
-| 4.2.4 | Floating IP assigned, ping works | ☐ |
-| 4.3.3 | SSH into VM, uname + ip addr confirmed | ☐ |
-| 4.4.6 | Stop/Start/Reboot all work | ☐ |
-| 4.5.5 | Volume formatted, mounted, data written | ☐ |
-| 4.5.7 | Data persists across 2 VMs | ☐ |
-| 4.6.5 | Snapshot restored with same data | ☐ |
-| 4.7.4 | Custom AMI boots new VM | ☐ |
-| 4.8.6 | nginx web server accessible in browser | ☐ |
+| 4.1.4 | Instance ACTIVE, console log shows boot | ✅ |
+| 4.2.4 | Floating IP assigned, ping works | ✅ |
+| 4.3.3 | SSH into VM, uname + ip addr confirmed | ✅ |
+| 4.4.6 | Stop/Start/Reboot all work | ✅ |
+| 4.5.5 | Volume formatted, mounted, data written | ✅ |
+| 4.5.7 | Data persists across 2 VMs | ✅ |
+| 4.6.5 | Snapshot restored with same data | ✅ |
+| 4.7.4 | Custom AMI boots new VM | ✅ |
+| 4.8.6 | nginx web server accessible in browser | ✅ |
 
 ## Phase 5 — Multi-User
 | Sub-step | Task | Done |
 |----------|------|------|
-| 5.2.3 | dev-project + prod-project created | ☐ |
-| 5.3.4 | devuser, opsuser, devadmin created | ☐ |
-| 5.4.1 | Roles assigned | ☐ |
-| 5.4.3 | User isolation proven | ☐ |
-| 5.4.5 | Screenshot of isolated dashboard | ☐ |
+| 5.2.3 | dev-project + prod-project created | ✅ |
+| 5.3.4 | devuser, opsuser, devadmin created | ✅ |
+| 5.4.1 | Roles assigned | ✅ |
+| 5.4.3 | User isolation proven | ✅ |
+| 5.4.5 | Screenshot of isolated dashboard | ✅ |
 
 ## Phase 6 — Testing
 | Sub-step | Task | Done |
 |----------|------|------|
-| 6.1.12 | All 10 tests in table: PASS | ☐ |
-| 6.2.3 | Performance numbers recorded | ☐ |
-| 6.3.2 | Smoke test passes | ☐ |
+| 6.1.12 | All 10 tests in table: PASS | ✅ |
+| 6.2.3 | Performance numbers recorded | ✅ |
+| 6.3.2 | Smoke test passes | ✅ |
 
 ## Phase 7 — Documentation
 | Sub-step | Task | Done |
@@ -1938,6 +1940,8 @@ git commit -m "Final semester project: Local EC2 replica using DevStack"
 | 7.2 | Architecture diagram complete | ✅ |
 | 7.3 | Comparison tables complete | ✅ |
 | 7.4 | Project folder organized | ✅ |
+| 7.5 | COMMANDS_CHEATSHEET.md created | ✅ |
+| 7.6 | DEMO_SCRIPT.md created | ✅ |
 
 ---
 
