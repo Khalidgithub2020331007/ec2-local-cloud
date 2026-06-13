@@ -1,7 +1,7 @@
 # Dashboard Startup Guide
 ## Local EC2 Replica — OpenStack Dashboard
 
-This guide explains exactly what to run every time you want to show the project dashboard, how to verify everything is working, and how to fix common problems.
+This guide explains exactly what to run every time you want to show the project, how to test every feature from the UI, and how to verify the system is working accurately.
 
 ---
 
@@ -15,7 +15,7 @@ Step 2 → Run python3 app.py         (starts the web dashboard)
 Step 3 → Open browser at localhost:8080
 ```
 
-Full commands are in the sections below.
+Full commands and testing instructions are in the sections below.
 
 ---
 
@@ -26,7 +26,7 @@ If you skip them, the dashboard will show errors or instances won't be reachable
 
 ### Step 1 — Check your WiFi IP
 
-Your WiFi IP can change every time you reconnect. You must verify it first.
+Your WiFi IP can change every time you reconnect. Verify it first.
 
 ```bash
 ip addr show wlp0s20f3 | grep 'inet '
@@ -37,73 +37,32 @@ Example output:
 inet 10.200.195.97/22 brd 10.200.199.255 scope global dynamic wlp0s20f3
 ```
 
-The IP is the number before the `/22` — in this example: `10.200.195.97`
-
-Write it down. You will need it to check Keystone in Step 3.
+The IP is the number before the `/22`. Write it down.
 
 ---
 
 ### Step 2 — Run the Restart Fix Script
 
-This script fixes all the things that break after a reboot:
-- Updates HOST_IP if your WiFi IP changed
-- Restarts OVN networking
-- Fixes floating IP routing
-- Restarts Nova API and other services that get stuck
+This fixes everything that breaks after a reboot: HOST_IP drift, OVN networking, floating IP routing, and stuck Nova workers.
 
 ```bash
 cd /home/khalid/ec2-local-cloud
 echo "2923" | sudo -S bash restart-fix.sh
 ```
 
-Wait for it to finish. The last lines should look like:
-
-```
-=== DevStack services ===
-devstack@c-api.service     running
-devstack@c-sch.service     running
-devstack@c-vol.service     running
-devstack@g-api.service     running
-devstack@keystone.service  running
-devstack@n-api.service     running
-devstack@n-cond-cell1.service running
-devstack@n-cpu.service     running
-devstack@n-sch.service     running
-devstack@n-super-cond.service running
-devstack@placement-api.service running
-devstack@q-meta.service    running
-devstack@q-ovn-metadata-agent.service running
-devstack@q-svc.service     running
-```
-
-All services must say `running`. If any say `failed` or `inactive`, see Part 4.
+Wait for it to finish. The last section should show all services as `running`.
 
 ---
 
 ### Step 3 — Verify OpenStack is Responding
-
-Run this to confirm the API is alive:
 
 ```bash
 source /opt/stack/devstack/openrc admin admin
 openstack token issue
 ```
 
-Expected output — a table with a token ID:
-```
-+------------+----------------------------------------------------------+
-| Field      | Value                                                    |
-+------------+----------------------------------------------------------+
-| expires    | 2026-06-14T...                                           |
-| id         | gAAAAABq...                                              |
-| project_id | 79b51eb5...                                              |
-| user_id    | ...                                                      |
-+------------+----------------------------------------------------------+
-```
-
-If you see a table: **OpenStack is working. Move to Part 2.**
-
-If you see an error: see Part 4 — Troubleshooting.
+If you see a table with a token ID: **OpenStack is working. Move to Part 2.**
+If you see an error: see Part 5 — Troubleshooting.
 
 ---
 
@@ -118,140 +77,209 @@ cd /home/khalid/ec2-local-cloud/dashboard
 python3 app.py
 ```
 
-You will see this output:
-
+You will see:
 ```
   Dashboard  →  http://localhost:8080
   Network    →  http://10.200.195.97:8080
   OpenStack  →  http://10.200.195.97/identity
 ```
 
-**Leave this terminal open.** The dashboard runs as long as this terminal is open.
-Do not press Ctrl+C — that will stop the dashboard.
+**Leave this terminal open.** Do not press Ctrl+C — that stops the dashboard.
 
 ---
 
-### Step 5 — Open the Dashboard in Browser
+### Step 5 — Open in Browser
 
 Open Firefox or Chrome and go to:
-
 ```
 http://localhost:8080
 ```
 
-You should see the **OpenStack EC2 Dashboard** with:
-- A dark header bar showing `HOST: 10.200.195.97`
-- A sidebar on the left with sections: Overview, Instances, Images, Volumes, etc.
-- Cards showing counts: 2 Instances, 4 Images, 1 Volume, etc.
-
-If the browser shows an error or blank page: see Part 4.
+You should see the **OpenStack EC2 Dashboard** with a dark header bar, sidebar, and stat cards.
 
 ---
 
-## Part 3 — What to Show Your Teacher
+## Part 3 — Testing: Create, Update, Delete from the UI
 
-Once the dashboard is open, here is what to click through and explain.
-
-### Overview (loads automatically)
-
-Shows a summary of all resources:
-
-| Card | What it means | AWS equivalent |
-|------|--------------|----------------|
-| Instances: 2 | 2 virtual computers running | EC2 Instances |
-| Images: 4 | OS templates to boot from | AMI (Amazon Machine Image) |
-| Volumes: 1 | Extra storage disk | EBS (Elastic Block Store) |
-| Floating IPs: 1 | Public IP attached to a VM | Elastic IP |
-| Users: 16 | Accounts in the system | IAM Users |
-| Projects: 7 | Separate isolated environments | AWS Accounts |
-
-Below the cards you will see a table of running instances.
+The dashboard lets you create, stop, start, and delete resources directly from the browser. Use these tests to prove the system is fully working.
 
 ---
 
-### Instances (click in sidebar)
+### Test A — Launch a New Instance
 
-Shows both virtual machines:
+**What it proves:** The compute engine (Nova) can create virtual machines on demand.
 
-| Name | Status | Private IP | Floating IP | Flavor | Project |
-|------|--------|-----------|-------------|--------|---------|
-| demo-instance-01 | ACTIVE | 192.168.100.40 | 10.200.195.153 | m1.tiny | admin |
-| dev-vm-01 | ACTIVE | 192.168.100.139 | — | m1.tiny | dev-project |
+**Steps:**
+1. Click **Instances** in the sidebar
+2. Click the orange **Launch Instance** button (top right)
+3. Fill in the form:
+   - **Name:** `test-vm-01`
+   - **Image:** `cirros-0.6.2-x86_64-disk`
+   - **Flavor:** `m1.tiny — 1 vCPU · 512MB RAM · 1GB Disk`
+   - **Key Pair:** `project-key`
+4. Click **Launch**
 
-**What to say:** "These are virtual machines running on this laptop, just like EC2 instances on AWS. They each have a private IP on an internal network, and one has a floating IP — that's the public IP, same as an Elastic IP on AWS."
+**What happens immediately:**
+- A green toast notification appears: *"Instance created — will be ACTIVE in ~20 seconds"*
+- The table automatically refreshes after 5 seconds
 
----
+**How to verify it worked:**
+- After 20–30 seconds, click **Refresh** — the new instance appears with status `ACTIVE`
+- The Overview card updates: Instances count increases by 1
 
-### Images (click in sidebar)
-
-Shows the OS templates available. You should see:
-- `cirros-0.6.2-x86_64-disk` — the small test OS used for most VMs
-- `Ubuntu-22.04-LTS` — the full Ubuntu image
-- `demo-instance-snapshot` — a snapshot we created from a running VM
-- `web-server-snapshot` — snapshot of the web server VM
-
-**What to say:** "These are like AMIs on AWS — pre-built OS templates. We have CirrOS (a tiny test OS), Ubuntu 22.04, and two snapshots we made from running instances."
-
----
-
-### Volumes (click in sidebar)
-
-Shows block storage volumes (like extra hard drives for VMs).
-
-**What to say:** "Volumes are like EBS on AWS — extra storage you can attach to a VM, detach, and move to another VM."
+**CLI verification (optional — in a second terminal):**
+```bash
+source /opt/stack/devstack/openrc admin admin
+openstack server show test-vm-01 -f value -c status
+# Expected: ACTIVE
+```
 
 ---
 
-### Networks (click in sidebar)
+### Test B — Stop a Running Instance
 
-Shows 3 networks:
-- `private-network` — internal network (like a VPC) where VMs communicate
-- `public` — external network where floating IPs come from
-- `lb-mgmt-net` — management network (created by DevStack automatically)
+**What it proves:** Power management works — instances can be shut down without deleting them.
 
-**What to say:** "This is the virtual networking layer — equivalent to VPC on AWS. VMs are on the private network and reach the internet through the public network via floating IPs."
+**Steps:**
+1. In the **Instances** section, find `test-vm-01` (status: `ACTIVE`)
+2. Click the yellow **Stop** button on that row
+3. A toast notification appears: *"test-vm-01 is shutting down"*
 
----
-
-### Floating IPs (click in sidebar)
-
-Shows `10.200.195.153` attached to `demo-instance-01`.
-
-**What to say:** "This floating IP works exactly like an Elastic IP on AWS — a public address you assign to a specific instance. You can reassign it to a different instance without changing the instance's private IP."
+**How to verify it worked:**
+- Click **Refresh** after 10 seconds — status changes from `ACTIVE` to `SHUTOFF`
+- The Stop button disappears and a green **Start** button appears instead
 
 ---
 
-### Security Groups (click in sidebar)
+### Test C — Start a Stopped Instance
 
-Shows firewall rules controlling which ports are open.
+**What it proves:** Instances can be resumed from SHUTOFF state, just like in AWS.
 
-Key groups to point out:
-- `ssh-only` — allows TCP port 22 (SSH) and ICMP (ping)
-- `web-server` — allows TCP port 80 (HTTP) in addition to SSH
-- `default` — default rules created by OpenStack
+**Steps:**
+1. Find `test-vm-01` with status `SHUTOFF`
+2. Click the green **Start** button
+3. Toast notification: *"test-vm-01 is booting up"*
 
-**What to say:** "Security Groups are identical to AWS Security Groups — stateful firewall rules. We control exactly which ports are open on each instance."
-
----
-
-### Users & Projects (click in sidebar)
-
-Shows multi-tenant isolation:
-
-| Username | Projects |
-|----------|---------|
-| admin | admin |
-| devuser | dev-project |
-| opsuser | prod-project |
-| devadmin | dev-project |
-
-**What to say:** "This is equivalent to IAM users and AWS accounts. Each user can only see their own project's resources. If you log in as devuser, you only see dev-project's instances — you cannot see admin's instances. We tested this and proved it works."
+**How to verify it worked:**
+- Click **Refresh** after 15 seconds — status returns to `ACTIVE`
 
 ---
 
-### Live Proof: SSH into a Running Instance
+### Test D — Delete an Instance
 
-To really impress the teacher, open a second terminal and SSH into the VM:
+**What it proves:** Resources can be cleaned up — no orphaned VMs left running.
+
+**Steps:**
+1. Find `test-vm-01`
+2. Click the red **Delete** button
+3. A confirmation dialog appears: *"Delete instance test-vm-01? This cannot be undone."*
+4. Click **Delete** to confirm
+
+**How to verify it worked:**
+- The instance disappears from the table within seconds
+- Overview card: Instances count decreases by 1
+
+**CLI verification:**
+```bash
+openstack server list --all-projects
+# test-vm-01 should NOT appear
+```
+
+---
+
+### Test E — Create a Volume (Block Storage)
+
+**What it proves:** Block storage (EBS equivalent) can be provisioned on demand.
+
+**Steps:**
+1. Click **Volumes** in the sidebar
+2. Click the orange **Create Volume** button
+3. Fill in the form:
+   - **Name:** `test-disk-01`
+   - **Size:** `2` (GB)
+4. Click **Create**
+
+**What happens:**
+- Toast: *"Creating volume — test-disk-01 (2 GB)"*
+- Table refreshes after 3 seconds
+
+**How to verify it worked:**
+- `test-disk-01` appears with status `available` and size `2 GB`
+- Overview card: Volumes count increases by 1
+
+**CLI verification:**
+```bash
+openstack volume show test-disk-01 -f value -c status
+# Expected: available
+```
+
+---
+
+### Test F — Delete a Volume
+
+**What it proves:** Storage can be released cleanly (only when not in use).
+
+**Steps:**
+1. Find `test-disk-01` with status `available`
+2. Click **Delete** on that row
+3. Confirm in the dialog
+
+**Note:** Volumes that are attached to an instance show `in-use` and the Delete button is disabled — this prevents accidental data loss, exactly like AWS.
+
+**How to verify it worked:**
+- `test-disk-01` disappears from the table
+- Overview card: Volumes count decreases by 1
+
+---
+
+### Test G — Allocate a Floating IP
+
+**What it proves:** Public IPs can be provisioned from the external network pool.
+
+**Steps:**
+1. Click **Floating IPs** in the sidebar
+2. Click the orange **Allocate IP** button
+3. Toast: *"Requesting a new floating IP from the public pool"*
+
+**How to verify it worked:**
+- A new row appears with a new IP address (e.g. `10.200.195.xxx`) and status `DOWN`
+- The IP pool count increases in the header
+
+---
+
+### Test H — Release a Floating IP
+
+**What it proves:** Unused IPs can be returned to the pool cleanly.
+
+**Steps:**
+1. Find the newly allocated IP that shows `Not attached` in the Fixed IP column
+2. Click the red **Release** button on that row
+3. Confirm in the dialog
+
+**How to verify it worked:**
+- The IP row disappears from the table
+- **Note:** Floating IPs that are attached to an instance show `in use` — the Release button is disabled until you detach the IP first.
+
+---
+
+## Part 4 — What to Show Your Teacher
+
+Click through each sidebar section and explain:
+
+| Section | What to say |
+|---------|------------|
+| **Overview** | "This is the summary — 2 VMs, 4 images, 1 volume, users, and projects. All resources at a glance." |
+| **Instances** | "These are the virtual machines. I can launch, stop, start, and delete them from here. Same as EC2 on AWS." |
+| **Images** | "These are OS templates — CirrOS (tiny test OS), Ubuntu 22.04, and two snapshots I made. Same as AMI on AWS." |
+| **Volumes** | "Extra storage I can attach to any VM. Same as EBS on AWS. I can create and delete volumes from here." |
+| **Networks** | "The virtual network layer — private-network is the VPC where VMs communicate, public is where floating IPs come from." |
+| **Floating IPs** | "Public IPs I can assign to VMs — same as Elastic IP on AWS. I can allocate and release them from here." |
+| **Security Groups** | "Firewall rules — ssh-only allows port 22 and ICMP. web-server also allows port 80." |
+| **Users & Projects** | "Multi-tenant isolation — devuser only sees dev-project, opsuser only sees prod-project. Same as IAM on AWS." |
+
+### Live proof — SSH into a running VM
+
+Open a second terminal while the dashboard is visible:
 
 ```bash
 ssh -i /home/khalid/ec2-local-cloud/configs/project-key.pem \
@@ -259,38 +287,26 @@ ssh -i /home/khalid/ec2-local-cloud/configs/project-key.pem \
     cirros@10.200.195.153
 ```
 
-You will get a shell prompt inside the virtual machine:
-```
-$ _
-```
-
-Type `uname -a` to show it's a real Linux system, then `exit` to leave.
-
-**What to say:** "This is a real virtual machine running on this laptop. I just SSH'd into it the same way you would SSH into an EC2 instance on AWS."
+Type `uname -a` inside the VM, then `exit`. This proves the VM is real and accessible.
 
 ---
 
-## Part 4 — Troubleshooting
+## Part 5 — Troubleshooting
 
-### Problem: Dashboard shows "error" on Overview or Instances
-
-**Cause:** Nova API workers are stuck.
+### Problem: Instances section shows an error
 
 **Fix:**
 ```bash
 echo "2923" | sudo -S systemctl restart devstack@n-api
 sleep 4
 ```
-
-Then click **Refresh** in the dashboard header.
+Then click **Refresh** in the dashboard.
 
 ---
 
-### Problem: `openstack token issue` returns connection error
+### Problem: `openstack token issue` shows connection error
 
-**Cause:** Your WiFi IP changed and services are using the old IP.
-
-**Fix:** Run the full restart script again:
+**Fix:** Run the full restart script:
 ```bash
 cd /home/khalid/ec2-local-cloud
 echo "2923" | sudo -S bash restart-fix.sh
@@ -298,13 +314,9 @@ echo "2923" | sudo -S bash restart-fix.sh
 
 ---
 
-### Problem: Dashboard page won't open in browser
+### Problem: Dashboard won't open in browser
 
-**Cause:** The dashboard server is not running.
-
-**Check:** Is the terminal with `python3 app.py` still open and running?
-
-**Fix:** Open a new terminal and start it:
+**Fix:** Check if `python3 app.py` terminal is still open. If not, restart it:
 ```bash
 cd /home/khalid/ec2-local-cloud/dashboard
 python3 app.py
@@ -312,9 +324,18 @@ python3 app.py
 
 ---
 
-### Problem: Ping to `10.200.195.153` fails
+### Problem: Launch Instance says "Launch failed"
 
-**Cause:** OVN networking broke after reboot.
+**Likely cause:** Nova API hit a transient error. Fix:
+```bash
+echo "2923" | sudo -S systemctl restart devstack@n-api
+sleep 4
+```
+Then try launching again.
+
+---
+
+### Problem: Ping `10.200.195.153` fails
 
 **Fix:**
 ```bash
@@ -323,110 +344,86 @@ echo "2923" | sudo -S bash /home/khalid/ec2-local-cloud/restart-fix.sh
 
 ---
 
-### Problem: A DevStack service shows `failed` or `inactive`
+### Problem: A service shows `failed` or `inactive`
 
-**Fix:** Restart that specific service:
 ```bash
-echo "2923" | sudo -S systemctl restart devstack@SERVICENAME
-# Example:
-echo "2923" | sudo -S systemctl restart devstack@n-api
-echo "2923" | sudo -S systemctl restart devstack@q-svc
-```
-
-Check all services at once:
-```bash
+# Check what's broken
 systemctl list-units 'devstack@*' --no-pager --all | grep -v running
-```
 
-If the list is empty — all services are running.
+# Restart the specific service
+echo "2923" | sudo -S systemctl restart devstack@SERVICE-NAME
+```
 
 ---
 
-### Problem: SSH gives "Connection refused" or "Permission denied"
+## Part 6 — Pre-Presentation Checklist
 
-**Check:** Is the instance actually running?
-```bash
-source /opt/stack/devstack/openrc admin admin
-openstack server show demo-instance-01 -f value -c status
-```
-
-Should say `ACTIVE`. If it says `SHUTOFF`:
-```bash
-openstack server start demo-instance-01
-sleep 20
-```
-
-Then try SSH again.
-
----
-
-## Part 5 — Quick Verification Checklist
-
-Run this before your presentation to confirm everything works:
+Run this 5 minutes before you present:
 
 ```bash
 # 1. Load credentials
 source /opt/stack/devstack/openrc admin admin
 
-# 2. Check all services running
+# 2. Check all services running (output should be empty)
 systemctl list-units 'devstack@*' --no-pager --all | grep -v running | grep -v Legend
-# Expected: empty output (all running)
 
 # 3. Check instances are ACTIVE
 openstack server list --all-projects
-# Expected: demo-instance-01 and dev-vm-01 both ACTIVE
 
 # 4. Ping the floating IP
 ping -c 3 10.200.195.153
-# Expected: 0% packet loss
 
-# 5. Check dashboard is up
+# 5. Dashboard is up
 curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/
 # Expected: 200
+
+# 6. Test Nova API is responding
+curl -s http://localhost:8080/api/overview | python3 -c "import sys,json; d=json.load(sys.stdin); print('OK —', d.get('instances',{}).get('total'), 'instances')"
 ```
 
-If all 5 pass — you are ready to present.
+If all 6 pass — you are ready to present.
 
 ---
 
-## Part 6 — Full Startup Commands (Copy-Paste Ready)
-
-Open **two terminals**:
+## Part 7 — Full Startup Commands (Copy-Paste Ready)
 
 ### Terminal 1 — Fix services and verify
 
 ```bash
-# Fix everything after reboot
 cd /home/khalid/ec2-local-cloud
 echo "2923" | sudo -S bash restart-fix.sh
 
-# Verify OpenStack works
 source /opt/stack/devstack/openrc admin admin
 openstack server list --all-projects
-
-# Verify network works
 ping -c 3 10.200.195.153
 ```
 
-### Terminal 2 — Run the dashboard
+### Terminal 2 — Run the dashboard (keep this terminal open)
 
 ```bash
-# Start the web dashboard (keep this terminal open)
 cd /home/khalid/ec2-local-cloud/dashboard
 python3 app.py
 ```
 
-Then open browser: **http://localhost:8080**
+**Browser:** `http://localhost:8080`
 
 ---
 
-## Summary
+## Summary Table
 
-| When | What to run |
-|------|------------|
-| Every reboot / WiFi reconnect | `echo "2923" \| sudo -S bash restart-fix.sh` |
-| To start the dashboard | `cd dashboard && python3 app.py` |
-| To open in browser | `http://localhost:8080` |
-| Nova is stuck (instances section errors) | `echo "2923" \| sudo -S systemctl restart devstack@n-api` |
-| Check all services | `systemctl list-units 'devstack@*' --no-pager --all \| grep -v running` |
+| Task | Command / Location |
+|------|--------------------|
+| Fix services after reboot | `echo "2923" \| sudo -S bash restart-fix.sh` |
+| Start the dashboard | `cd dashboard && python3 app.py` |
+| Open in browser | `http://localhost:8080` |
+| Launch a VM | Instances → Launch Instance button |
+| Stop a VM | Instances → Stop button on that row |
+| Start a VM | Instances → Start button on that row |
+| Delete a VM | Instances → Delete button → confirm |
+| Create a volume | Volumes → Create Volume button |
+| Delete a volume | Volumes → Delete button (only if not attached) |
+| Allocate a floating IP | Floating IPs → Allocate IP button |
+| Release a floating IP | Floating IPs → Release button (only if unattached) |
+| Fix stuck Nova workers | `echo "2923" \| sudo -S systemctl restart devstack@n-api` |
+| Check all services | `systemctl list-units 'devstack@*' --all \| grep -v running` |
 | SSH into demo VM | `ssh -i configs/project-key.pem cirros@10.200.195.153` |
