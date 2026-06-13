@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(ovn-sbctl show *)",
-      "Bash(ovn-sbctl list *)"
+      "Bash(ovn-sbctl list *)",
+      "Bash(/opt/stack/data/venv/bin/python3 -c ' *)"
     ]
   }
 }
