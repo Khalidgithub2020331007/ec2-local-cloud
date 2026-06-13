@@ -10,7 +10,18 @@
       "Bash(sudo -S tail -30 /var/log/apache2/nova-api_error.log)",
       "Bash(sudo -S tail -30 /var/log/apache2/error.log)",
       "Bash(sudo -S ls -la /var/run/uwsgi/)",
-      "Bash(sudo -S systemctl is-active devstack@n-api)"
+      "Bash(sudo -S systemctl is-active devstack@n-api)",
+      "Bash(python3 -c \"import flask; print\\('flask ok'\\)\")",
+      "Bash(python3 -c \"import requests; print\\('requests ok'\\)\")",
+      "Bash(/opt/stack/data/venv/bin/python -c \"import openstack; print\\('openstacksdk ok'\\)\")",
+      "Bash(awk '{print $2}')",
+      "Bash(pip install *)",
+      "Bash(sudo pip install flask)",
+      "Bash(mkdir -p /home/khalid/ec2-local-cloud/dashboard/templates)",
+      "Bash(timeout 5 python3 app.py)"
+    ],
+    "additionalDirectories": [
+      "/home/khalid/ec2-local-cloud/dashboard"
     ]
   }
 }
