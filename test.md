@@ -314,24 +314,237 @@ source /opt/stack/devstack/openrc admin admin
 
 ---
 
+## Section 3B — UI Tests: Create, Update, Delete from the Dashboard
+
+Open the dashboard at `http://localhost:8080` before running these tests.
+If the dashboard is not running, start it first:
+
+```bash
+cd /home/khalid/ec2-local-cloud/dashboard
+python3 app.py
+```
+
+---
+
+### UI Test 1 — Launch a New Instance from the Browser
+
+**What this tests:** Can you create a virtual machine from the web interface?
+
+**Steps:**
+1. Click **Instances** in the left sidebar
+2. Click the orange **Launch Instance** button (top right)
+3. Fill in the form:
+   - Name: `ui-test-vm`
+   - Image: `cirros-0.6.2-x86_64-disk`
+   - Flavor: `m1.tiny`
+   - Key Pair: `project-key`
+4. Click **Launch**
+
+**Expected result:**
+- A green notification bar appears at the bottom right of the screen
+- The instance table refreshes automatically after ~5 seconds
+- After 20–30 seconds (click **Refresh**): `ui-test-vm` appears with status `ACTIVE`
+
+**Verify from CLI:**
+```bash
+source /opt/stack/devstack/openrc admin admin
+openstack server show ui-test-vm -f value -c status
+```
+Expected: `ACTIVE`
+
+**Pass:** Instance appears in table with `ACTIVE` status within 30 seconds.
+**Fail:** Error notification appears, or instance stays in `BUILD` for more than 2 minutes.
+
+---
+
+### UI Test 2 — Stop an Instance from the Browser
+
+**What this tests:** Can you shut down a running VM from the UI?
+
+**Steps:**
+1. Find `ui-test-vm` in the Instances table (status: `ACTIVE`)
+2. Click the yellow **Stop** button on that row
+
+**Expected result:**
+- A toast notification appears: *"ui-test-vm is shutting down"*
+- Click **Refresh** after 10 seconds — status changes to `SHUTOFF`
+- The Stop button disappears; a green **Start** button appears in its place
+
+**Verify from CLI:**
+```bash
+openstack server show ui-test-vm -f value -c status
+```
+Expected: `SHUTOFF`
+
+**Pass:** Status changes from `ACTIVE` to `SHUTOFF`.
+**Fail:** Status stays `ACTIVE` or shows `ERROR`.
+
+---
+
+### UI Test 3 — Start a Stopped Instance from the Browser
+
+**What this tests:** Can you resume a stopped VM from the UI?
+
+**Steps:**
+1. Find `ui-test-vm` with status `SHUTOFF`
+2. Click the green **Start** button on that row
+
+**Expected result:**
+- Toast: *"ui-test-vm is booting up"*
+- Click **Refresh** after 15 seconds — status returns to `ACTIVE`
+
+**Pass:** Status changes from `SHUTOFF` back to `ACTIVE`.
+**Fail:** Status stays `SHUTOFF` or shows `ERROR`.
+
+---
+
+### UI Test 4 — Delete an Instance from the Browser
+
+**What this tests:** Can you permanently remove a VM from the UI?
+
+**Steps:**
+1. Find `ui-test-vm` in the Instances table
+2. Click the red **Delete** button
+3. A confirmation dialog appears — click **Delete** to confirm
+
+**Expected result:**
+- The row disappears from the table within a few seconds
+- The Instances count in the Overview decreases by 1
+
+**Verify from CLI:**
+```bash
+openstack server list --all-projects
+```
+Expected: `ui-test-vm` does NOT appear.
+
+**Pass:** Instance is removed from the table and CLI confirms it no longer exists.
+**Fail:** Instance still shows in the list, or an error toast appears.
+
+---
+
+### UI Test 5 — Create a Volume from the Browser
+
+**What this tests:** Can you provision block storage (EBS equivalent) from the UI?
+
+**Steps:**
+1. Click **Volumes** in the sidebar
+2. Click the orange **Create Volume** button
+3. Fill in the form:
+   - Name: `ui-test-disk`
+   - Size: `2`
+4. Click **Create**
+
+**Expected result:**
+- Toast: *"Creating volume — ui-test-disk (2 GB)"*
+- Table refreshes after 3 seconds
+- `ui-test-disk` appears with status `available` and size `2 GB`
+
+**Verify from CLI:**
+```bash
+openstack volume show ui-test-disk -f value -c status
+```
+Expected: `available`
+
+**Pass:** Volume appears with status `available`.
+**Fail:** Error notification, or volume shows `error` status.
+
+---
+
+### UI Test 6 — Delete a Volume from the Browser
+
+**What this tests:** Can you clean up storage that is not in use?
+
+**Steps:**
+1. Find `ui-test-disk` with status `available`
+2. Click the red **Delete** button on that row
+3. Confirm in the dialog
+
+**Expected result:**
+- `ui-test-disk` disappears from the table
+
+**Note:** If a volume shows `in-use`, the Delete button is disabled — this is correct behavior. A volume must be detached from an instance before it can be deleted.
+
+**Pass:** Volume row disappears from the table.
+**Fail:** Error toast appears, or the volume stays in the list.
+
+---
+
+### UI Test 7 — Allocate a Floating IP from the Browser
+
+**What this tests:** Can you request a new public IP from the pool?
+
+**Steps:**
+1. Click **Floating IPs** in the sidebar
+2. Note the current count of IPs
+3. Click the orange **Allocate IP** button
+
+**Expected result:**
+- Toast: *"Requesting a new floating IP from the public pool"*
+- A new row appears with a new IP address and status `DOWN`
+- The IP count increases by 1
+
+**Pass:** New IP row appears in the table.
+**Fail:** Error toast, or IP count stays the same.
+
+---
+
+### UI Test 8 — Release a Floating IP from the Browser
+
+**What this tests:** Can you return an unattached IP to the pool?
+
+**Steps:**
+1. Find the newly allocated IP that shows **Not attached** in the Fixed IP column
+2. Click the red **Release** button
+3. Confirm in the dialog
+
+**Expected result:**
+- The IP row disappears from the table
+
+**Note:** IPs that are attached to an instance show `in use` — the Release button is disabled until the IP is detached first. This prevents breaking a live instance.
+
+**Pass:** Unattached IP is removed from the table.
+**Fail:** Error toast, or IP row stays.
+
+---
+
 ## Section 4 — What Exactly Should You Test?
 
-Here is a simple checklist. Go through each item and write **PASS** or **FAIL** next to it:
+Here is a complete checklist. Go through each item and write **PASS** or **FAIL** next to it.
+
+### CLI Tests (run in terminal)
 
 ```
-[ ] 1. openstack token issue          → Shows a token (not an error)
-[ ] 2. openstack server list          → Shows ACTIVE instances
-[ ] 3. Ping 10.200.195.153            → 0% packet loss
-[ ] 4. SSH into demo-instance-01      → Shell prompt appears
-[ ] 5. Stop demo-instance-01          → Status becomes SHUTOFF
-[ ] 6. Start demo-instance-01         → Status returns to ACTIVE
-[ ] 7. Launch a new instance          → Reaches ACTIVE in < 30 seconds
-[ ] 8. Create and attach a volume     → Status goes available → in-use
-[ ] 9. Assign a floating IP           → IP is linked in the list
-[ ] 10. openstack image list          → CirrOS and Ubuntu images active
-[ ] 11. Security group rules visible  → Port 22 and ICMP rules exist
-[ ] 12. devuser sees only dev-vm-01   → No cross-project visibility
-[ ] 13. opsuser sees empty list       → Isolation working
+[ ] 1.  openstack token issue           → Shows a token (not an error)
+[ ] 2.  openstack server list           → Shows ACTIVE instances
+[ ] 3.  Ping 10.200.195.153             → 0% packet loss
+[ ] 4.  SSH into demo-instance-01       → Shell prompt appears
+[ ] 5.  Stop demo-instance-01           → Status becomes SHUTOFF
+[ ] 6.  Start demo-instance-01          → Status returns to ACTIVE
+[ ] 7.  Launch a new instance (CLI)     → Reaches ACTIVE in < 30 seconds
+[ ] 8.  Create and attach a volume      → Status goes available → in-use
+[ ] 9.  Assign a floating IP            → IP is linked in the list
+[ ] 10. openstack image list            → CirrOS and Ubuntu images active
+[ ] 11. Security group rules visible    → Port 22 and ICMP rules exist
+[ ] 12. devuser sees only dev-vm-01     → No cross-project visibility
+[ ] 13. opsuser sees empty list         → Isolation working
+```
+
+### UI Tests (run from browser at localhost:8080)
+
+```
+[ ] 14. Dashboard loads                 → Overview cards show correct counts
+[ ] 15. Launch Instance button          → ui-test-vm reaches ACTIVE in < 30 seconds
+[ ] 16. Stop button                     → ui-test-vm status changes to SHUTOFF
+[ ] 17. Start button                    → ui-test-vm status returns to ACTIVE
+[ ] 18. Delete button                   → ui-test-vm disappears from the table
+[ ] 19. Create Volume button            → ui-test-disk appears with status available
+[ ] 20. Delete Volume button            → ui-test-disk disappears from the table
+[ ] 21. Allocate IP button              → New floating IP appears in the list
+[ ] 22. Release IP button               → Unattached IP is removed from the list
+[ ] 23. Images section                  → 4 images listed (CirrOS, Ubuntu, 2 snapshots)
+[ ] 24. Security Groups section         → ssh-only shows TCP 22 and ICMP rules
+[ ] 25. Users & Projects section        → devuser shows dev-project, opsuser shows prod-project
+[ ] 26. Networks section                → 3 networks visible (private, public, lb-mgmt)
 ```
 
 ---
