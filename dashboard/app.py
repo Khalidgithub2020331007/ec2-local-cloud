@@ -1,7 +1,7 @@
 import os
 import subprocess
 import requests
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
 
@@ -67,6 +67,25 @@ def os_get(url, token, params=None):
     return r.json()
 
 
+def os_post(url, token, body):
+    """Authenticated POST to OpenStack API. Returns (status_code, response_dict)."""
+    r = requests.post(
+        url,
+        headers={'X-Auth-Token': token, 'Content-Type': 'application/json'},
+        json=body,
+        timeout=20
+    )
+    r.raise_for_status()
+    return r.status_code, (r.json() if r.content else {})
+
+
+def os_delete(url, token):
+    """Authenticated DELETE to OpenStack API."""
+    r = requests.delete(url, headers={'X-Auth-Token': token}, timeout=15)
+    r.raise_for_status()
+    return r.status_code
+
+
 def fmt_size(bytes_val):
     """Convert bytes to human-readable string."""
     if not bytes_val:
@@ -83,6 +102,8 @@ def vol_endpoint(eps):
     return eps.get('volumev3') or eps.get('block-storage') or eps.get('volume', '')
 
 
+# ── Read endpoints ────────────────────────────────────────────────────────────
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -92,11 +113,11 @@ def index():
 def api_overview():
     try:
         token, eps, host_ip = authenticate()
-        servers = os_get(eps['compute'] + '/servers/detail', token, {'all_tenants': 1}).get('servers', [])
-        images = os_get(eps['image'] + '/v2/images', token, {'limit': 1000}).get('images', [])
-        volumes = os_get(vol_endpoint(eps) + '/volumes/detail', token, {'all_tenants': 1}).get('volumes', [])
-        fips = os_get(eps['network'] + '/v2.0/floatingips', token).get('floatingips', [])
-        users = os_get(f'http://{host_ip}/identity/v3/users', token).get('users', [])
+        servers  = os_get(eps['compute'] + '/servers/detail', token, {'all_tenants': 1}).get('servers', [])
+        images   = os_get(eps['image'] + '/v2/images', token, {'limit': 1000}).get('images', [])
+        volumes  = os_get(vol_endpoint(eps) + '/volumes/detail', token, {'all_tenants': 1}).get('volumes', [])
+        fips     = os_get(eps['network'] + '/v2.0/floatingips', token).get('floatingips', [])
+        users    = os_get(f'http://{host_ip}/identity/v3/users', token).get('users', [])
         projects = os_get(f'http://{host_ip}/identity/v3/projects', token).get('projects', [])
         return jsonify({
             'host_ip': host_ip,
@@ -106,19 +127,10 @@ def api_overview():
                 'shutoff': sum(1 for s in servers if s['status'] == 'SHUTOFF'),
                 'error': sum(1 for s in servers if s['status'] == 'ERROR'),
             },
-            'images': {
-                'total': len(images),
-                'active': sum(1 for i in images if i.get('status') == 'active'),
-            },
-            'volumes': {
-                'total': len(volumes),
-                'in_use': sum(1 for v in volumes if v.get('status') == 'in-use'),
-                'available': sum(1 for v in volumes if v.get('status') == 'available'),
-            },
-            'floating_ips': {
-                'total': len(fips),
-                'attached': sum(1 for f in fips if f.get('fixed_ip_address')),
-            },
+            'images':   {'total': len(images),  'active': sum(1 for i in images  if i.get('status') == 'active')},
+            'volumes':  {'total': len(volumes),  'in_use': sum(1 for v in volumes if v.get('status') == 'in-use'),
+                         'available': sum(1 for v in volumes if v.get('status') == 'available')},
+            'floating_ips': {'total': len(fips), 'attached': sum(1 for f in fips if f.get('fixed_ip_address'))},
             'users': len(users),
             'projects': len(projects),
         })
@@ -130,9 +142,9 @@ def api_overview():
 def api_instances():
     try:
         token, eps, host_ip = authenticate()
-        servers = os_get(eps['compute'] + '/servers/detail', token, {'all_tenants': 1}).get('servers', [])
-        flavors = {f['id']: f for f in os_get(eps['compute'] + '/flavors/detail', token).get('flavors', [])}
-        projects = {p['id']: p['name'] for p in os_get(f'http://{host_ip}/identity/v3/projects', token).get('projects', [])}
+        servers    = os_get(eps['compute'] + '/servers/detail', token, {'all_tenants': 1}).get('servers', [])
+        flavors    = {f['id']: f for f in os_get(eps['compute'] + '/flavors/detail', token).get('flavors', [])}
+        projects   = {p['id']: p['name'] for p in os_get(f'http://{host_ip}/identity/v3/projects', token).get('projects', [])}
         images_map = {i['id']: i.get('name', i['id']) for i in os_get(eps['image'] + '/v2/images', token, {'limit': 1000}).get('images', [])}
 
         result = []
@@ -142,23 +154,23 @@ def api_instances():
                 for a in addrs:
                     (floating_ips if a.get('OS-EXT-IPS:type') == 'floating' else private_ips).append(a['addr'])
 
-            fl = flavors.get(s.get('flavor', {}).get('id', ''), {})
+            fl  = flavors.get(s.get('flavor', {}).get('id', ''), {})
             img = s.get('image')
             img_name = images_map.get(img.get('id', '') if isinstance(img, dict) else '', 'Volume Boot')
 
             result.append({
-                'id': s['id'][:8],
-                'name': s['name'],
-                'status': s['status'],
-                'task_state': s.get('OS-EXT-STS:task_state') or '',
+                'id':          s['id'],           # full UUID — needed for actions
+                'name':        s['name'],
+                'status':      s['status'],
+                'task_state':  s.get('OS-EXT-STS:task_state') or '',
                 'private_ips': private_ips,
                 'floating_ips': floating_ips,
-                'flavor': fl.get('name', '?'),
-                'vcpus': fl.get('vcpus', '?'),
-                'ram_mb': fl.get('ram', 0),
-                'image': img_name,
-                'project': projects.get(s.get('tenant_id', ''), '?'),
-                'created': s.get('created', '')[:10],
+                'flavor':      fl.get('name', '?'),
+                'vcpus':       fl.get('vcpus', '?'),
+                'ram_mb':      fl.get('ram', 0),
+                'image':       img_name,
+                'project':     projects.get(s.get('tenant_id', ''), '?'),
+                'created':     s.get('created', '')[:10],
             })
         return jsonify(result)
     except Exception as e:
@@ -171,16 +183,42 @@ def api_images():
         token, eps, _ = authenticate()
         images = os_get(eps['image'] + '/v2/images', token, {'limit': 1000}).get('images', [])
         return jsonify([{
-            'id': i['id'][:8],
-            'name': i.get('name', i['id']),
-            'status': i.get('status', 'unknown'),
-            'size': fmt_size(i.get('size', 0)),
-            'disk_format': i.get('disk_format', ''),
-            'visibility': i.get('visibility', 'private'),
-            'created_at': i.get('created_at', '')[:10],
-            'min_disk_gb': i.get('min_disk', 0),
-            'min_ram_mb': i.get('min_ram', 0),
+            'id':           i['id'],              # full UUID — needed for launch form
+            'name':         i.get('name', i['id']),
+            'status':       i.get('status', 'unknown'),
+            'size':         fmt_size(i.get('size', 0)),
+            'disk_format':  i.get('disk_format', ''),
+            'visibility':   i.get('visibility', 'private'),
+            'created_at':   i.get('created_at', '')[:10],
+            'min_disk_gb':  i.get('min_disk', 0),
+            'min_ram_mb':   i.get('min_ram', 0),
         } for i in images])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/flavors')
+def api_flavors():
+    try:
+        token, eps, _ = authenticate()
+        flavors = os_get(eps['compute'] + '/flavors/detail', token).get('flavors', [])
+        return jsonify([{
+            'id':    f['id'],
+            'name':  f['name'],
+            'vcpus': f['vcpus'],
+            'ram':   f['ram'],
+            'disk':  f['disk'],
+        } for f in sorted(flavors, key=lambda x: x['vcpus'])])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/keypairs')
+def api_keypairs():
+    try:
+        token, eps, _ = authenticate()
+        keypairs = os_get(eps['compute'] + '/os-keypairs', token).get('keypairs', [])
+        return jsonify([kp['keypair']['name'] for kp in keypairs])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -189,18 +227,18 @@ def api_images():
 def api_volumes():
     try:
         token, eps, host_ip = authenticate()
-        volumes = os_get(vol_endpoint(eps) + '/volumes/detail', token, {'all_tenants': 1}).get('volumes', [])
+        volumes  = os_get(vol_endpoint(eps) + '/volumes/detail', token, {'all_tenants': 1}).get('volumes', [])
         projects = {p['id']: p['name'] for p in os_get(f'http://{host_ip}/identity/v3/projects', token).get('projects', [])}
         return jsonify([{
-            'id': v['id'][:8],
-            'name': v.get('name') or v['id'][:8],
-            'status': v.get('status', 'unknown'),
-            'size_gb': v.get('size', 0),
+            'id':          v['id'],               # full UUID — needed for delete
+            'name':        v.get('name') or v['id'][:8],
+            'status':      v.get('status', 'unknown'),
+            'size_gb':     v.get('size', 0),
             'volume_type': v.get('volume_type', ''),
-            'bootable': v.get('bootable') == 'true',
+            'bootable':    v.get('bootable') == 'true',
             'attached_to': [a.get('server_id', '')[:8] for a in v.get('attachments', [])],
-            'project': projects.get(v.get('os-vol-tenant-attr:tenant_id', ''), '?'),
-            'created_at': v.get('created_at', '')[:10],
+            'project':     projects.get(v.get('os-vol-tenant-attr:tenant_id', ''), '?'),
+            'created_at':  v.get('created_at', '')[:10],
         } for v in volumes])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -211,18 +249,18 @@ def api_networks():
     try:
         token, eps, _ = authenticate()
         networks = os_get(eps['network'] + '/v2.0/networks', token).get('networks', [])
-        subnets = {s['id']: s for s in os_get(eps['network'] + '/v2.0/subnets', token).get('subnets', [])}
+        subnets  = {s['id']: s for s in os_get(eps['network'] + '/v2.0/subnets', token).get('subnets', [])}
         return jsonify([{
-            'id': n['id'][:8],
-            'name': n.get('name', n['id'][:8]),
-            'status': n.get('status', 'unknown'),
-            'shared': n.get('shared', False),
+            'id':       n['id'][:8],
+            'name':     n.get('name', n['id'][:8]),
+            'status':   n.get('status', 'unknown'),
+            'shared':   n.get('shared', False),
             'external': n.get('router:external', False),
             'subnets': [{
-                'name': subnets[sid].get('name', ''),
-                'cidr': subnets[sid].get('cidr', ''),
+                'name':    subnets[sid].get('name', ''),
+                'cidr':    subnets[sid].get('cidr', ''),
                 'gateway': subnets[sid].get('gateway_ip', ''),
-                'dhcp': subnets[sid].get('enable_dhcp', False),
+                'dhcp':    subnets[sid].get('enable_dhcp', False),
             } for sid in n.get('subnets', []) if sid in subnets],
         } for n in networks])
     except Exception as e:
@@ -235,10 +273,10 @@ def api_floating_ips():
         token, eps, _ = authenticate()
         fips = os_get(eps['network'] + '/v2.0/floatingips', token).get('floatingips', [])
         return jsonify([{
-            'id': f['id'][:8],
+            'id':          f['id'],               # full UUID — needed for delete
             'floating_ip': f.get('floating_ip_address', ''),
-            'fixed_ip': f.get('fixed_ip_address') or '—',
-            'status': f.get('status', 'DOWN'),
+            'fixed_ip':    f.get('fixed_ip_address') or '—',
+            'status':      f.get('status', 'DOWN'),
         } for f in fips])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -251,17 +289,17 @@ def api_security_groups():
         sgs = os_get(eps['network'] + '/v2.0/security-groups', token).get('security_groups', [])
         result = []
         for sg in sgs:
-            rules = sg.get('security_group_rules', [])
+            rules   = sg.get('security_group_rules', [])
             ingress = [r for r in rules if r.get('direction') == 'ingress' and r.get('protocol')]
             result.append({
-                'id': sg['id'][:8],
-                'name': sg.get('name', ''),
+                'id':          sg['id'][:8],
+                'name':        sg.get('name', ''),
                 'description': sg.get('description', ''),
-                'rule_count': len(rules),
+                'rule_count':  len(rules),
                 'ingress_rules': [{
-                    'protocol': (r.get('protocol') or 'any').upper(),
-                    'port_min': r.get('port_range_min', ''),
-                    'port_max': r.get('port_range_max', ''),
+                    'protocol':  (r.get('protocol') or 'any').upper(),
+                    'port_min':  r.get('port_range_min', ''),
+                    'port_max':  r.get('port_range_max', ''),
                     'remote_ip': r.get('remote_ip_prefix') or '0.0.0.0/0',
                 } for r in ingress],
             })
@@ -274,9 +312,9 @@ def api_security_groups():
 def api_users():
     try:
         token, _, host_ip = authenticate()
-        users = os_get(f'http://{host_ip}/identity/v3/users', token).get('users', [])
+        users    = os_get(f'http://{host_ip}/identity/v3/users', token).get('users', [])
         projects = {p['id']: p['name'] for p in os_get(f'http://{host_ip}/identity/v3/projects', token).get('projects', [])}
-        result = []
+        result   = []
         for u in users:
             assignments = os_get(f'http://{host_ip}/identity/v3/role_assignments', token, {'user.id': u['id']}).get('role_assignments', [])
             user_projects = sorted({
@@ -285,12 +323,136 @@ def api_users():
                 if 'project' in ra.get('scope', {}) and ra['scope']['project']['id'] in projects
             })
             result.append({
-                'id': u['id'][:8],
-                'name': u.get('name', ''),
-                'enabled': u.get('enabled', True),
+                'id':       u['id'][:8],
+                'name':     u.get('name', ''),
+                'enabled':  u.get('enabled', True),
                 'projects': user_projects,
             })
         return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Write endpoints — Instances ───────────────────────────────────────────────
+
+@app.route('/api/instances', methods=['POST'])
+def create_instance():
+    """Launch a new instance. Body: {name, image_id, flavor_id, key_name}."""
+    try:
+        token, eps, _ = authenticate()
+        data = request.json
+
+        # Resolve private-network UUID
+        networks = os_get(eps['network'] + '/v2.0/networks', token).get('networks', [])
+        net = next((n for n in networks if n['name'] == 'private-network'), None)
+        if not net:
+            return jsonify({'error': 'private-network not found'}), 400
+
+        payload = {
+            "server": {
+                "name":      data['name'],
+                "imageRef":  data['image_id'],
+                "flavorRef": data['flavor_id'],
+                "networks":  [{"uuid": net['id']}],
+                "security_groups": [{"name": "ssh-only"}],
+            }
+        }
+        if data.get('key_name'):
+            payload['server']['key_name'] = data['key_name']
+
+        _, body = os_post(eps['compute'] + '/servers', token, payload)
+        return jsonify({'id': body.get('server', {}).get('id', ''), 'status': 'BUILD'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/instances/<server_id>/stop', methods=['POST'])
+def stop_instance(server_id):
+    try:
+        token, eps, _ = authenticate()
+        os_post(eps['compute'] + f'/servers/{server_id}/action', token, {"os-stop": None})
+        return jsonify({'status': 'stopping'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/instances/<server_id>/start', methods=['POST'])
+def start_instance(server_id):
+    try:
+        token, eps, _ = authenticate()
+        os_post(eps['compute'] + f'/servers/{server_id}/action', token, {"os-start": None})
+        return jsonify({'status': 'starting'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/instances/<server_id>', methods=['DELETE'])
+def delete_instance(server_id):
+    try:
+        token, eps, _ = authenticate()
+        os_delete(eps['compute'] + f'/servers/{server_id}', token)
+        return jsonify({'status': 'deleted'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Write endpoints — Volumes ─────────────────────────────────────────────────
+
+@app.route('/api/volumes', methods=['POST'])
+def create_volume():
+    """Create a new volume. Body: {name, size}."""
+    try:
+        token, eps, _ = authenticate()
+        data = request.json
+        _, body = os_post(
+            vol_endpoint(eps) + '/volumes',
+            token,
+            {"volume": {"name": data['name'], "size": int(data['size'])}}
+        )
+        return jsonify({'id': body.get('volume', {}).get('id', ''), 'status': 'creating'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/volumes/<volume_id>', methods=['DELETE'])
+def delete_volume(volume_id):
+    try:
+        token, eps, _ = authenticate()
+        os_delete(vol_endpoint(eps) + f'/volumes/{volume_id}', token)
+        return jsonify({'status': 'deleted'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Write endpoints — Floating IPs ────────────────────────────────────────────
+
+@app.route('/api/floating-ips', methods=['POST'])
+def allocate_floating_ip():
+    """Allocate a new floating IP from the public pool."""
+    try:
+        token, eps, _ = authenticate()
+        networks   = os_get(eps['network'] + '/v2.0/networks', token).get('networks', [])
+        public_net = next((n for n in networks if n.get('router:external')), None)
+        if not public_net:
+            return jsonify({'error': 'No external network found'}), 400
+
+        _, body = os_post(
+            eps['network'] + '/v2.0/floatingips',
+            token,
+            {"floatingip": {"floating_network_id": public_net['id']}}
+        )
+        fip = body.get('floatingip', {})
+        return jsonify({'id': fip.get('id', ''), 'floating_ip': fip.get('floating_ip_address', '')}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/floating-ips/<fip_id>', methods=['DELETE'])
+def release_floating_ip(fip_id):
+    try:
+        token, eps, _ = authenticate()
+        os_delete(eps['network'] + f'/v2.0/floatingips/{fip_id}', token)
+        return jsonify({'status': 'released'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
