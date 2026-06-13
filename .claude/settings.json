@@ -3,7 +3,14 @@
     "allow": [
       "Bash(ovn-sbctl show *)",
       "Bash(ovn-sbctl list *)",
-      "Bash(/opt/stack/data/venv/bin/python3 -c ' *)"
+      "Bash(/opt/stack/data/venv/bin/python3 -c ' *)",
+      "Bash(sudo -S journalctl -u devstack@n-api -n 50 --no-pager)",
+      "Bash(sudo -S journalctl -u devstack@n-api --since \"10:00\" --no-pager)",
+      "Bash(sudo -S journalctl -u devstack@n-api --since \"2026-06-13 09:50\" --no-pager)",
+      "Bash(sudo -S tail -30 /var/log/apache2/nova-api_error.log)",
+      "Bash(sudo -S tail -30 /var/log/apache2/error.log)",
+      "Bash(sudo -S ls -la /var/run/uwsgi/)",
+      "Bash(sudo -S systemctl is-active devstack@n-api)"
     ]
   }
 }
