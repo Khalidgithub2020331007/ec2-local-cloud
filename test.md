@@ -18,6 +18,405 @@ This project is a **local copy** of EC2 running on your own machine using a tool
 
 ---
 
+## Section 1B — EC2 Features Explained (For First-Time Users)
+
+This section explains every major EC2 concept in plain language, so you understand what you are working with before you run any tests.
+
+---
+
+### 1. Instances (Virtual Machines)
+
+An **instance** is a virtual computer. It has a CPU, RAM, and storage — just like a real computer — but it runs inside a large physical server in a data center.
+
+**What you can do with an instance:**
+- **Launch** — create a new virtual computer from a template
+- **Stop** — pause it (like sleep mode); the disk is kept but you stop paying for CPU
+- **Start** — resume it again
+- **Reboot** — restart the OS without deleting anything
+- **Terminate/Delete** — permanently destroy it; all data is gone
+- **Connect (SSH)** — log in to the terminal over the network
+
+**Real-world analogy:** An instance is like a virtual laptop you rent by the hour. You can start it, log in, run programs, and return it when done.
+
+**Instance states:**
+| State | Meaning |
+|-------|---------|
+| `ACTIVE` / Running | Instance is on and running normally |
+| `SHUTOFF` / Stopped | Instance is off; disk data is preserved |
+| `BUILD` / Pending | Instance is still being created |
+| `ERROR` | Something went wrong during launch |
+| `PAUSED` | Frozen in memory; can be resumed instantly |
+| `SHELVED` | Stored to disk to free up compute resources |
+
+---
+
+### 2. AMIs — Amazon Machine Images (called "Images" here)
+
+An **image** is a pre-built template for an instance's hard drive. It contains the operating system and any pre-installed software.
+
+**Think of it as:** A factory setting for your virtual computer. Every new instance starts from an image.
+
+**Common images:**
+- **CirrOS** — a tiny 12MB Linux OS used for testing; not for real apps
+- **Ubuntu 22.04 LTS** — a full Linux OS suitable for real workloads
+- **Amazon Linux 2** — AWS's own Linux, optimized for EC2
+
+**What you can do with images:**
+- **List images** — see what OS templates are available
+- **Launch from an image** — pick one when creating a new instance
+- **Create a custom image** — snapshot a running instance to save your installed software as a new template
+- **Delete an image** — remove a template you no longer need
+
+**Custom images (AMIs) are useful when:**
+You have installed your app on an instance. You save it as an image. Now you can launch 10 identical instances in seconds.
+
+---
+
+### 3. Instance Types / Flavors — Choosing the Right Size
+
+When you launch an instance, you pick how powerful it is. These size options are called **instance types** in AWS and **flavors** in OpenStack.
+
+**AWS naming pattern:** `t3.micro`, `m5.large`, `c6i.xlarge`
+- The letter(s) = family (t = general, m = memory, c = compute)
+- The number = generation (newer = better)
+- The word = size (nano < micro < small < medium < large < xlarge)
+
+**Common instance types and what they mean:**
+
+| AWS Type | OpenStack Flavor | vCPU | RAM | Disk | Use Case |
+|----------|-----------------|------|-----|------|----------|
+| t2.nano | m1.nano | 1 | 64 MB | 1 GB | Test and dev only |
+| t2.micro | m1.tiny | 1 | 512 MB | 1 GB | Very small apps, free tier |
+| t2.small | m1.small | 1 | 2 GB | 20 GB | Light web apps |
+| t2.medium | m1.medium | 2 | 4 GB | 40 GB | Medium web servers |
+| t2.large | m1.large | 4 | 8 GB | 80 GB | Databases, busier apps |
+
+**Rule:** Pick the smallest size that meets your needs. You can always resize later.
+
+---
+
+### 4. Key Pairs — Secure SSH Login
+
+A **key pair** is a pair of cryptographic keys used to log into instances securely instead of using a password.
+
+- **Private key (.pem file)** — lives on your machine, never share it
+- **Public key** — uploaded to AWS/OpenStack; installed on every instance at launch
+
+**How it works:**
+1. You create a key pair and download the `.pem` file
+2. When you launch an instance, you attach the key pair
+3. To log in: `ssh -i my-key.pem ubuntu@<instance-ip>`
+4. The server checks your private key against its public key — if they match, you get in
+
+**Why not passwords?** Passwords can be brute-forced. Cryptographic keys are practically unbreakable.
+
+**What you can do:**
+- **Create a key pair** — generates a new key pair; you download the private key once
+- **Import a key pair** — upload your own existing public key
+- **Delete a key pair** — removes it from the system (does not affect running instances)
+
+---
+
+### 5. Security Groups — The Firewall
+
+A **security group** is a virtual firewall. It controls what network traffic is allowed into and out of your instances.
+
+**Think of it as:** A set of rules on a bouncer's clipboard. Only traffic that matches a rule gets through.
+
+**Rules have these parts:**
+| Part | Example | Meaning |
+|------|---------|---------|
+| Protocol | TCP, UDP, ICMP | What type of traffic |
+| Port | 22, 80, 443 | Which door it knocks on |
+| Source | 0.0.0.0/0 or a specific IP | Who is allowed to knock |
+
+**Common rule setups:**
+
+| Rule | Port | Purpose |
+|------|------|---------|
+| SSH | TCP 22 | Log in from terminal |
+| HTTP | TCP 80 | Serve a website |
+| HTTPS | TCP 443 | Serve a website securely |
+| Ping (ICMP) | — | Check if the instance is alive |
+| MySQL | TCP 3306 | Database access |
+
+**Important rules:**
+- By default, all **inbound** traffic is blocked. You must add rules to allow it.
+- All **outbound** traffic is allowed by default.
+- Security groups are **stateful** — if you allow inbound on port 22, the response traffic is automatically allowed back out.
+
+**What you can do:**
+- **Create a security group** — a new empty firewall
+- **Add rules** — allow specific traffic in
+- **Attach to an instance** — apply the firewall to a VM
+- **Remove rules** — tighten security after testing
+
+---
+
+### 6. Elastic IPs / Floating IPs — Public IP Addresses
+
+By default, instances get a **private IP** (like `10.x.x.x`). That IP only works inside your private network. The outside world cannot reach it.
+
+A **Floating IP** (called **Elastic IP** in AWS) is a real, routable public IP address that you attach to an instance so the outside world can connect to it.
+
+**How it works:**
+1. You allocate a floating IP from the public pool
+2. You associate it with a specific instance
+3. Now anyone can connect to your instance at that IP
+
+**Key properties:**
+- The floating IP is **yours until you release it** — it does not change when you stop/start the instance
+- You can **move it** from one instance to another instantly (useful for zero-downtime deployments)
+- If an instance fails, you point the IP at a replacement instance in seconds
+
+**What you can do:**
+- **Allocate** — reserve an IP from the pool
+- **Associate** — attach it to an instance
+- **Disassociate** — detach it (instance is unreachable from outside)
+- **Release** — return the IP to the pool (you lose it)
+
+---
+
+### 7. EBS Volumes — Block Storage (Persistent Disk)
+
+An **EBS Volume** (Elastic Block Store) is a virtual hard drive. It stores data independently from the instance.
+
+**Why it matters:** The root disk of an instance is destroyed when you terminate the instance. A separate EBS volume persists — it keeps your data even after the instance is gone.
+
+**Think of it as:** A USB hard drive you can plug into any virtual machine.
+
+**Volume types (AWS):**
+| Type | Speed | Use Case |
+|------|-------|----------|
+| gp3 (General Purpose SSD) | Fast | Most workloads — default choice |
+| io2 (Provisioned IOPS SSD) | Very fast | Databases needing consistent speed |
+| st1 (Throughput HDD) | Sequential read fast | Big data, log processing |
+| sc1 (Cold HDD) | Slowest, cheapest | Archival data rarely accessed |
+
+**What you can do:**
+- **Create a volume** — specify size in GB and type
+- **Attach to an instance** — shows up as `/dev/sdb` or similar inside the VM
+- **Detach** — unmount it from one instance
+- **Re-attach** — plug it into a different instance
+- **Delete** — permanently destroy it (all data gone)
+- **Resize** — increase size (you can never shrink a volume)
+
+---
+
+### 8. Snapshots — Point-in-Time Backups
+
+A **snapshot** is a copy of a volume's data at a specific moment in time. It is saved to object storage (S3 in AWS).
+
+**Think of it as:** Taking a photo of your hard drive. If something breaks later, you can restore from the photo.
+
+**What snapshots are used for:**
+- **Backups** — take a snapshot before a risky change
+- **Migration** — copy data from one region to another
+- **Creating images** — snapshot a root volume to make a custom AMI
+- **Cloning volumes** — create a new volume from a snapshot
+
+**What you can do:**
+- **Create snapshot** — take a copy of a volume right now
+- **List snapshots** — see all saved backups
+- **Restore volume from snapshot** — create a new volume with the old data
+- **Delete snapshot** — remove the backup (does not affect the original volume)
+
+---
+
+### 9. VPC — Virtual Private Cloud (Networking)
+
+A **VPC** is your own private, isolated section of the cloud network. All your instances live inside it.
+
+**Think of it as:** Your own private office building. The internet is outside. You control which doors open to the outside, which rooms talk to each other, and who has access.
+
+**Key networking concepts:**
+
+| Concept | What It Is | Analogy |
+|---------|-----------|---------|
+| **VPC** | Your entire private network | The office building |
+| **Subnet** | A smaller segment of the VPC | A floor or department |
+| **Private subnet** | Instances with no direct internet access | Back office |
+| **Public subnet** | Instances that can reach the internet | Reception area |
+| **Internet Gateway** | The door to the internet | The front door |
+| **Route Table** | Rules for where traffic goes | The building directory |
+| **NAT Gateway** | Lets private instances reach the internet without being reachable from it | Outgoing-only exit |
+
+**In this local system (OpenStack):**
+- `private-network` = your VPC/private subnet
+- `public` = the external network pool (where floating IPs come from)
+- Floating IPs = the bridge from private to public
+
+---
+
+### 10. Auto Scaling — Automatic Capacity Management
+
+**Auto Scaling** watches your instances and automatically adds or removes them based on demand.
+
+**Example:** You run a website. At 9am traffic spikes. Auto Scaling launches 5 more instances. At 2am traffic drops. Auto Scaling terminates the extra 5. You only pay for what you used.
+
+**Key parts:**
+- **Launch Template** — the blueprint for new instances (which image, type, key pair, etc.)
+- **Auto Scaling Group (ASG)** — the group of instances managed together
+- **Scaling Policies** — the rules that trigger scale-up or scale-down
+  - *Target tracking* — keep CPU at 50%; add/remove instances to stay there
+  - *Step scaling* — when CPU > 80%, add 2 instances
+  - *Scheduled scaling* — at 8am every Monday, launch 4 extra instances
+
+**Minimum, desired, and maximum:**
+- Min: never go below this count (keep at least 1 instance alive)
+- Desired: the target count under normal conditions
+- Max: never go above this count (cost control)
+
+> This local OpenStack system does not simulate Auto Scaling, but knowing the concept is important for working with real AWS EC2.
+
+---
+
+### 11. Load Balancers — Distributing Traffic
+
+A **Load Balancer** sits in front of multiple instances and spreads incoming requests evenly across them.
+
+**Without a load balancer:**
+- All traffic goes to one instance
+- If that instance crashes, your app goes down
+
+**With a load balancer:**
+- Traffic is spread across 3 instances
+- If one crashes, the other two keep running; users notice nothing
+
+**AWS Load Balancer types:**
+| Type | Use Case |
+|------|----------|
+| **ALB (Application Load Balancer)** | HTTP/HTTPS — routes based on URL path or hostname |
+| **NLB (Network Load Balancer)** | TCP/UDP — ultra-low latency, static IP |
+| **GLB (Gateway Load Balancer)** | Inspect traffic with virtual appliances |
+
+**How ALB routing works:**
+- `/api/*` → Route to backend instances
+- `/static/*` → Route to CDN or file server instances
+- `app.example.com` → Route to app instances
+- `admin.example.com` → Route to admin instances
+
+> This local OpenStack system has basic load balancing support via Octavia, but it is not configured in these tests.
+
+---
+
+### 12. IAM — Identity and Access Management (Users & Projects)
+
+**IAM** controls who can do what inside your AWS account. In OpenStack, this is handled by **Users**, **Projects (Tenants)**, and **Roles**.
+
+**Core concepts:**
+
+| Concept | AWS Name | OpenStack Name | What It Is |
+|---------|----------|----------------|-----------|
+| Account | AWS Account | Project / Tenant | A container that owns resources |
+| Person | IAM User | User | A human with login credentials |
+| Permission set | IAM Policy | Role | A list of allowed actions |
+| Assumed identity | IAM Role | Role assignment | Temporary permission to act as something |
+
+**Key principle — least privilege:**
+Give a user only the permissions they absolutely need. Nothing more.
+
+**Examples:**
+- A developer gets read-only access to production; write access to staging only
+- A CI/CD pipeline gets permission to push container images and update deployments only
+- An on-call engineer gets permission to restart instances but not delete them
+
+**In this system:**
+- `admin` → full access to everything
+- `devuser` → access to `dev-project` only
+- `opsuser` → access to `prod-project` only
+
+---
+
+### 13. Regions and Availability Zones — Geographic Distribution
+
+**Region:** A geographic location where AWS has data centers (e.g., `us-east-1` = North Virginia, `eu-west-1` = Ireland).
+
+**Availability Zone (AZ):** A physically separate data center within a region. Each region has 2–6 AZs. They have separate power, cooling, and networking so a failure in one does not affect the others.
+
+**Why this matters:**
+- **Latency** — deploy in the region closest to your users
+- **Redundancy** — spread instances across 2+ AZs; if one AZ has a power outage, the other keeps running
+- **Compliance** — some laws require data to stay within a country
+
+**Multi-AZ setup example:**
+```
+us-east-1a: instance-A, database-primary
+us-east-1b: instance-B, database-replica
+```
+If `us-east-1a` goes down, `instance-B` keeps serving traffic. The replica is promoted to primary. Users see no downtime.
+
+> This local system does not simulate multiple AZs, but the concept is core to production EC2 design.
+
+---
+
+### 14. Instance Metadata and User Data
+
+**Instance Metadata:** Every running EC2 instance can query information about itself by hitting a special internal URL:
+```bash
+curl http://169.254.169.254/latest/meta-data/
+```
+This returns: instance ID, public IP, instance type, security groups, and more. Useful for scripts running inside the instance.
+
+**User Data:** A script you attach to an instance at launch time. It runs automatically on first boot.
+
+**Example user data script:**
+```bash
+#!/bin/bash
+apt-get update -y
+apt-get install -y nginx
+systemctl start nginx
+```
+
+When the instance boots, it installs and starts nginx automatically — no manual SSH needed.
+
+**Use cases for user data:**
+- Install software on first boot
+- Pull your app code from GitHub
+- Register the instance with a monitoring system
+- Configure environment variables
+
+---
+
+### 15. Pricing Models — How You Pay
+
+AWS EC2 offers different ways to pay, each with a different cost/commitment trade-off.
+
+| Model | How It Works | Savings vs On-Demand | Best For |
+|-------|-------------|---------------------|---------|
+| **On-Demand** | Pay per second, no commitment | 0% (baseline) | Unpredictable workloads, testing |
+| **Reserved** | Pay upfront for 1 or 3 years | Up to 72% | Steady, predictable workloads |
+| **Savings Plans** | Commit to $/hour for 1–3 years | Up to 66% | Flexible reserved pricing |
+| **Spot** | Bid on unused AWS capacity | Up to 90% | Batch jobs, fault-tolerant workloads |
+| **Dedicated Host** | Physical server just for you | varies | Compliance, licensing requirements |
+
+**Spot instances warning:** AWS can terminate a spot instance with 2 minutes notice if it needs the capacity back. Only use for workloads that can handle interruption (data processing, rendering, CI jobs).
+
+---
+
+### 16. Elastic Network Interfaces (ENI)
+
+An **ENI** is a virtual network card you can attach to an instance. Every instance has at least one ENI (its primary network interface).
+
+**Why you would add a second ENI:**
+- Separate management traffic from application traffic
+- Move a network interface from a failed instance to a replacement
+- Attach a fixed private IP that persists independently of the instance
+
+---
+
+### 17. Placement Groups — Controlling Where Instances Run
+
+AWS normally places instances wherever hardware is available. **Placement Groups** let you control this.
+
+| Type | What It Does | Use Case |
+|------|-------------|---------|
+| **Cluster** | All instances on same physical rack, low latency | High-performance computing, ML training |
+| **Spread** | Each instance on different hardware | Critical apps needing maximum fault isolation |
+| **Partition** | Groups of instances isolated from each other | Distributed databases like Cassandra, HDFS |
+
+---
+
 ## Section 2 — What Features Are in This System?
 
 This system simulates the following AWS services:
