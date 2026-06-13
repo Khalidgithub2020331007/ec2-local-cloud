@@ -128,14 +128,27 @@ else
     echo "WARNING: Could not set DHCP classless_static_route (DHCP_UUID=${DHCP_UUID}, META_IP=${META_IP})"
 fi
 
-# ── Step 5c: Restart services that may have failed after HOST_IP change ──────
+# ── Step 5c: Fix nova-api.conf duplicate ProxyPass lines ──────────────────────
+# nova-api.conf can accumulate duplicate ProxyPass lines on repeated stack.sh runs.
+# Multiple identical directives cause Apache to silently drop requests to /compute.
+NOVA_CONF=/etc/apache2/sites-enabled/nova-api.conf
+if [ $(grep -c 'ProxyPass.*compute' "$NOVA_CONF" 2>/dev/null) -gt 1 ]; then
+    echo "Fixing nova-api.conf (duplicate ProxyPass lines detected)..."
+    sudo tee "$NOVA_CONF" > /dev/null <<'APACHEEOF'
+KeepAlive Off
+SetEnv proxy-sendchunked 1
+ProxyPass "/compute" "unix:/var/run/uwsgi/nova-api.socket|uwsgi://uwsgi-uds-nova-api" retry=0 acquire=1
+APACHEEOF
+    sudo systemctl reload apache2
+fi
+
+# ── Step 5d: Restart services that may have failed after HOST_IP change ──────
 # c-sch/c-vol/n-sch can get stuck connecting to a stale RabbitMQ IP after drift.
+# n-api workers can get stuck in RabbitMQ retry loops on startup — restart clears them.
 # Their configs already have the correct IP; a restart is enough to clear failed state.
-for svc in devstack@c-sch devstack@c-vol devstack@n-sch; do
-    if ! sudo systemctl is-active --quiet "$svc"; then
-        echo "Restarting $svc (was not active)..."
-        sudo systemctl restart "$svc"
-    fi
+for svc in devstack@c-sch devstack@c-vol devstack@n-sch devstack@n-api; do
+    sudo systemctl restart "$svc"
+    echo "Restarted $svc"
 done
 sleep 3
 
