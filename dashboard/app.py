@@ -252,6 +252,7 @@ def api_networks():
         subnets  = {s['id']: s for s in os_get(eps['network'] + '/v2.0/subnets', token).get('subnets', [])}
         return jsonify([{
             'id':       n['id'][:8],
+            'uuid':     n['id'],         # full UUID needed for Nova network attachment
             'name':     n.get('name', n['id'][:8]),
             'status':   n.get('status', 'unknown'),
             'shared':   n.get('shared', False),
@@ -337,28 +338,40 @@ def api_users():
 
 @app.route('/api/instances', methods=['POST'])
 def create_instance():
-    """Launch a new instance. Body: {name, image_id, flavor_id, key_name}."""
+    """Launch new instance(s). Body: {name, image_id, flavor_id, network_id, security_groups, key_name, count, user_data}."""
+    import base64
     try:
         token, eps, _ = authenticate()
         data = request.json
 
-        # Resolve private-network UUID
-        networks = os_get(eps['network'] + '/v2.0/networks', token).get('networks', [])
-        net = next((n for n in networks if n['name'] == 'private-network'), None)
-        if not net:
-            return jsonify({'error': 'private-network not found'}), 400
+        name             = (data.get('name') or '').strip()
+        image_id         = data.get('image_id', '')
+        flavor_id        = data.get('flavor_id', '')
+        network_id       = data.get('network_id', '')
+        security_groups  = data.get('security_groups') or ['ssh-only']
+        key_name         = data.get('key_name', '')
+        count            = min(max(int(data.get('count', 1)), 1), 5)
+        user_data_raw    = (data.get('user_data') or '').strip()
+
+        if not name or not image_id or not flavor_id or not network_id:
+            return jsonify({'error': 'name, image_id, flavor_id, and network_id are required'}), 400
 
         payload = {
             "server": {
-                "name":      data['name'],
-                "imageRef":  data['image_id'],
-                "flavorRef": data['flavor_id'],
-                "networks":  [{"uuid": net['id']}],
-                "security_groups": [{"name": "ssh-only"}],
+                "name":            name,
+                "imageRef":        image_id,
+                "flavorRef":       flavor_id,
+                "networks":        [{"uuid": network_id}],
+                "security_groups": [{"name": sg} for sg in security_groups],
+                "min_count":       count,
+                "max_count":       count,
             }
         }
-        if data.get('key_name'):
-            payload['server']['key_name'] = data['key_name']
+        if key_name:
+            payload['server']['key_name'] = key_name
+        if user_data_raw:
+            # Nova requires user_data as base64-encoded string
+            payload['server']['user_data'] = base64.b64encode(user_data_raw.encode()).decode()
 
         _, body = os_post(eps['compute'] + '/servers', token, payload)
         return jsonify({'id': body.get('server', {}).get('id', ''), 'status': 'BUILD'}), 201

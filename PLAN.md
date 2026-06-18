@@ -1943,6 +1943,20 @@ git commit -m "Final semester project: Local EC2 replica using DevStack"
 | 7.5 | COMMANDS_CHEATSHEET.md created | ✅ |
 | 7.6 | DEMO_SCRIPT.md created | ✅ |
 
+## Phase 8 — Dashboard Enhancement: Full Launch Wizard
+| Sub-step | Task | Done |
+|----------|------|------|
+| 8.1 | Add `uuid` field to `/api/networks` response for Nova attachment | ✅ |
+| 8.2 | Update `POST /api/instances` to accept `network_id`, `security_groups`, `count`, `user_data` | ✅ |
+| 8.3 | Remove hardcoded `private-network` and `ssh-only` from instance creation | ✅ |
+| 8.4 | Add network dropdown to launch modal (filtered to internal networks only) | ✅ |
+| 8.5 | Add security group checkboxes to launch modal (multi-select, ssh-only default) | ✅ |
+| 8.6 | Add instance count field (1–5) to launch modal | ✅ |
+| 8.7 | Add collapsible user data textarea (cloud-init script) to launch modal | ✅ |
+| 8.8 | Update `openLaunchModal()` to fetch networks and security groups in parallel | ✅ |
+| 8.9 | Update `submitLaunch()` to validate and send all new fields | ✅ |
+| 8.10 | Update FR-01.1 and add FR-10.8 in PROJECT_REQUIREMENTS.md | ✅ |
+
 ---
 
 *Project: Local EC2 Replica | DevStack 2024.2 | Ubuntu 24.04 | Final Semester*

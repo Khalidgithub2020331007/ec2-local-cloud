@@ -278,9 +278,16 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div class="mb-3">
-          <label class="form-label fw-bold">Instance Name <span class="text-danger">*</span></label>
-          <input type="text" id="launch-name" class="form-control" placeholder="e.g. my-test-vm">
+        <div class="row mb-3">
+          <div class="col-8">
+            <label class="form-label fw-bold">Instance Name <span class="text-danger">*</span></label>
+            <input type="text" id="launch-name" class="form-control" placeholder="e.g. my-test-vm">
+          </div>
+          <div class="col-4">
+            <label class="form-label fw-bold">Count</label>
+            <input type="number" id="launch-count" class="form-control" value="1" min="1" max="5">
+            <div class="form-text">1–5 instances</div>
+          </div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-bold">Image (OS) <span class="text-danger">*</span></label>
@@ -290,13 +297,35 @@
           <label class="form-label fw-bold">Flavor (Size) <span class="text-danger">*</span></label>
           <select id="launch-flavor" class="form-select"><option value="">Loading flavors…</option></select>
         </div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Key Pair</label>
-          <select id="launch-keypair" class="form-select"><option value="">Loading keypairs…</option></select>
+        <div class="row mb-3">
+          <div class="col-6">
+            <label class="form-label fw-bold">Key Pair</label>
+            <select id="launch-keypair" class="form-select"><option value="">Loading keypairs…</option></select>
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-bold">Network <span class="text-danger">*</span></label>
+            <select id="launch-network" class="form-select"><option value="">Loading networks…</option></select>
+          </div>
         </div>
-        <div class="alert alert-info py-2 mb-0" style="font-size:13px;">
-          <i class="bi bi-info-circle me-1"></i>
-          Network: <strong>private-network</strong> &nbsp;|&nbsp; Security group: <strong>ssh-only</strong> &nbsp;(fixed defaults)
+        <div class="mb-3">
+          <label class="form-label fw-bold">Security Groups <span class="text-danger">*</span></label>
+          <div id="launch-sgs" style="max-height:120px;overflow-y:auto;border:1px solid #dee2e6;border-radius:6px;padding:8px 12px">
+            <span style="color:#aaa;font-size:13px">Loading security groups…</span>
+          </div>
+        </div>
+        <div class="mb-0">
+          <button class="btn btn-sm btn-outline-secondary w-100 text-start" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#launch-advanced" style="font-size:13px">
+            <i class="bi bi-chevron-down me-1"></i>Advanced Options — User Data (cloud-init)
+          </button>
+          <div class="collapse" id="launch-advanced">
+            <div class="mt-2">
+              <textarea id="launch-userdata" class="form-control font-monospace" rows="5"
+                        style="font-size:12px"
+                        placeholder="#!/bin/bash&#10;# Commands run on first boot as root&#10;apt-get update -y"></textarea>
+              <div class="form-text">Script executed once at first boot via cloud-init. Leave blank if not needed.</div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -516,38 +545,69 @@
   // ── Launch Instance ───────────────────────────────────────────────────────
   async function openLaunchModal() {
     launchModal.show();
-    const [imgs, flavors, keypairs] = await Promise.all([
+    const [imgs, flavors, keypairs, networks, sgs] = await Promise.all([
       fetch('/api/images').then(r => r.json()),
       fetch('/api/flavors').then(r => r.json()),
       fetch('/api/keypairs').then(r => r.json()),
+      fetch('/api/networks').then(r => r.json()),
+      fetch('/api/security-groups').then(r => r.json()),
     ]);
+
     document.getElementById('launch-image').innerHTML =
       imgs.filter(i => i.status === 'active').map(i => `<option value="${i.id}">${i.name} (${i.size})</option>`).join('');
     document.getElementById('launch-flavor').innerHTML =
       flavors.map(f => `<option value="${f.id}">${f.name} — ${f.vcpus} vCPU · ${f.ram >= 1024 ? (f.ram/1024)+'GB' : f.ram+'MB'} RAM · ${f.disk}GB Disk</option>`).join('');
     document.getElementById('launch-keypair').innerHTML =
       ['<option value="">No key pair</option>', ...keypairs.map(k => `<option value="${k}" ${k === 'project-key' ? 'selected' : ''}>${k}</option>`)].join('');
+
+    // Only internal (non-external) networks can be attached to an instance
+    const internalNets = networks.filter(n => !n.external);
+    document.getElementById('launch-network').innerHTML = internalNets.length
+      ? internalNets.map(n => `<option value="${n.uuid}" ${n.name === 'private-network' ? 'selected' : ''}>${n.name}</option>`).join('')
+      : '<option value="">No networks available</option>';
+
+    // Security group checkboxes — ssh-only selected by default
+    document.getElementById('launch-sgs').innerHTML = sgs.length
+      ? sgs.map(sg => `
+          <div class="form-check">
+            <input class="form-check-input sg-check" type="checkbox" value="${sg.name}" id="sg-${sg.id}" ${sg.name === 'ssh-only' ? 'checked' : ''}>
+            <label class="form-check-label" for="sg-${sg.id}" style="font-size:13px">
+              <strong>${sg.name}</strong>${sg.description ? ` <span style="color:#aaa">— ${sg.description}</span>` : ''}
+            </label>
+          </div>`).join('')
+      : '<span style="color:#aaa;font-size:13px">No security groups available</span>';
   }
 
   async function submitLaunch() {
-    const name     = document.getElementById('launch-name').value.trim();
-    const image_id = document.getElementById('launch-image').value;
-    const flavor_id= document.getElementById('launch-flavor').value;
-    const key_name = document.getElementById('launch-keypair').value;
-    if (!name)     { toast('error', 'Validation', 'Instance name is required'); return; }
-    if (!image_id) { toast('error', 'Validation', 'Select an image'); return; }
-    if (!flavor_id){ toast('error', 'Validation', 'Select a flavor'); return; }
+    const name            = document.getElementById('launch-name').value.trim();
+    const image_id        = document.getElementById('launch-image').value;
+    const flavor_id       = document.getElementById('launch-flavor').value;
+    const key_name        = document.getElementById('launch-keypair').value;
+    const network_id      = document.getElementById('launch-network').value;
+    const count           = parseInt(document.getElementById('launch-count').value, 10) || 1;
+    const user_data       = document.getElementById('launch-userdata').value.trim();
+    const security_groups = Array.from(document.querySelectorAll('.sg-check:checked')).map(cb => cb.value);
+
+    if (!name)                   { toast('error', 'Validation', 'Instance name is required'); return; }
+    if (!image_id)               { toast('error', 'Validation', 'Select an image'); return; }
+    if (!flavor_id)              { toast('error', 'Validation', 'Select a flavor'); return; }
+    if (!network_id)             { toast('error', 'Validation', 'Select a network'); return; }
+    if (!security_groups.length) { toast('error', 'Validation', 'Select at least one security group'); return; }
 
     launchModal.hide();
-    toast('info', 'Launching…', `"${name}" is being created`);
+    const label = count > 1 ? `${count} instances of "${name}"` : `"${name}"`;
+    toast('info', 'Launching…', `${label} ${count > 1 ? 'are' : 'is'} being created`);
+
     const r = await fetch('/api/instances', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name, image_id, flavor_id, key_name})
+      body: JSON.stringify({name, image_id, flavor_id, key_name, network_id, security_groups, count, user_data})
     }).then(r => r.json());
 
     if (r.error) { toast('error', 'Launch failed', r.error); return; }
-    toast('success', 'Instance created', `"${name}" is building — will be ACTIVE in ~20 seconds`);
+    toast('success', 'Instance created', `${label} ${count > 1 ? 'are' : 'is'} building — ACTIVE in ~20 seconds`);
     document.getElementById('launch-name').value = '';
+    document.getElementById('launch-count').value = '1';
+    document.getElementById('launch-userdata').value = '';
     delete loaded['instances'];
     if (currentSection === 'instances') { scheduleRefresh('instances', 5000); }
   }

@@ -72,7 +72,7 @@ This project builds a local cloud computing environment that replicates the core
 ## Functional Requirements
 
 ### FR-01: Virtual Machine Lifecycle Management
-- **FR-01.1** — User can launch a new virtual machine (instance) by selecting image, flavor, network, and key pair
+- **FR-01.1** — User can launch a new virtual machine (instance) by selecting image, flavor, network, security group(s), key pair, instance count (1–5), and optional user data (cloud-init script)
 - **FR-01.2** — User can start a stopped instance
 - **FR-01.3** — User can stop a running instance (graceful shutdown)
 - **FR-01.4** — User can hard reboot a running instance
@@ -153,6 +153,7 @@ This project builds a local cloud computing environment that replicates the core
 - **FR-10.5** — Dashboard shall provide VNC console access to instances (like EC2 Instance Connect)
 - **FR-10.6** — Dashboard shall show volume list, network topology, and security group rules
 - **FR-10.7** — Admin panel accessible to `admin` user for system-wide management
+- **FR-10.8** — Launch wizard shall support: selectable network, multi-select security groups, instance count (1–5), and user data (cloud-init) input — matching the AWS EC2 launch wizard scope
 
 ### FR-11: Command Line Interface (AWS CLI Equivalent)
 - **FR-11.1** — `openstack` CLI available for all operations
