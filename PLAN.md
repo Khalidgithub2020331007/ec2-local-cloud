@@ -1957,6 +1957,22 @@ git commit -m "Final semester project: Local EC2 replica using DevStack"
 | 8.9 | Update `submitLaunch()` to validate and send all new fields | ✅ |
 | 8.10 | Update FR-01.1 and add FR-10.8 in PROJECT_REQUIREMENTS.md | ✅ |
 
+## Phase 9 — AMI Operations (Create, Launch, Copy, Delete)
+| Sub-step | Task | Done |
+|----------|------|------|
+| 9.1 | Add `POST /api/instances/<server_id>/image` — Nova createImage action (microversion 2.45) | ✅ |
+| 9.2 | Add `DELETE /api/images/<image_id>` — Glance image delete | ✅ |
+| 9.3 | Add `POST /api/images/<image_id>/copy` — duplicate image by streaming data via Glance | ✅ |
+| 9.4 | Add CSS button styles: `btn-snapshot`, `btn-copy`, `btn-launch-ami` | ✅ |
+| 9.5 | Add Actions column to Images table (Launch, Copy, Delete per row) | ✅ |
+| 9.6 | Add AMI button to Instances table rows (ACTIVE and SHUTOFF states) | ✅ |
+| 9.7 | Add `preselectedImageId` param to `openLaunchModal()` for Launch-from-AMI flow | ✅ |
+| 9.8 | Add Create AMI modal with source instance name + image name input | ✅ |
+| 9.9 | Add Copy AMI modal with new name input and size warning | ✅ |
+| 9.10 | Add JS functions: `launchFromAmi`, `openCreateAmiModal`, `submitCreateAmi`, `openCopyAmiModal`, `submitCopyAmi`, `deleteImage` | ✅ |
+| 9.11 | Update FR-02 in PROJECT_REQUIREMENTS.md to reflect dashboard AMI operations | ✅ |
+| 9.12 | Add UI Tests 9–12 in test.md for AMI operations | ✅ |
+
 ---
 
 *Project: Local EC2 Replica | DevStack 2024.2 | Ubuntu 24.04 | Final Semester*

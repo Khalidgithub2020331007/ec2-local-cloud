@@ -906,6 +906,107 @@ Expected: `available`
 
 ---
 
+### UI Test 9 — Create AMI from a Running Instance
+
+**What this tests:** Can you snapshot a running VM into a reusable image?
+
+**Steps:**
+1. Click **Instances** in the left sidebar
+2. Find any instance with status `ACTIVE` or `SHUTOFF`
+3. Click the teal **📷 AMI** button on that row
+4. In the modal, edit the name if desired (default is `<instance-name>-ami`)
+5. Click **Create AMI**
+
+**Expected result:**
+- Toast: *"Snapshotting… this may take 1–5 minutes"*
+- After 2–5 minutes, click **Images** in the sidebar
+- A new image with your chosen name appears with status `active`
+
+**Verify from CLI:**
+```bash
+openstack image list
+```
+Expected: new image appears with `active` status.
+
+**Pass:** Image appears in Images section with `active` status within 5 minutes.
+**Fail:** Error toast appears, or image stays in `saving` indefinitely.
+
+---
+
+### UI Test 10 — Launch an Instance from the Images Table (Launch from AMI)
+
+**What this tests:** Can you start a new VM directly from the Images section?
+
+**Steps:**
+1. Click **Images** in the left sidebar
+2. Find any `active` image (e.g. `cirros-0.6.2-x86_64-disk`)
+3. Click the green **▶ Launch** button on that row
+4. The Launch Instance modal opens with that image already selected
+5. Fill in the remaining fields (name, flavor, network, security group)
+6. Click **Launch**
+
+**Expected result:**
+- The image dropdown in the modal is pre-filled with the image you clicked
+- Instance launches and reaches `ACTIVE` within 30 seconds (visible in Instances section)
+
+**Pass:** Modal opens with image pre-selected; instance reaches `ACTIVE`.
+**Fail:** Modal opens with wrong image selected, or launch fails.
+
+---
+
+### UI Test 11 — Copy an AMI
+
+**What this tests:** Can you duplicate an image under a new name?
+
+**Steps:**
+1. Click **Images** in the left sidebar
+2. Find `cirros-0.6.2-x86_64-disk` (small image — copies in seconds)
+3. Click the purple **⛧ Copy** button on that row
+4. In the modal, change the name to `cirros-copy-test`
+5. Click **Copy**
+
+**Expected result:**
+- Toast: *"Copying AMI… Streaming image data"*
+- After a few seconds, click **Refresh**
+- `cirros-copy-test` appears in the Images table with status `active`
+
+**Verify from CLI:**
+```bash
+openstack image list
+```
+Expected: `cirros-copy-test` appears with `active` status.
+
+**Pass:** New image appears with `active` status and correct name.
+**Fail:** Error toast, or image stays in `queued`/`saving` state.
+
+---
+
+### UI Test 12 — Delete an AMI
+
+**What this tests:** Can you remove an image from the system?
+
+**Steps:**
+1. Click **Images** in the left sidebar
+2. Find `cirros-copy-test` created in UI Test 11
+3. Click the red **🗑 Delete** button on that row
+4. Read the confirmation dialog — note it says running instances are not affected
+5. Click **Delete** to confirm
+
+**Expected result:**
+- `cirros-copy-test` disappears from the Images table
+- Image count in the sidebar badge decreases by 1
+
+**Verify from CLI:**
+```bash
+openstack image list
+```
+Expected: `cirros-copy-test` does NOT appear.
+
+**Pass:** Image is removed from the table.
+**Fail:** Error toast appears, or image remains in the list.
+
+---
+
 ## Section 4 — What Exactly Should You Test?
 
 Here is a complete checklist. Go through each item and write **PASS** or **FAIL** next to it.
@@ -944,6 +1045,10 @@ Here is a complete checklist. Go through each item and write **PASS** or **FAIL*
 [ ] 24. Security Groups section         → ssh-only shows TCP 22 and ICMP rules
 [ ] 25. Users & Projects section        → devuser shows dev-project, opsuser shows prod-project
 [ ] 26. Networks section                → 3 networks visible (private, public, lb-mgmt)
+[ ] 27. Create AMI button (Instances)   → snapshot modal opens; image appears in Images within 5 min
+[ ] 28. Launch from AMI (Images)        → launch modal opens with image pre-selected
+[ ] 29. Copy AMI button (Images)        → copy modal; cirros-copy-test appears active within 30s
+[ ] 30. Delete AMI button (Images)      → cirros-copy-test removed from Images table
 ```
 
 ---

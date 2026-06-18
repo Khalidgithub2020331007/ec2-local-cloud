@@ -82,9 +82,11 @@ This project builds a local cloud computing environment that replicates the core
 ### FR-02: Machine Images (AMI Equivalent)
 - **FR-02.1** — System shall provide a default CirrOS test image pre-loaded on setup
 - **FR-02.2** — Admin can upload custom disk images (qcow2, raw, vmdk formats)
-- **FR-02.3** — User can create a snapshot of a running instance as a new image
+- **FR-02.3** — User can create a snapshot of a running or stopped instance as a new image (Create AMI) — via dashboard AMI button on any instance row or OpenStack CLI
 - **FR-02.4** — Images can be set as `public` (available to all) or `private`
-- **FR-02.5** — User can delete images they own
+- **FR-02.5** — User can delete images they own — via dashboard Delete button in Images table
+- **FR-02.6** — User can duplicate an existing image with a new name (Copy AMI) — data is streamed via Glance; CirrOS copies in seconds, Ubuntu in several minutes
+- **FR-02.7** — User can launch a new instance directly from the Images table (Launch from AMI) — opens the launch wizard with the selected image pre-filled
 
 ### FR-03: Instance Types / Flavors (EC2 Instance Types Equivalent)
 - **FR-03.1** — Admin can create custom flavors defining vCPU count, RAM, and disk size

@@ -446,6 +446,34 @@ def delete_instance(server_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/instances/<server_id>/image', methods=['POST'])
+def create_image_from_instance(server_id):
+    """Create an AMI snapshot from a running instance. Body: {name}.
+    Uses Nova microversion 2.45 so image_id is returned in the body, not the Location header."""
+    try:
+        token, eps, _ = authenticate()
+        data = request.json
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'error': 'name is required'}), 400
+
+        r = requests.post(
+            eps['compute'] + f'/servers/{server_id}/action',
+            headers={
+                'X-Auth-Token': token,
+                'Content-Type': 'application/json',
+                'X-OpenStack-Nova-API-Version': '2.45',
+            },
+            json={"createImage": {"name": name, "metadata": {}}},
+            timeout=20
+        )
+        r.raise_for_status()
+        body = r.json() if r.content else {}
+        return jsonify({'id': body.get('image_id', ''), 'name': name, 'status': 'saving'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ── Write endpoints — Volumes ─────────────────────────────────────────────────
 
 @app.route('/api/volumes', methods=['POST'])
@@ -470,6 +498,70 @@ def delete_volume(volume_id):
         token, eps, _ = authenticate()
         os_delete(vol_endpoint(eps) + f'/volumes/{volume_id}', token)
         return jsonify({'status': 'deleted'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Write endpoints — Images (AMI) ───────────────────────────────────────────
+
+@app.route('/api/images/<image_id>', methods=['DELETE'])
+def delete_image(image_id):
+    try:
+        token, eps, _ = authenticate()
+        os_delete(eps['image'] + f'/v2/images/{image_id}', token)
+        return jsonify({'status': 'deleted'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/images/<image_id>/copy', methods=['POST'])
+def copy_image(image_id):
+    """Duplicate an image with a new name. Body: {name}.
+    Streams image data through to avoid holding it in memory — slow for large images."""
+    try:
+        token, eps, _ = authenticate()
+        data = request.json
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'error': 'name is required'}), 400
+
+        src = os_get(eps['image'] + f'/v2/images/{image_id}', token)
+
+        # Create target image record with the same format/size metadata
+        create_r = requests.post(
+            eps['image'] + '/v2/images',
+            headers={'X-Auth-Token': token, 'Content-Type': 'application/json'},
+            json={
+                'name':             name,
+                'disk_format':      src.get('disk_format', 'qcow2'),
+                'container_format': src.get('container_format', 'bare'),
+                'visibility':       'private',
+                'min_disk':         src.get('min_disk', 0),
+                'min_ram':          src.get('min_ram', 0),
+            },
+            timeout=20
+        )
+        create_r.raise_for_status()
+        new_image_id = create_r.json()['id']
+
+        # Stream image data directly from source to new image record
+        src_stream = requests.get(
+            eps['image'] + f'/v2/images/{image_id}/file',
+            headers={'X-Auth-Token': token},
+            stream=True,
+            timeout=300
+        )
+        src_stream.raise_for_status()
+
+        upload_r = requests.put(
+            eps['image'] + f'/v2/images/{new_image_id}/file',
+            headers={'X-Auth-Token': token, 'Content-Type': 'application/octet-stream'},
+            data=src_stream.iter_content(chunk_size=1024 * 1024),
+            timeout=600
+        )
+        upload_r.raise_for_status()
+
+        return jsonify({'id': new_image_id, 'name': name, 'status': 'active'}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

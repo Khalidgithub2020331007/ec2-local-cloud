@@ -95,6 +95,9 @@
     .btn-delete { background:#f8d7da; color:#842029; }
     .btn-alloc  { background:#d4edda; color:#1a6b35; }
     .btn-release{ background:#f8d7da; color:#842029; }
+    .btn-snapshot   { background:#d1ecf1; color:#0c5460; }
+    .btn-copy       { background:#e2d9f3; color:#4b2e83; }
+    .btn-launch-ami { background:#d4edda; color:#1a6b35; }
     .btn-primary-act { background:var(--aws-orange); color:white; border:none; border-radius:4px; padding:7px 14px; font-size:13px; font-weight:600; cursor:pointer; }
     .btn-primary-act:hover { background:var(--aws-orange2); }
     .btn-secondary-act { background:#f0f2f5; color:#16191f; border:1px solid #d5dbdb; border-radius:4px; padding:7px 14px; font-size:13px; font-weight:600; cursor:pointer; }
@@ -201,8 +204,8 @@
     <div class="card-box">
       <div class="card-box-header"><h5>Available Images</h5><span id="images-count" style="font-size:13px;color:#6b7785"></span></div>
       <table class="data-table">
-        <thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Size</th><th>Format</th><th>Visibility</th><th>Min Disk</th><th>Min RAM</th><th>Created</th></tr></thead>
-        <tbody id="images-body"><tr><td colspan="9" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+        <thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Size</th><th>Format</th><th>Visibility</th><th>Min Disk</th><th>Min RAM</th><th>Created</th><th>Actions</th></tr></thead>
+        <tbody id="images-body"><tr><td colspan="10" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -397,6 +400,64 @@
   </div>
 </div>
 
+<!-- ── Create AMI Modal ───────────────────────────────────────────────────── -->
+<div class="modal fade" id="createAmiModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-camera me-2"></i>Create AMI</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="create-ami-server-id">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Source Instance</label>
+          <input type="text" id="create-ami-server-name" class="form-control" disabled>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Image Name <span class="text-danger">*</span></label>
+          <input type="text" id="create-ami-name" class="form-control" placeholder="e.g. my-server-v1">
+        </div>
+        <div class="alert alert-info" style="font-size:13px;padding:8px 12px;margin-bottom:0">
+          <i class="bi bi-info-circle me-1"></i>
+          Nova snapshots the instance disk. The instance keeps running. The new image takes 1–5 minutes to reach <strong>active</strong> status.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitCreateAmi()"><i class="bi bi-camera me-1"></i>Create AMI</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Copy AMI Modal ──────────────────────────────────────────────────────── -->
+<div class="modal fade" id="copyAmiModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-copy me-2"></i>Copy AMI</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="copy-ami-image-id">
+        <div class="mb-3">
+          <label class="form-label fw-bold">New Image Name <span class="text-danger">*</span></label>
+          <input type="text" id="copy-ami-name" class="form-control" placeholder="e.g. my-image-copy">
+        </div>
+        <div class="alert alert-warning" style="font-size:13px;padding:8px 12px;margin-bottom:0">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          Image data is streamed through the API. CirrOS (~13 MB) copies in seconds. Ubuntu (~600 MB) takes several minutes.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitCopyAmi()"><i class="bi bi-copy me-1"></i>Copy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Confirm Modal ───────────────────────────────────────────────────────── -->
 <div class="modal fade" id="confirmModal" tabindex="-1">
   <div class="modal-dialog modal-sm">
@@ -419,10 +480,12 @@
 <script>
   let currentSection = 'overview';
   const loaded = {};
-  const launchModal  = new bootstrap.Modal(document.getElementById('launchModal'));
-  const modifyModal  = new bootstrap.Modal(document.getElementById('modifyModal'));
-  const volumeModal  = new bootstrap.Modal(document.getElementById('volumeModal'));
-  const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+  const launchModal    = new bootstrap.Modal(document.getElementById('launchModal'));
+  const modifyModal    = new bootstrap.Modal(document.getElementById('modifyModal'));
+  const volumeModal    = new bootstrap.Modal(document.getElementById('volumeModal'));
+  const createAmiModal = new bootstrap.Modal(document.getElementById('createAmiModal'));
+  const copyAmiModal   = new bootstrap.Modal(document.getElementById('copyAmiModal'));
+  const confirmModal   = new bootstrap.Modal(document.getElementById('confirmModal'));
 
   // ── Navigation ────────────────────────────────────────────────────────────
   function showSection(name) {
@@ -541,6 +604,7 @@
           if (s.status === 'ACTIVE')        actions += `<button class="btn-act btn-reboot me-1"  onclick="rebootInstance('${s.id}','${s.name}')">&#8635; Reboot</button>`;
           if (s.status === 'SHUTOFF')       actions += `<button class="btn-act btn-start me-1"   onclick="startInstance('${s.id}','${s.name}')">&#9654; Start</button>`;
           if (s.status === 'SHUTOFF')       actions += `<button class="btn-act btn-modify me-1"  onclick="openModifyModal('${s.id}','${s.name}','${s.flavor}')">&#9881; Modify</button>`;
+          if (s.status === 'ACTIVE' || s.status === 'SHUTOFF') actions += `<button class="btn-act btn-snapshot me-1" onclick="openCreateAmiModal('${s.id}','${s.name}')">&#128247; AMI</button>`;
           if (s.status === 'VERIFY_RESIZE') actions += `<button class="btn-act btn-confirm me-1" onclick="confirmResize('${s.id}','${s.name}')">&#10003; Confirm</button>`;
           if (s.status !== 'BUILD')         actions += `<button class="btn-act btn-delete"        onclick="deleteInstance('${s.id}','${s.name}')">&#128465; Delete</button>`;
           return `<tr>
@@ -624,7 +688,7 @@
   }
 
   // ── Launch Instance ───────────────────────────────────────────────────────
-  async function openLaunchModal() {
+  async function openLaunchModal(preselectedImageId = null) {
     launchModal.show();
     const [imgs, flavors, keypairs, networks, sgs] = await Promise.all([
       fetch('/api/images').then(r => r.json()),
@@ -636,6 +700,7 @@
 
     document.getElementById('launch-image').innerHTML =
       imgs.filter(i => i.status === 'active').map(i => `<option value="${i.id}">${i.name} (${i.size})</option>`).join('');
+    if (preselectedImageId) document.getElementById('launch-image').value = preselectedImageId;
     document.getElementById('launch-flavor').innerHTML =
       flavors.map(f => `<option value="${f.id}">${f.name} — ${f.vcpus} vCPU · ${f.ram >= 1024 ? (f.ram/1024)+'GB' : f.ram+'MB'} RAM · ${f.disk}GB Disk</option>`).join('');
     document.getElementById('launch-keypair').innerHTML =
@@ -693,21 +758,92 @@
     if (currentSection === 'instances') { scheduleRefresh('instances', 5000); }
   }
 
+  // ── AMI operations ────────────────────────────────────────────────────────
+
+  // Reuses the existing launch modal with the chosen image pre-selected.
+  function launchFromAmi(imageId) { openLaunchModal(imageId); }
+
+  function openCreateAmiModal(serverId, serverName) {
+    document.getElementById('create-ami-server-id').value  = serverId;
+    document.getElementById('create-ami-server-name').value = serverName;
+    // Pre-fill a sensible default name so the user only has to adjust it.
+    document.getElementById('create-ami-name').value = serverName + '-ami';
+    createAmiModal.show();
+  }
+
+  async function submitCreateAmi() {
+    const serverId   = document.getElementById('create-ami-server-id').value;
+    const serverName = document.getElementById('create-ami-server-name').value;
+    const name       = document.getElementById('create-ami-name').value.trim();
+    if (!name) { toast('error', 'Validation', 'Image name is required'); return; }
+    createAmiModal.hide();
+    toast('info', 'Creating AMI…', `Snapshotting "${serverName}" — this may take 1–5 minutes`);
+    const r = await fetch(`/api/instances/${serverId}/image`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Create AMI failed', r.error); return; }
+    toast('success', 'AMI created', `"${name}" is saving — check the Images section in a few minutes`);
+    // Image takes time to transition from saving → active, so delay the refresh.
+    scheduleRefresh('images', 20000);
+  }
+
+  function openCopyAmiModal(imageId, imageName) {
+    document.getElementById('copy-ami-image-id').value = imageId;
+    document.getElementById('copy-ami-name').value     = imageName + '-copy';
+    copyAmiModal.show();
+  }
+
+  async function submitCopyAmi() {
+    const imageId = document.getElementById('copy-ami-image-id').value;
+    const name    = document.getElementById('copy-ami-name').value.trim();
+    if (!name) { toast('error', 'Validation', 'Image name is required'); return; }
+    copyAmiModal.hide();
+    // Copy streams image data through the API — warn the user it may be slow.
+    toast('info', 'Copying AMI…', 'Streaming image data — may take several minutes for large images');
+    const r = await fetch(`/api/images/${imageId}/copy`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Copy failed', r.error); return; }
+    toast('success', 'AMI copied', `"${name}" is now available in Images`);
+    scheduleRefresh('images', 3000);
+  }
+
+  function deleteImage(imageId, imageName) {
+    // Running instances are not affected — they already have the disk data.
+    confirm(`Delete image "${imageName}"? Running instances are not affected, but no new instances can be launched from it.`, async () => {
+      const r = await fetch(`/api/images/${imageId}`, { method: 'DELETE' }).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'Deleted', `Image "${imageName}" has been deleted`);
+      scheduleRefresh('images', 2000);
+    });
+  }
+
   // ── Images ────────────────────────────────────────────────────────────────
   async function fetchImages() {
     const data = await fetch('/api/images').then(r => r.json());
-    if (data.error) { document.getElementById('images-body').innerHTML = errRow(data.error, 9); return; }
+    if (data.error) { document.getElementById('images-body').innerHTML = errRow(data.error, 10); return; }
     document.getElementById('images-count').textContent = data.length + ' images';
     document.getElementById('images-body').innerHTML = data.length === 0
-      ? '<tr><td colspan="9" class="empty-state"><i class="bi bi-inbox"></i>No images</td></tr>'
-      : data.map(i => `<tr>
-          <td class="id-col">${shortId(i.id)}</td>
-          <td><strong>${i.name}</strong></td><td>${badge(i.status)}</td>
-          <td>${i.size}</td><td><code style="font-size:12px">${i.disk_format}</code></td>
-          <td><span class="badge-s s-${i.visibility}">${i.visibility}</span></td>
-          <td>${i.min_disk_gb > 0 ? i.min_disk_gb+' GB' : '—'}</td>
-          <td>${i.min_ram_mb > 0 ? i.min_ram_mb+' MB' : '—'}</td>
-          <td style="color:#8892a0;font-size:12px">${i.created_at}</td></tr>`).join('');
+      ? '<tr><td colspan="10" class="empty-state"><i class="bi bi-inbox"></i>No images</td></tr>'
+      : data.map(i => {
+          const safeName = i.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          const isActive = i.status === 'active';
+          return `<tr>
+            <td class="id-col">${shortId(i.id)}</td>
+            <td><strong>${i.name}</strong></td><td>${badge(i.status)}</td>
+            <td>${i.size}</td><td><code style="font-size:12px">${i.disk_format}</code></td>
+            <td><span class="badge-s s-${i.visibility}">${i.visibility}</span></td>
+            <td>${i.min_disk_gb > 0 ? i.min_disk_gb+' GB' : '—'}</td>
+            <td>${i.min_ram_mb > 0 ? i.min_ram_mb+' MB' : '—'}</td>
+            <td style="color:#8892a0;font-size:12px">${i.created_at}</td>
+            <td style="white-space:nowrap">
+              ${isActive ? `<button class="btn-act btn-launch-ami me-1" onclick="launchFromAmi('${i.id}')">&#9658; Launch</button>` : ''}
+              <button class="btn-act btn-copy me-1" onclick="openCopyAmiModal('${i.id}','${safeName}')">&#10697; Copy</button>
+              <button class="btn-act btn-delete" onclick="deleteImage('${i.id}','${safeName}')">&#128465; Delete</button>
+            </td></tr>`;
+        }).join('');
   }
 
   // ── Volumes ───────────────────────────────────────────────────────────────
