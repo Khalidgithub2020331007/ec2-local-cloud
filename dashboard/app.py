@@ -399,6 +399,43 @@ def start_instance(server_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/instances/<server_id>/reboot', methods=['POST'])
+def reboot_instance(server_id):
+    try:
+        token, eps, _ = authenticate()
+        # SOFT asks the OS to restart gracefully; Nova falls back to HARD if unresponsive
+        os_post(eps['compute'] + f'/servers/{server_id}/action', token, {"reboot": {"type": "SOFT"}})
+        return jsonify({'status': 'rebooting'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/instances/<server_id>/resize', methods=['POST'])
+def resize_instance(server_id):
+    """Resize to a different flavor. Instance must be SHUTOFF first. Body: {flavor_id}."""
+    try:
+        token, eps, _ = authenticate()
+        data = request.json
+        flavor_id = (data.get('flavor_id') or '').strip()
+        if not flavor_id:
+            return jsonify({'error': 'flavor_id is required'}), 400
+        os_post(eps['compute'] + f'/servers/{server_id}/action', token, {"resize": {"flavorRef": flavor_id}})
+        return jsonify({'status': 'resizing'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/instances/<server_id>/confirm-resize', methods=['POST'])
+def confirm_resize(server_id):
+    """Confirm a completed resize. Instance must be in VERIFY_RESIZE state."""
+    try:
+        token, eps, _ = authenticate()
+        os_post(eps['compute'] + f'/servers/{server_id}/action', token, {"confirmResize": None})
+        return jsonify({'status': 'confirmed'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/instances/<server_id>', methods=['DELETE'])
 def delete_instance(server_id):
     try:

@@ -89,6 +89,9 @@
     .btn-act:hover { opacity:.82; }
     .btn-stop   { background:#fff3cd; color:#856404; }
     .btn-start  { background:#d4edda; color:#1a6b35; }
+    .btn-reboot { background:#d1ecf1; color:#0c5460; }
+    .btn-modify { background:#e2d9f3; color:#4b2e83; }
+    .btn-confirm{ background:#d4edda; color:#1a6b35; }
     .btn-delete { background:#f8d7da; color:#842029; }
     .btn-alloc  { background:#d4edda; color:#1a6b35; }
     .btn-release{ background:#f8d7da; color:#842029; }
@@ -336,6 +339,37 @@
   </div>
 </div>
 
+<!-- ── Modify Instance Modal ───────────────────────────────────────────────── -->
+<div class="modal fade" id="modifyModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-sliders me-2"></i>Modify Instance Type</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modify-instance-id">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Instance</label>
+          <input type="text" id="modify-instance-name" class="form-control" disabled>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">New Flavor (Size) <span class="text-danger">*</span></label>
+          <select id="modify-flavor" class="form-select"><option value="">Loading flavors…</option></select>
+        </div>
+        <div class="alert alert-warning" style="font-size:13px;padding:8px 12px;margin-bottom:0">
+          <i class="bi bi-info-circle me-1"></i>
+          The instance will enter <strong>VERIFY_RESIZE</strong> state after resizing. Confirm the resize to finalize.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitModify()"><i class="bi bi-arrow-repeat me-1"></i>Resize</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Create Volume Modal ────────────────────────────────────────────────── -->
 <div class="modal fade" id="volumeModal" tabindex="-1">
   <div class="modal-dialog">
@@ -385,8 +419,9 @@
 <script>
   let currentSection = 'overview';
   const loaded = {};
-  const launchModal = new bootstrap.Modal(document.getElementById('launchModal'));
-  const volumeModal = new bootstrap.Modal(document.getElementById('volumeModal'));
+  const launchModal  = new bootstrap.Modal(document.getElementById('launchModal'));
+  const modifyModal  = new bootstrap.Modal(document.getElementById('modifyModal'));
+  const volumeModal  = new bootstrap.Modal(document.getElementById('volumeModal'));
   const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -502,9 +537,12 @@
       ? '<tr><td colspan="10" class="empty-state"><i class="bi bi-inbox"></i>No instances — click Launch Instance to create one</td></tr>'
       : data.map(s => {
           let actions = '';
-          if (s.status === 'ACTIVE')  actions += `<button class="btn-act btn-stop me-1"   onclick="stopInstance('${s.id}','${s.name}')">&#9632; Stop</button>`;
-          if (s.status === 'SHUTOFF') actions += `<button class="btn-act btn-start me-1"  onclick="startInstance('${s.id}','${s.name}')">&#9654; Start</button>`;
-          if (s.status !== 'BUILD')   actions += `<button class="btn-act btn-delete"       onclick="deleteInstance('${s.id}','${s.name}')">&#128465; Delete</button>`;
+          if (s.status === 'ACTIVE')        actions += `<button class="btn-act btn-stop me-1"    onclick="stopInstance('${s.id}','${s.name}')">&#9632; Stop</button>`;
+          if (s.status === 'ACTIVE')        actions += `<button class="btn-act btn-reboot me-1"  onclick="rebootInstance('${s.id}','${s.name}')">&#8635; Reboot</button>`;
+          if (s.status === 'SHUTOFF')       actions += `<button class="btn-act btn-start me-1"   onclick="startInstance('${s.id}','${s.name}')">&#9654; Start</button>`;
+          if (s.status === 'SHUTOFF')       actions += `<button class="btn-act btn-modify me-1"  onclick="openModifyModal('${s.id}','${s.name}','${s.flavor}')">&#9881; Modify</button>`;
+          if (s.status === 'VERIFY_RESIZE') actions += `<button class="btn-act btn-confirm me-1" onclick="confirmResize('${s.id}','${s.name}')">&#10003; Confirm</button>`;
+          if (s.status !== 'BUILD')         actions += `<button class="btn-act btn-delete"        onclick="deleteInstance('${s.id}','${s.name}')">&#128465; Delete</button>`;
           return `<tr>
             <td class="id-col">${shortId(s.id)}</td>
             <td><strong>${s.name}</strong>${s.task_state ? ` <small style="color:#aaa">(${s.task_state})</small>` : ''}</td>
@@ -540,6 +578,49 @@
       toast('success', 'Deleted', `Instance "${name}" has been deleted`);
       scheduleRefresh('instances', 3000);
     });
+  }
+
+  async function rebootInstance(id, name) {
+    confirm(`Reboot instance "${name}"?`, async () => {
+      const r = await fetch(`/api/instances/${id}/reboot`, {method:'POST'}).then(r => r.json());
+      if (r.error) { toast('error', 'Reboot failed', r.error); return; }
+      toast('info', 'Rebooting…', `"${name}" is restarting`);
+      scheduleRefresh('instances', 10000);
+    });
+  }
+
+  // Loads flavors into the modify modal and sets the current flavor as disabled placeholder
+  async function openModifyModal(id, name, currentFlavor) {
+    document.getElementById('modify-instance-id').value = id;
+    document.getElementById('modify-instance-name').value = name;
+    modifyModal.show();
+    const flavors = await fetch('/api/flavors').then(r => r.json());
+    document.getElementById('modify-flavor').innerHTML =
+      [`<option value="">Select new flavor (current: ${currentFlavor})</option>`,
+       ...flavors.map(f => `<option value="${f.id}">${f.name} — ${f.vcpus} vCPU · ${f.ram >= 1024 ? (f.ram/1024)+'GB' : f.ram+'MB'} RAM · ${f.disk}GB Disk</option>`)
+      ].join('');
+  }
+
+  async function submitModify() {
+    const id        = document.getElementById('modify-instance-id').value;
+    const name      = document.getElementById('modify-instance-name').value;
+    const flavor_id = document.getElementById('modify-flavor').value;
+    if (!flavor_id) { toast('error', 'Validation', 'Please select a new flavor'); return; }
+    modifyModal.hide();
+    const r = await fetch(`/api/instances/${id}/resize`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({flavor_id})
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Resize failed', r.error); return; }
+    toast('info', 'Resizing…', `"${name}" is being resized — confirm once it reaches VERIFY_RESIZE`);
+    scheduleRefresh('instances', 8000);
+  }
+
+  async function confirmResize(id, name) {
+    const r = await fetch(`/api/instances/${id}/confirm-resize`, {method:'POST'}).then(r => r.json());
+    if (r.error) { toast('error', 'Confirm failed', r.error); return; }
+    toast('success', 'Resize confirmed', `"${name}" has been resized successfully`);
+    scheduleRefresh('instances', 5000);
   }
 
   // ── Launch Instance ───────────────────────────────────────────────────────

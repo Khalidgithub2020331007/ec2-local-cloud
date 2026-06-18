@@ -18,7 +18,19 @@
       "Bash(pip install *)",
       "Bash(sudo pip install flask)",
       "Bash(mkdir -p /home/khalid/ec2-local-cloud/dashboard/templates)",
-      "Bash(timeout 5 python3 app.py)"
+      "Bash(timeout 5 python3 app.py)",
+      "Bash(curl -sv --max-time 5 http://10.200.193.64/compute/v2.1)",
+      "Bash(curl -sv --max-time 5 http://10.200.193.64:9696/)",
+      "Bash(sudo ss -tlnp)",
+      "Bash(awk '{print $1,$2,$11}')",
+      "Bash(sudo tail -20 /var/log/apache2/error.log)",
+      "Bash(sudo journalctl -u apache2 -n 20 --no-pager)",
+      "Bash(curl -s --max-time 4 http://10.200.193.64/identity/v3)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Keystone OK:', d['version']['id']\\)\")",
+      "Bash(curl -s --max-time 4 http://10.200.193.64/image)",
+      "Bash(curl -s --max-time 4 http://10.200.193.64/placement)",
+      "Bash(curl -s --max-time 8 http://10.200.193.64/compute/v2.1)",
+      "Bash(sudo journalctl -u devstack@n-api -n 10 --no-pager)"
     ],
     "additionalDirectories": [
       "/home/khalid/ec2-local-cloud/dashboard"
