@@ -294,10 +294,12 @@ def api_security_groups():
             ingress = [r for r in rules if r.get('direction') == 'ingress' and r.get('protocol')]
             result.append({
                 'id':          sg['id'][:8],
+                'uuid':        sg['id'],       # full UUID needed for action routes
                 'name':        sg.get('name', ''),
                 'description': sg.get('description', ''),
                 'rule_count':  len(rules),
                 'ingress_rules': [{
+                    'uuid':      r['id'],      # full UUID needed for delete-rule
                     'protocol':  (r.get('protocol') or 'any').upper(),
                     'port_min':  r.get('port_range_min', ''),
                     'port_max':  r.get('port_range_max', ''),
@@ -595,6 +597,109 @@ def release_floating_ip(fip_id):
         token, eps, _ = authenticate()
         os_delete(eps['network'] + f'/v2.0/floatingips/{fip_id}', token)
         return jsonify({'status': 'released'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Write endpoints — Security Groups ────────────────────────────────────────
+
+@app.route('/api/security-groups', methods=['POST'])
+def create_security_group():
+    """Create a new security group. Body: {name, description}."""
+    try:
+        token, eps, _ = authenticate()
+        data        = request.json
+        name        = (data.get('name') or '').strip()
+        description = (data.get('description') or '').strip()
+        if not name:
+            return jsonify({'error': 'name is required'}), 400
+
+        _, body = os_post(
+            eps['network'] + '/v2.0/security-groups',
+            token,
+            {"security_group": {"name": name, "description": description}}
+        )
+        sg = body.get('security_group', {})
+        return jsonify({'id': sg.get('id', ''), 'name': sg.get('name', '')}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/security-groups/<sg_id>', methods=['DELETE'])
+def delete_security_group(sg_id):
+    try:
+        token, eps, _ = authenticate()
+        os_delete(eps['network'] + f'/v2.0/security-groups/{sg_id}', token)
+        return jsonify({'status': 'deleted'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/security-groups/<sg_id>/rules', methods=['POST'])
+def add_security_group_rule(sg_id):
+    """Add an ingress or egress rule. Body: {direction, protocol, port_min, port_max, remote_ip}.
+    direction defaults to 'ingress'; omit protocol/ports to allow all traffic."""
+    try:
+        token, eps, _ = authenticate()
+        data      = request.json
+        direction = data.get('direction', 'ingress')
+        protocol  = (data.get('protocol') or '').lower() or None
+        port_min  = data.get('port_min')
+        port_max  = data.get('port_max')
+        remote_ip = (data.get('remote_ip') or '0.0.0.0/0').strip() or None
+
+        rule = {
+            "security_group_id": sg_id,
+            "direction":         direction,
+            "ethertype":         "IPv4",
+        }
+        if protocol:
+            rule["protocol"] = protocol
+        if port_min is not None:
+            rule["port_range_min"] = int(port_min)
+        if port_max is not None:
+            rule["port_range_max"] = int(port_max)
+        if remote_ip:
+            rule["remote_ip_prefix"] = remote_ip
+
+        _, body = os_post(
+            eps['network'] + '/v2.0/security-group-rules',
+            token,
+            {"security_group_rule": rule}
+        )
+        r = body.get('security_group_rule', {})
+        return jsonify({'id': r.get('id', '')}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/security-groups/<sg_id>/rules/<rule_id>', methods=['DELETE'])
+def delete_security_group_rule(sg_id, rule_id):
+    # Neutron rules are immutable — to modify a rule: delete it here, then POST a new one.
+    try:
+        token, eps, _ = authenticate()
+        os_delete(eps['network'] + f'/v2.0/security-group-rules/{rule_id}', token)
+        return jsonify({'status': 'deleted'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/instances/<server_id>/security-groups', methods=['POST'])
+def attach_security_group(server_id):
+    """Attach a security group to a running instance. Body: {name}."""
+    try:
+        token, eps, _ = authenticate()
+        name = (request.json.get('name') or '').strip()
+        if not name:
+            return jsonify({'error': 'name is required'}), 400
+
+        # Nova action API identifies SGs by name, not UUID
+        os_post(
+            eps['compute'] + f'/servers/{server_id}/action',
+            token,
+            {"addSecurityGroup": {"name": name}}
+        )
+        return jsonify({'status': 'attached'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

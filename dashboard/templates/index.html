@@ -248,12 +248,15 @@
 
   <!-- Security Groups -->
   <section class="section" id="section-security-groups">
-    <div class="page-header"><div class="page-header-left"><h2>Security Groups</h2><p>Firewall rules controlling instance access</p></div></div>
+    <div class="page-header">
+      <div class="page-header-left"><h2>Security Groups</h2><p>Firewall rules controlling instance access</p></div>
+      <button class="btn-primary-act" onclick="openCreateSgModal()"><i class="bi bi-plus-lg me-1"></i>Create Security Group</button>
+    </div>
     <div class="card-box">
       <div class="card-box-header"><h5>All Security Groups</h5><span id="sgs-count" style="font-size:13px;color:#6b7785"></span></div>
       <table class="data-table">
-        <thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Rules</th><th>Ingress Rules</th></tr></thead>
-        <tbody id="sgs-body"><tr><td colspan="5" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+        <thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Rules</th><th>Ingress Rules</th><th>Actions</th></tr></thead>
+        <tbody id="sgs-body"><tr><td colspan="6" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -458,6 +461,111 @@
   </div>
 </div>
 
+<!-- ── Create Security Group Modal ────────────────────────────────────────── -->
+<div class="modal fade" id="createSgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-shield-plus me-2"></i>Create Security Group</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Name <span class="text-danger">*</span></label>
+          <input type="text" id="sg-name" class="form-control" placeholder="e.g. web-servers">
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold">Description</label>
+          <input type="text" id="sg-description" class="form-control" placeholder="e.g. Allow HTTP and HTTPS">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitCreateSg()"><i class="bi bi-plus-lg me-1"></i>Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add Rule Modal ──────────────────────────────────────────────────────── -->
+<div class="modal fade" id="addRuleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-shield-check me-2"></i>Add Rule</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="rule-sg-uuid">
+        <div class="mb-2" style="font-size:13px;color:#6b7785">Security Group: <strong id="rule-sg-name"></strong></div>
+        <div class="row mb-3">
+          <div class="col-6">
+            <label class="form-label fw-bold">Direction</label>
+            <select id="rule-direction" class="form-select">
+              <option value="ingress">Ingress (inbound)</option>
+              <option value="egress">Egress (outbound)</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-bold">Protocol</label>
+            <select id="rule-protocol" class="form-select" onchange="onRuleProtocolChange()">
+              <option value="">Any</option>
+              <option value="tcp">TCP</option>
+              <option value="udp">UDP</option>
+              <option value="icmp">ICMP</option>
+            </select>
+          </div>
+        </div>
+        <div class="row mb-3" id="rule-port-row">
+          <div class="col-6">
+            <label class="form-label fw-bold">Port Min</label>
+            <input type="number" id="rule-port-min" class="form-control" placeholder="e.g. 80" min="1" max="65535">
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-bold">Port Max</label>
+            <input type="number" id="rule-port-max" class="form-control" placeholder="e.g. 80" min="1" max="65535">
+          </div>
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold">Remote IP (CIDR)</label>
+          <input type="text" id="rule-remote-ip" class="form-control" placeholder="0.0.0.0/0">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitAddRule()"><i class="bi bi-plus-lg me-1"></i>Add Rule</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Attach Security Group Modal ────────────────────────────────────────── -->
+<div class="modal fade" id="attachSgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-shield-lock me-2"></i>Attach Security Group</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="attach-sg-server-id">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Instance</label>
+          <input type="text" id="attach-sg-server-name" class="form-control" disabled>
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold">Security Group <span class="text-danger">*</span></label>
+          <select id="attach-sg-select" class="form-select"><option value="">Loading…</option></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitAttachSg()"><i class="bi bi-link-45deg me-1"></i>Attach</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Confirm Modal ───────────────────────────────────────────────────────── -->
 <div class="modal fade" id="confirmModal" tabindex="-1">
   <div class="modal-dialog modal-sm">
@@ -486,6 +594,9 @@
   const createAmiModal = new bootstrap.Modal(document.getElementById('createAmiModal'));
   const copyAmiModal   = new bootstrap.Modal(document.getElementById('copyAmiModal'));
   const confirmModal   = new bootstrap.Modal(document.getElementById('confirmModal'));
+  const createSgModal  = new bootstrap.Modal(document.getElementById('createSgModal'));
+  const addRuleModal   = new bootstrap.Modal(document.getElementById('addRuleModal'));
+  const attachSgModal  = new bootstrap.Modal(document.getElementById('attachSgModal'));
 
   // ── Navigation ────────────────────────────────────────────────────────────
   function showSection(name) {
@@ -605,6 +716,7 @@
           if (s.status === 'SHUTOFF')       actions += `<button class="btn-act btn-start me-1"   onclick="startInstance('${s.id}','${s.name}')">&#9654; Start</button>`;
           if (s.status === 'SHUTOFF')       actions += `<button class="btn-act btn-modify me-1"  onclick="openModifyModal('${s.id}','${s.name}','${s.flavor}')">&#9881; Modify</button>`;
           if (s.status === 'ACTIVE' || s.status === 'SHUTOFF') actions += `<button class="btn-act btn-snapshot me-1" onclick="openCreateAmiModal('${s.id}','${s.name}')">&#128247; AMI</button>`;
+          if (s.status === 'ACTIVE')        actions += `<button class="btn-act btn-modify me-1"   onclick="openAttachSgModal('${s.id}','${s.name}')">&#128737; SG</button>`;
           if (s.status === 'VERIFY_RESIZE') actions += `<button class="btn-act btn-confirm me-1" onclick="confirmResize('${s.id}','${s.name}')">&#10003; Confirm</button>`;
           if (s.status !== 'BUILD')         actions += `<button class="btn-act btn-delete"        onclick="deleteInstance('${s.id}','${s.name}')">&#128465; Delete</button>`;
           return `<tr>
@@ -713,6 +825,12 @@
       : '<option value="">No networks available</option>';
 
     // Security group checkboxes — ssh-only selected by default
+    renderLaunchSgs(sgs);
+  }
+
+  // Renders SG checkboxes inside the launch modal.
+  // Empty state shows an inline create button so the user never needs to leave the modal.
+  function renderLaunchSgs(sgs) {
     document.getElementById('launch-sgs').innerHTML = sgs.length
       ? sgs.map(sg => `
           <div class="form-check">
@@ -721,7 +839,20 @@
               <strong>${sg.name}</strong>${sg.description ? ` <span style="color:#aaa">— ${sg.description}</span>` : ''}
             </label>
           </div>`).join('')
-      : '<span style="color:#aaa;font-size:13px">No security groups available</span>';
+      : `<div style="display:flex;align-items:center;gap:12px">
+           <span style="color:#aaa;font-size:13px">No security groups yet.</span>
+           <button type="button" class="btn-primary-act" style="padding:4px 10px;font-size:12px" onclick="openCreateSgFromLaunch()">
+             <i class="bi bi-plus-lg me-1"></i>Create one now
+           </button>
+         </div>`;
+  }
+
+  // Opens Create SG modal while keeping the launch modal open underneath.
+  function openCreateSgFromLaunch() {
+    document.getElementById('sg-name').value = '';
+    document.getElementById('sg-description').value = '';
+    document.getElementById('createSgModal').dataset.calledFromLaunch = '1';
+    createSgModal.show();
   }
 
   async function submitLaunch() {
@@ -962,10 +1093,10 @@
   // ── Security Groups ───────────────────────────────────────────────────────
   async function fetchSecurityGroups() {
     const data = await fetch('/api/security-groups').then(r => r.json());
-    if (data.error) { document.getElementById('sgs-body').innerHTML = errRow(data.error, 5); return; }
+    if (data.error) { document.getElementById('sgs-body').innerHTML = errRow(data.error, 6); return; }
     document.getElementById('sgs-count').textContent = data.length + ' groups';
     document.getElementById('sgs-body').innerHTML = data.length === 0
-      ? '<tr><td colspan="5" class="empty-state">No security groups</td></tr>'
+      ? '<tr><td colspan="6" class="empty-state">No security groups</td></tr>'
       : data.map(sg => `<tr>
           <td class="id-col">${sg.id}</td>
           <td><strong>${sg.name}</strong></td>
@@ -974,8 +1105,130 @@
           <td>${sg.ingress_rules.length === 0 ? '<span style="color:#aaa;font-size:12px">No ingress rules</span>'
             : sg.ingress_rules.map(r => {
                 const port = r.port_min ? (r.port_min === r.port_max ? r.port_min : `${r.port_min}-${r.port_max}`) : 'any';
-                return `<span class="rule-pill">${r.protocol} ${port} ← ${r.remote_ip}</span>`;
-              }).join('')}</td></tr>`).join('');
+                return `<span class="rule-pill">${r.protocol} ${port} ← ${r.remote_ip} <span style="cursor:pointer;margin-left:4px;opacity:0.6" onclick="deleteRule('${sg.uuid}','${r.uuid}')">&#10005;</span></span>`;
+              }).join('')}</td>
+          <td style="white-space:nowrap">
+            <button class="btn-act btn-modify me-1" onclick="openAddRuleModal('${sg.uuid}','${sg.name}')"><i class="bi bi-plus-lg"></i> Rule</button>
+            <button class="btn-act btn-delete" onclick="deleteSg('${sg.uuid}','${sg.name}')">&#128465; Delete</button>
+          </td></tr>`).join('');
+  }
+
+  // Opens Create SG modal and clears previous input.
+  function openCreateSgModal() {
+    document.getElementById('sg-name').value = '';
+    document.getElementById('sg-description').value = '';
+    createSgModal.show();
+  }
+
+  async function submitCreateSg() {
+    const name        = document.getElementById('sg-name').value.trim();
+    const description = document.getElementById('sg-description').value.trim();
+    if (!name) { toast('error', 'Validation', 'Name is required'); return; }
+    const r = await fetch('/api/security-groups', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, description})
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Create failed', r.error); return; }
+    toast('success', 'Created', `Security group "${name}" created`);
+    const calledFromLaunch = document.getElementById('createSgModal').dataset.calledFromLaunch === '1';
+    delete document.getElementById('createSgModal').dataset.calledFromLaunch;
+    createSgModal.hide();
+    if (calledFromLaunch) {
+      // Refresh SG checkboxes in the still-open launch modal instead of navigating away.
+      const sgs = await fetch('/api/security-groups').then(r => r.json());
+      renderLaunchSgs(sgs.error ? [] : sgs);
+    } else {
+      delete loaded['security-groups'];
+      loadSection('security-groups');
+    }
+  }
+
+  function deleteSg(uuid, name) {
+    confirm(`Delete security group "${name}"? All its rules will be removed.`, async () => {
+      const r = await fetch(`/api/security-groups/${uuid}`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'Deleted', `Security group "${name}" removed`);
+      delete loaded['security-groups'];
+      loadSection('security-groups');
+    });
+  }
+
+  // Stores sg UUID in hidden field so submitAddRule knows which SG to target.
+  function openAddRuleModal(sgUuid, sgName) {
+    document.getElementById('rule-sg-uuid').value = sgUuid;
+    document.getElementById('rule-sg-name').textContent  = sgName;
+    document.getElementById('rule-direction').value  = 'ingress';
+    document.getElementById('rule-protocol').value   = 'tcp';
+    document.getElementById('rule-port-min').value   = '';
+    document.getElementById('rule-port-max').value   = '';
+    document.getElementById('rule-remote-ip').value  = '0.0.0.0/0';
+    onRuleProtocolChange();
+    addRuleModal.show();
+  }
+
+  // ICMP has no port concept — hide port fields when selected.
+  function onRuleProtocolChange() {
+    const proto = document.getElementById('rule-protocol').value;
+    document.getElementById('rule-port-row').style.display = (proto === 'icmp' || proto === '') ? 'none' : '';
+  }
+
+  async function submitAddRule() {
+    const sgUuid   = document.getElementById('rule-sg-uuid').value;
+    const direction = document.getElementById('rule-direction').value;
+    const protocol  = document.getElementById('rule-protocol').value || null;
+    const portMin   = document.getElementById('rule-port-min').value  || null;
+    const portMax   = document.getElementById('rule-port-max').value  || null;
+    const remoteIp  = document.getElementById('rule-remote-ip').value.trim() || '0.0.0.0/0';
+    const r = await fetch(`/api/security-groups/${sgUuid}/rules`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({direction, protocol, port_min: portMin, port_max: portMax, remote_ip: remoteIp})
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Add rule failed', r.error); return; }
+    toast('success', 'Rule added', 'New rule is now active');
+    addRuleModal.hide();
+    delete loaded['security-groups'];
+    loadSection('security-groups');
+  }
+
+  // Neutron rules are immutable — delete removes the rule; user then adds a corrected one.
+  function deleteRule(sgUuid, ruleUuid) {
+    confirm('Remove this rule?', async () => {
+      const r = await fetch(`/api/security-groups/${sgUuid}/rules/${ruleUuid}`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Delete rule failed', r.error); return; }
+      toast('success', 'Rule removed', 'Security group rule deleted');
+      delete loaded['security-groups'];
+      loadSection('security-groups');
+    });
+  }
+
+  // Fetches current SG list to populate the dropdown before showing the modal.
+  async function openAttachSgModal(serverId, serverName) {
+    document.getElementById('attach-sg-server-id').value   = serverId;
+    document.getElementById('attach-sg-server-name').value = serverName;
+    const sgs = await fetch('/api/security-groups').then(r => r.json());
+    const sel = document.getElementById('attach-sg-select');
+    if (sgs.error || sgs.length === 0) {
+      sel.innerHTML = '<option value="">No security groups available</option>';
+    } else {
+      sel.innerHTML = sgs.map(sg => `<option value="${sg.name}">${sg.name}</option>`).join('');
+    }
+    attachSgModal.show();
+  }
+
+  async function submitAttachSg() {
+    const serverId = document.getElementById('attach-sg-server-id').value;
+    const name     = document.getElementById('attach-sg-select').value;
+    if (!name) { toast('error', 'Validation', 'Select a security group'); return; }
+    const r = await fetch(`/api/instances/${serverId}/security-groups`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name})
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Attach failed', r.error); return; }
+    toast('success', 'Attached', `Security group "${name}" attached to instance`);
+    attachSgModal.hide();
   }
 
   // ── Users ─────────────────────────────────────────────────────────────────
