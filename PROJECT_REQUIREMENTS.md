@@ -124,11 +124,12 @@ This project builds a local cloud computing environment that replicates the core
 - **FR-06.6** — User can delete security group rules individually
 
 ### FR-07: SSH Key Pairs (EC2 Key Pairs Equivalent)
-- **FR-07.1** — User can upload an existing public key to create a key pair
-- **FR-07.2** — User can generate a new key pair and download the private key
-- **FR-07.3** — Key pair must be injected into new instances at launch
-- **FR-07.4** — User can delete key pairs
-- **FR-07.5** — SSH access to instance must work using the associated private key
+- **FR-07.1** — User can upload an existing public key to create a key pair (CLI)
+- **FR-07.2** — User can generate a new key pair from the dashboard; the private key downloads automatically as a `.pem` file immediately on creation — it is not stored and cannot be retrieved again
+- **FR-07.3** — Key pair must be injected into new instances at launch (supported in both CLI and launch wizard)
+- **FR-07.4** — User can delete key pairs from the dashboard; running instances using the key are not affected
+- **FR-07.5** — SSH access to instance must work using the downloaded private key: `ssh -i <name>.pem <user>@<floating-ip>`
+- **FR-07.6** — Dashboard Key Pairs section displays: name, fingerprint, creation date, SSH command hint, and delete action per row
 
 ### FR-08: Block Storage / Volumes (EBS Equivalent)
 - **FR-08.1** — User can create a persistent volume with a specified size (GB)

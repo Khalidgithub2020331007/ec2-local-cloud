@@ -1007,6 +1007,101 @@ Expected: `cirros-copy-test` does NOT appear.
 
 ---
 
+### UI Test 13 — View Key Pairs from the Dashboard
+
+**What this tests:** Are existing key pairs listed with their details?
+
+**Steps:**
+1. Click **Key Pairs** in the left sidebar (under Networking)
+2. The table loads automatically
+
+**Expected result:**
+- Each key pair row shows: Name, Fingerprint, Creation date, SSH command hint
+- The SSH command column shows: `ssh -i <name>.pem <user>@<floating-ip>`
+- An info bar at the top reminds you that private keys are one-time only
+
+**Pass:** Key pairs table loads with at least `project-key` visible.
+**Fail:** Error message, or empty table when key pairs exist in CLI (`openstack keypair list`).
+
+---
+
+### UI Test 14 — Create a Key Pair and Download Private Key
+
+**What this tests:** Can you generate a new SSH key pair and get the private key file?
+
+**Steps:**
+1. Click **Key Pairs** in the left sidebar
+2. Click the orange **Create Key Pair** button
+3. Enter name: `ui-test-key`
+4. Click **Create & Download**
+
+**Expected result:**
+- A `.pem` file named `ui-test-key.pem` downloads automatically to your Downloads folder
+- A success toast appears: *"ui-test-key.pem downloaded — store it safely"*
+- After 2 seconds the table refreshes and `ui-test-key` appears in the list with its fingerprint
+
+**Verify from CLI:**
+```bash
+openstack keypair list
+```
+Expected: `ui-test-key` appears.
+
+**Pass:** `.pem` file downloaded and key pair appears in the table.
+**Fail:** No file download, error toast, or key does not appear in the table.
+
+---
+
+### UI Test 15 — Use the New Key Pair When Launching an Instance
+
+**What this tests:** Does the newly created key pair appear in the launch wizard?
+
+**Steps:**
+1. Click **Instances** in the sidebar
+2. Click **Launch Instance**
+3. Open the **Key Pair** dropdown
+
+**Expected result:**
+- `ui-test-key` appears in the dropdown alongside any other key pairs
+
+**Steps (continued):**
+4. Select `ui-test-key`
+5. Fill in the remaining fields and launch an instance
+6. SSH into the instance using the downloaded key:
+```bash
+ssh -i ~/Downloads/ui-test-key.pem cirros@<floating-ip>
+```
+
+**Pass:** Key pair appears in dropdown; SSH login works with the downloaded `.pem` file.
+**Fail:** Key pair missing from dropdown, or SSH fails with `Permission denied`.
+
+---
+
+### UI Test 16 — Delete a Key Pair from the Dashboard
+
+**What this tests:** Can you remove a key pair that is no longer needed?
+
+**Steps:**
+1. Click **Key Pairs** in the left sidebar
+2. Find `ui-test-key` in the table
+3. Click the red **Delete** button on that row
+4. Read the confirmation dialog — note it says running instances are not affected
+5. Click **Delete** to confirm
+
+**Expected result:**
+- `ui-test-key` disappears from the table
+- The Key Pairs count badge decreases by 1
+
+**Verify from CLI:**
+```bash
+openstack keypair list
+```
+Expected: `ui-test-key` does NOT appear.
+
+**Pass:** Key pair is removed from the table.
+**Fail:** Error toast appears, or key pair remains in the list.
+
+---
+
 ## Section 4 — What Exactly Should You Test?
 
 Here is a complete checklist. Go through each item and write **PASS** or **FAIL** next to it.
@@ -1049,6 +1144,10 @@ Here is a complete checklist. Go through each item and write **PASS** or **FAIL*
 [ ] 28. Launch from AMI (Images)        → launch modal opens with image pre-selected
 [ ] 29. Copy AMI button (Images)        → copy modal; cirros-copy-test appears active within 30s
 [ ] 30. Delete AMI button (Images)      → cirros-copy-test removed from Images table
+[ ] 31. Key Pairs section loads         → project-key visible with fingerprint and SSH hint
+[ ] 32. Create Key Pair button          → ui-test-key.pem downloads; key appears in table
+[ ] 33. Launch wizard key pair dropdown → ui-test-key appears; SSH login works with .pem
+[ ] 34. Delete Key Pair button          → ui-test-key removed from table
 ```
 
 ---

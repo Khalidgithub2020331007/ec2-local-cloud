@@ -1788,7 +1788,9 @@ User clicks "Launch Instance"
 | Permissions | IAM Roles/Policies | Keystone Roles | `openstack role add` |
 | Web Console | AWS Management Console | Horizon Dashboard | http://IP/dashboard |
 | CLI | AWS CLI | OpenStack CLI | `openstack` |
-| VM Console Access | EC2 Instance Connect | VNC Console | Horizon > Console tab |
+| VM Console Access | EC2 Instance Connect | VNC Console + Serial Log | `/api/instances/<id>/console` |
+| Network Interfaces | Elastic Network Interface (ENI) | Neutron Ports | `/api/ports`, `os-interface` |
+| Service Quotas | AWS Service Quotas | Nova/Cinder/Neutron Quota Sets | `/api/quotas` |
 
 ### Sub-step 7.3.2 — Architecture comparison for report
 
@@ -1972,6 +1974,61 @@ git commit -m "Final semester project: Local EC2 replica using DevStack"
 | 9.10 | Add JS functions: `launchFromAmi`, `openCreateAmiModal`, `submitCreateAmi`, `openCopyAmiModal`, `submitCopyAmi`, `deleteImage` | ✅ |
 | 9.11 | Update FR-02 in PROJECT_REQUIREMENTS.md to reflect dashboard AMI operations | ✅ |
 | 9.12 | Add UI Tests 9–12 in test.md for AMI operations | ✅ |
+
+## Phase 10 — Key Pair Management (Create, Download, Use in SSH, Delete)
+| Sub-step | Task | Done |
+|----------|------|------|
+| 10.1 | Expand `GET /api/keypairs` to return full objects (name, fingerprint, public_key, created_at) instead of names only | ✅ |
+| 10.2 | Add `POST /api/keypairs` — Nova key pair creation; returns private_key in response (only at creation time) | ✅ |
+| 10.3 | Add `DELETE /api/keypairs/<name>` — remove a key pair by name | ✅ |
+| 10.4 | Add Key Pairs nav item under Networking in the sidebar with a count badge | ✅ |
+| 10.5 | Add Key Pairs section with table (Name, Fingerprint, Created, SSH Usage, Actions) | ✅ |
+| 10.6 | Add Create Key Pair modal with name input and one-time-download warning | ✅ |
+| 10.7 | Auto-download `.pem` file via Blob URL immediately after successful creation (Nova private key is one-time only) | ✅ |
+| 10.8 | Add `deleteKeypair()` with confirmation dialog explaining running instances are not affected | ✅ |
+| 10.9 | Fix `openLaunchModal()` keypair dropdown to map `kp.name` after API response shape change | ✅ |
+| 10.10 | Update FR-07 in PROJECT_REQUIREMENTS.md to reflect dashboard key pair operations | ✅ |
+| 10.11 | Add UI Tests 13–16 in test.md for key pair operations | ✅ |
+
+## Phase 11 — Missing EC2 Services: Backend (Snapshots, Console, Ports, Quotas)
+| Sub-step | Task | Done |
+|----------|------|------|
+| 11.1 | `GET /api/snapshots` — list all Cinder snapshots with project name resolution | ✅ |
+| 11.2 | `POST /api/snapshots` — create snapshot from volume (`force: True` for in-use volumes) | ✅ |
+| 11.3 | `DELETE /api/snapshots/<id>` — delete snapshot | ✅ |
+| 11.4 | `POST /api/volumes/from-snapshot` — restore Cinder volume from snapshot | ✅ |
+| 11.5 | `POST /api/instances/<id>/console` — get Nova VNC console URL (`os-getVNCConsole`) | ✅ |
+| 11.6 | `GET /api/instances/<id>/console-output` — get serial console log (`os-getConsoleOutput`, max 500 lines) | ✅ |
+| 11.7 | `GET /api/ports` — list Neutron ports with subnet and IP info | ✅ |
+| 11.8 | `POST /api/ports` — create standalone Neutron port on a network | ✅ |
+| 11.9 | `DELETE /api/ports/<id>` — delete port | ✅ |
+| 11.10 | `GET /api/instances/<id>/interfaces` — list ports attached to an instance (`os-interface`) | ✅ |
+| 11.11 | `POST /api/instances/<id>/interfaces` — attach port or auto-create on network (`os-interface`) | ✅ |
+| 11.12 | `DELETE /api/instances/<id>/interfaces/<port_id>` — detach interface from instance | ✅ |
+| 11.13 | `GET /api/quotas` — aggregate compute+volume+network quotas per project with usage | ✅ |
+| 11.14 | `PUT /api/quotas/<project_id>` — update a single quota key (value -1 = unlimited) | ✅ |
+
+## Phase 12 — Missing EC2 Services: UI (Snapshots, Console, Ports, Quotas)
+| Sub-step | Task | Done |
+|----------|------|------|
+| 12.1 | Add Snapshots nav item under Storage (after Volumes) | ✅ |
+| 12.2 | Add Network Interfaces nav item under Networking (after Key Pairs) | ✅ |
+| 12.3 | Add Quotas nav item under Identity (after Users) | ✅ |
+| 12.4 | Add `section-snapshots` HTML section with table (ID, Name, Status, Size, Source Volume, Project, Created, Actions) | ✅ |
+| 12.5 | Add `section-ports` HTML section with table (ID, Name, Status, MAC, IPs, Device/Owner, Actions) | ✅ |
+| 12.6 | Add `section-quotas` HTML section with `quotas-grid` div for JS-rendered quota cards | ✅ |
+| 12.7 | Add Create Snapshot modal (volume dropdown, name, description) | ✅ |
+| 12.8 | Add Restore Snapshot modal (snapshot name disabled, new volume name, size ≥ original) | ✅ |
+| 12.9 | Add Create Port modal (network dropdown, port name) | ✅ |
+| 12.10 | Add Attach Interface modal (free-port dropdown OR network dropdown for auto-create) | ✅ |
+| 12.11 | Add Console modal XL (VNC link, line count selector, scrollable log output, XSS-safe) | ✅ |
+| 12.12 | Register all 5 new modals in `bootstrap.Modal(...)` initialization block | ✅ |
+| 12.13 | Update `loadSection` map with `snapshots → fetchSnapshots`, `ports → fetchPorts`, `quotas → fetchQuotas` | ✅ |
+| 12.14 | Add Console and NIC buttons to ACTIVE instance rows in `fetchInstances()` | ✅ |
+| 12.15 | Add `fetchSnapshots`, `openCreateSnapshotModal`, `submitCreateSnapshot`, `openRestoreSnapshotModal`, `submitRestoreSnapshot`, `deleteSnapshot` JS functions | ✅ |
+| 12.16 | Add `openConsoleModal`, `loadConsoleOutput`, `renderConsoleOutput`, `_consoleServerId` JS functions | ✅ |
+| 12.17 | Add `fetchPorts`, `openCreatePortModal`, `submitCreatePort`, `deletePort`, `openAttachInterfaceModal`, `submitAttachInterface` JS functions | ✅ |
+| 12.18 | Add `fetchQuotas` and `quotaSection` JS functions (progress bars, green/amber/red by % used) | ✅ |
 
 ---
 

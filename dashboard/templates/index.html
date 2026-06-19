@@ -156,17 +156,27 @@
   <div class="nav-group">Compute</div>
   <div class="nav-item" onclick="showSection('instances')"      id="nav-instances"><i class="bi bi-pc-display"></i> Instances <span class="nav-badge" id="badge-instances">—</span></div>
   <div class="nav-item" onclick="showSection('images')"         id="nav-images"><i class="bi bi-layers"></i> Images <span class="nav-badge" id="badge-images">—</span></div>
+  <div class="nav-item" onclick="showSection('auto-scaling')"   id="nav-auto-scaling"><i class="bi bi-arrows-expand"></i> Auto Scaling</div>
 
   <div class="nav-group">Storage</div>
   <div class="nav-item" onclick="showSection('volumes')"        id="nav-volumes"><i class="bi bi-device-hdd"></i> Volumes <span class="nav-badge" id="badge-volumes">—</span></div>
+  <div class="nav-item" onclick="showSection('snapshots')"      id="nav-snapshots"><i class="bi bi-camera"></i> Snapshots</div>
 
   <div class="nav-group">Networking</div>
-  <div class="nav-item" onclick="showSection('networks')"       id="nav-networks"><i class="bi bi-diagram-3"></i> Networks</div>
-  <div class="nav-item" onclick="showSection('floating-ips')"   id="nav-floating-ips"><i class="bi bi-globe2"></i> Floating IPs</div>
+  <div class="nav-item" onclick="showSection('networks')"        id="nav-networks"><i class="bi bi-diagram-3"></i> Networks</div>
+  <div class="nav-item" onclick="showSection('routers')"         id="nav-routers"><i class="bi bi-signpost-split"></i> Routers</div>
+  <div class="nav-item" onclick="showSection('floating-ips')"    id="nav-floating-ips"><i class="bi bi-globe2"></i> Floating IPs</div>
+  <div class="nav-item" onclick="showSection('load-balancers')"  id="nav-load-balancers"><i class="bi bi-distribute-vertical"></i> Load Balancers <span class="nav-badge" id="badge-load-balancers">—</span></div>
   <div class="nav-item" onclick="showSection('security-groups')" id="nav-security-groups"><i class="bi bi-shield-check"></i> Security Groups</div>
+  <div class="nav-item" onclick="showSection('key-pairs')"       id="nav-key-pairs"><i class="bi bi-key"></i> Key Pairs <span class="nav-badge" id="badge-key-pairs">—</span></div>
+  <div class="nav-item" onclick="showSection('ports')"          id="nav-ports"><i class="bi bi-ethernet"></i> Network Interfaces</div>
 
   <div class="nav-group">Identity</div>
   <div class="nav-item" onclick="showSection('users')"          id="nav-users"><i class="bi bi-people"></i> Users &amp; Projects</div>
+  <div class="nav-item" onclick="showSection('quotas')"         id="nav-quotas"><i class="bi bi-speedometer2"></i> Quotas</div>
+
+  <div class="nav-group">System</div>
+  <div class="nav-item" onclick="showSection('devstack')" id="nav-devstack"><i class="bi bi-terminal"></i> DevStack Monitor</div>
 </aside>
 
 <!-- Main -->
@@ -210,6 +220,21 @@
     </div>
   </section>
 
+  <!-- Auto Scaling Groups -->
+  <section class="section" id="section-auto-scaling">
+    <div class="page-header">
+      <div class="page-header-left"><h2>Auto Scaling Groups</h2><p>Managed instance groups that scale horizontally — EC2 Auto Scaling equivalent</p></div>
+      <button class="btn-primary-act" onclick="openCreateAsgModal()"><i class="bi bi-plus-lg me-1"></i>Create ASG</button>
+    </div>
+    <div class="card-box">
+      <div class="card-box-header"><h5>All Auto Scaling Groups</h5><span id="asg-count" style="font-size:13px;color:#6b7785"></span></div>
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Image</th><th>Flavor</th><th>Min</th><th>Max</th><th>Desired</th><th>Running</th><th>Created</th><th>Actions</th></tr></thead>
+        <tbody id="asg-body"><tr><td colspan="9" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
   <!-- Volumes -->
   <section class="section" id="section-volumes">
     <div class="page-header">
@@ -227,15 +252,38 @@
 
   <!-- Networks -->
   <section class="section" id="section-networks">
-    <div class="page-header"><div class="page-header-left"><h2>Networks</h2><p>Virtual networks and subnets — VPC equivalent</p></div></div>
+    <div class="page-header">
+      <div class="page-header-left"><h2>Networks</h2><p>Virtual networks and subnets — VPC equivalent</p></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-secondary-act" onclick="openCreateSubnetModal()"><i class="bi bi-plus-lg me-1"></i>Add Subnet</button>
+        <button class="btn-primary-act"   onclick="openCreateNetworkModal()"><i class="bi bi-plus-lg me-1"></i>Create Network</button>
+      </div>
+    </div>
     <div id="networks-grid" class="net-grid"><div class="empty-state"><span class="spinner"></span><br>Loading…</div></div>
+  </section>
+
+  <!-- Routers -->
+  <section class="section" id="section-routers">
+    <div class="page-header">
+      <div class="page-header-left"><h2>Routers</h2><p>Virtual routers — Internet Gateway equivalent connecting subnets to external networks</p></div>
+      <button class="btn-primary-act" onclick="openCreateRouterModal()"><i class="bi bi-plus-lg me-1"></i>Create Router</button>
+    </div>
+    <div class="card-box">
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Status</th><th>External Gateway</th><th>Attached Subnets</th><th>Static Routes</th><th>Actions</th></tr></thead>
+        <tbody id="routers-body"><tr><td colspan="6" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+      </table>
+    </div>
   </section>
 
   <!-- Floating IPs -->
   <section class="section" id="section-floating-ips">
     <div class="page-header">
       <div class="page-header-left"><h2>Floating IPs</h2><p>Public IPs assignable to instances — Elastic IP equivalent</p></div>
-      <button class="btn-primary-act" onclick="allocateFloatingIp()"><i class="bi bi-plus-lg me-1"></i>Allocate IP</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-secondary-act" onclick="openAssociateFipPanel()"><i class="bi bi-link-45deg me-1"></i>Associate</button>
+        <button class="btn-primary-act"   onclick="allocateFloatingIp()"><i class="bi bi-plus-lg me-1"></i>Allocate IP</button>
+      </div>
     </div>
     <div class="card-box">
       <div class="card-box-header"><h5>Floating IP Pool</h5><span id="fips-count" style="font-size:13px;color:#6b7785"></span></div>
@@ -243,6 +291,16 @@
         <thead><tr><th>ID</th><th>Floating IP</th><th>Fixed IP (Instance)</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="fips-body"><tr><td colspan="5" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
       </table>
+      <div id="fips-associate-panel" style="display:none;margin-top:12px;padding:12px;background:#f8f9fa;border-radius:6px;border:1px solid #dee2e6">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px">Associate Floating IP</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="fip-associate-fip" class="form-select form-select-sm" style="max-width:180px"></select>
+          <span style="font-size:13px;color:#6b7785">→</span>
+          <select id="fip-associate-server" class="form-select form-select-sm" style="max-width:220px"><option value="">Loading instances…</option></select>
+          <button class="btn-primary-act" style="padding:5px 14px;font-size:13px" onclick="submitAssociateFip()">Associate</button>
+          <button class="btn-secondary-act" style="padding:5px 14px;font-size:13px" onclick="document.getElementById('fips-associate-panel').style.display='none'">Cancel</button>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -255,8 +313,48 @@
     <div class="card-box">
       <div class="card-box-header"><h5>All Security Groups</h5><span id="sgs-count" style="font-size:13px;color:#6b7785"></span></div>
       <table class="data-table">
-        <thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Rules</th><th>Ingress Rules</th><th>Actions</th></tr></thead>
-        <tbody id="sgs-body"><tr><td colspan="6" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+        <thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Rules</th><th>Ingress Rules</th><th>Egress Rules</th><th>Actions</th></tr></thead>
+        <tbody id="sgs-body"><tr><td colspan="7" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Key Pairs -->
+  <section class="section" id="section-key-pairs">
+    <div class="page-header">
+      <div class="page-header-left"><h2>Key Pairs</h2><p>SSH key pairs for instance access — EC2 Key Pairs equivalent</p></div>
+      <button class="btn-primary-act" onclick="openCreateKeypairModal()"><i class="bi bi-plus-lg me-1"></i>Create Key Pair</button>
+    </div>
+    <div class="card-box">
+      <div class="alert alert-info" style="font-size:13px;margin:0 0 16px;padding:10px 14px;border-radius:6px;background:#e8f4fd;border:1px solid #bee5f6;color:#1a5276">
+        <i class="bi bi-info-circle me-1"></i>
+        The private key is available <strong>only at creation time</strong> — it downloads automatically. Nova does not store it.
+      </div>
+      <div class="card-box-header"><h5>All Key Pairs</h5><span id="kps-count" style="font-size:13px;color:#6b7785"></span></div>
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Fingerprint</th><th>Created</th><th>SSH Usage</th><th>Actions</th></tr></thead>
+        <tbody id="kps-body"><tr><td colspan="5" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Load Balancers -->
+  <section class="section" id="section-load-balancers">
+    <div class="page-header">
+      <div class="page-header-left"><h2>Load Balancers</h2><p>Distribute traffic across instances — Octavia with OVN provider</p></div>
+      <button class="btn-primary-act" onclick="openCreateLbModal()"><i class="bi bi-plus-lg me-1"></i>Create Load Balancer</button>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="label">Total LBs</div><div class="number" id="lb-stat-total">—</div></div>
+      <div class="stat-card"><div class="label">Active</div><div class="number" id="lb-stat-active">—</div></div>
+      <div class="stat-card"><div class="label">Total Listeners</div><div class="number" id="lb-stat-listeners">—</div></div>
+      <div class="stat-card"><div class="label">Total Members</div><div class="number" id="lb-stat-members">—</div></div>
+    </div>
+    <div class="card-box">
+      <div class="card-box-header"><h5>All Load Balancers</h5><span id="lb-count" style="font-size:13px;color:#6b7785"></span></div>
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>VIP Address</th><th>Provider</th><th>Provision Status</th><th>Op. Status</th><th>Listeners</th><th>Members</th><th>Actions</th></tr></thead>
+        <tbody id="lb-body"><tr><td colspan="8" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -270,6 +368,104 @@
         <thead><tr><th>ID</th><th>Username</th><th>Status</th><th>Projects (Isolated Tenants)</th></tr></thead>
         <tbody id="users-body"><tr><td colspan="4" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
       </table>
+    </div>
+  </section>
+
+  <!-- Snapshots -->
+  <section class="section" id="section-snapshots">
+    <div class="page-header">
+      <div class="page-header-left"><h2>Snapshots</h2><p>Point-in-time volume backups — EBS Snapshot equivalent</p></div>
+      <button class="btn-primary-act" onclick="openCreateSnapshotModal()"><i class="bi bi-plus-lg me-1"></i>Create Snapshot</button>
+    </div>
+    <div class="card-box">
+      <div class="card-box-header"><h5>All Snapshots</h5><span id="snapshots-count" style="font-size:13px;color:#6b7785"></span></div>
+      <table class="data-table">
+        <thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Size</th><th>Source Volume</th><th>Project</th><th>Created</th><th>Actions</th></tr></thead>
+        <tbody id="snapshots-body"><tr><td colspan="8" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Network Interfaces / Ports -->
+  <section class="section" id="section-ports">
+    <div class="page-header">
+      <div class="page-header-left"><h2>Network Interfaces</h2><p>Neutron ports — Elastic Network Interface (ENI) equivalent</p></div>
+      <button class="btn-primary-act" onclick="openCreatePortModal()"><i class="bi bi-plus-lg me-1"></i>Create Port</button>
+    </div>
+    <div class="card-box">
+      <div class="card-box-header"><h5>All Ports</h5><span id="ports-count" style="font-size:13px;color:#6b7785"></span></div>
+      <table class="data-table">
+        <thead><tr><th>ID</th><th>Name</th><th>Status</th><th>MAC Address</th><th>IP Addresses</th><th>Device / Owner</th><th>Actions</th></tr></thead>
+        <tbody id="ports-body"><tr><td colspan="7" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Resource Quotas -->
+  <section class="section" id="section-quotas">
+    <div class="page-header">
+      <div class="page-header-left"><h2>Resource Quotas</h2><p>Per-project limits and usage — EC2 Service Quotas equivalent</p></div>
+      <button class="btn-secondary-act" onclick="refreshCurrent()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+    </div>
+    <div id="quotas-grid"></div>
+  </section>
+
+  <!-- DevStack Monitor -->
+  <section class="section" id="section-devstack">
+    <div class="page-header">
+      <div class="page-header-left"><h2>DevStack Monitor</h2><p>Live stack.sh installation progress and service control</p></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn-secondary-act" onclick="loadDevstack()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+        <button class="btn-act btn-delete" id="ds-stop-btn" onclick="stopDevstack()" style="padding:7px 14px;font-size:13px;font-weight:600;display:none"><i class="bi bi-stop-circle me-1"></i>Stop stack.sh</button>
+      </div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="card-box" style="margin-bottom:16px;">
+      <div style="padding:16px 20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span id="ds-status-dot" style="width:12px;height:12px;border-radius:50%;background:#ccc;display:inline-block;flex-shrink:0;"></span>
+          <span id="ds-status-label" style="font-weight:700;font-size:15px;">—</span>
+        </div>
+        <div style="color:#6b7785;font-size:13px;">Phase: <strong id="ds-phase">—</strong></div>
+        <div style="color:#6b7785;font-size:13px;">PID: <span id="ds-pid" style="font-family:monospace;">—</span></div>
+        <div style="color:#6b7785;font-size:13px;">Log: <span id="ds-log-path" style="font-family:monospace;font-size:11px;">—</span></div>
+        <div style="margin-left:auto;font-size:12px;color:#8892a0;" id="ds-last-refresh"></div>
+      </div>
+    </div>
+
+    <!-- Progress phases -->
+    <div class="card-box" style="margin-bottom:16px;">
+      <div class="card-box-header"><h5><i class="bi bi-list-check me-2"></i>Installation Phases</h5></div>
+      <div style="padding:16px 20px;display:flex;gap:8px;flex-wrap:wrap;" id="ds-phases">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Log viewer -->
+    <div class="card-box">
+      <div class="card-box-header">
+        <h5><i class="bi bi-file-text me-2"></i>Live Log Output</h5>
+        <div class="hdr-right">
+          <label style="font-size:12px;color:#6b7785;margin:0;">Lines:
+            <select id="ds-lines-count" onchange="loadDevstack()" style="font-size:12px;padding:2px 6px;border:1px solid #d5dbdb;border-radius:4px;margin-left:4px;">
+              <option value="80">80</option>
+              <option value="150">150</option>
+              <option value="300">300</option>
+              <option value="500">500</option>
+            </select>
+          </label>
+          <label style="font-size:12px;color:#6b7785;display:flex;align-items:center;gap:6px;margin:0;">
+            <input type="checkbox" id="ds-auto-refresh" checked onchange="toggleDsAutoRefresh()"> Auto-refresh
+          </label>
+          <label style="font-size:12px;color:#6b7785;display:flex;align-items:center;gap:6px;margin:0;">
+            <input type="checkbox" id="ds-scroll-bottom" checked> Scroll to bottom
+          </label>
+        </div>
+      </div>
+      <div id="ds-log-container" style="background:#0d1117;border-radius:0 0 8px 8px;padding:16px 20px;overflow-y:auto;max-height:520px;font-family:monospace;font-size:12px;line-height:1.6;">
+        <div style="color:#6b7785;text-align:center;padding:20px;">Loading log…</div>
+      </div>
     </div>
   </section>
 
@@ -403,6 +599,104 @@
   </div>
 </div>
 
+<!-- ── Attach Volume Modal ────────────────────────────────────────────────── -->
+<div class="modal fade" id="attachVolumeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-link-45deg me-2"></i>Attach Volume</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="attach-volume-id">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Volume</label>
+          <input type="text" id="attach-volume-name" class="form-control" disabled>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Instance <span class="text-danger">*</span></label>
+          <select id="attach-server-id" class="form-select">
+            <option value="">— select an instance —</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Device path <small class="text-muted fw-normal">(optional)</small></label>
+          <input type="text" id="attach-device" class="form-control" placeholder="e.g. /dev/vdb">
+          <div class="form-text">Leave blank and Nova will pick the next available device.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitAttachVolume()"><i class="bi bi-link-45deg me-1"></i>Attach</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Detach Volume Modal ────────────────────────────────────────────────── -->
+<div class="modal fade" id="detachVolumeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-scissors me-2"></i>Detach Volume</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="detach-volume-id">
+        <input type="hidden" id="detach-server-id">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Volume</label>
+          <input type="text" id="detach-volume-name" class="form-control" disabled>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Attached to instance</label>
+          <input type="text" id="detach-server-display" class="form-control" disabled>
+        </div>
+        <div class="alert alert-warning" style="font-size:13px;padding:8px 12px;margin-bottom:0">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          Make sure the OS has unmounted the disk before detaching to avoid data corruption.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" style="background:#842029" onclick="submitDetachVolume()"><i class="bi bi-scissors me-1"></i>Detach</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Resize Volume Modal ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="resizeVolumeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-arrows-expand me-2"></i>Resize Volume</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="resize-volume-id">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Volume</label>
+          <input type="text" id="resize-volume-name" class="form-control" disabled>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Current size</label>
+          <input type="text" id="resize-current-size" class="form-control" disabled>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">New size (GB) <span class="text-danger">*</span></label>
+          <input type="number" id="resize-new-size" class="form-control" min="1">
+          <div class="form-text">Must be larger than the current size. Cinder cannot shrink volumes.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitResizeVolume()"><i class="bi bi-arrows-expand me-1"></i>Resize</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Create AMI Modal ───────────────────────────────────────────────────── -->
 <div class="modal fade" id="createAmiModal" tabindex="-1">
   <div class="modal-dialog">
@@ -487,6 +781,178 @@
   </div>
 </div>
 
+<!-- ── Create Network Modal ────────────────────────────────────────────────── -->
+<div class="modal fade" id="createNetworkModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i>Create Network</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Name <span class="text-danger">*</span></label>
+          <input type="text" id="net-name" class="form-control" placeholder="e.g. private-net">
+        </div>
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="net-shared">
+          <label class="form-check-label" for="net-shared">Shared (visible to all projects)</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitCreateNetwork()"><i class="bi bi-plus-lg me-1"></i>Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create Subnet Modal ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="createSubnetModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-hdd-network me-2"></i>Add Subnet</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Network <span class="text-danger">*</span></label>
+          <select id="subnet-network" class="form-select"><option value="">Loading…</option></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Subnet Name</label>
+          <input type="text" id="subnet-name" class="form-control" placeholder="e.g. private-subnet">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">CIDR <span class="text-danger">*</span></label>
+          <input type="text" id="subnet-cidr" class="form-control" placeholder="e.g. 192.168.10.0/24">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Gateway IP <span style="font-size:12px;color:#6b7785">(leave blank for auto)</span></label>
+          <input type="text" id="subnet-gateway" class="form-control" placeholder="e.g. 192.168.10.1">
+        </div>
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="subnet-dhcp" checked>
+          <label class="form-check-label" for="subnet-dhcp">Enable DHCP</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitCreateSubnet()"><i class="bi bi-plus-lg me-1"></i>Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create Router Modal ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="createRouterModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-signpost-split me-2"></i>Create Router</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Router Name <span class="text-danger">*</span></label>
+          <input type="text" id="router-name" class="form-control" placeholder="e.g. main-router">
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold">External Gateway <span style="font-size:12px;color:#6b7785">(optional)</span></label>
+          <select id="router-gateway-net" class="form-select"><option value="">None — set later</option></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitCreateRouter()"><i class="bi bi-plus-lg me-1"></i>Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Attach Subnet to Router Modal ──────────────────────────────────────── -->
+<div class="modal fade" id="attachSubnetModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-link-45deg me-2"></i>Attach Subnet — <span id="attach-subnet-router-name"></span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="attach-subnet-router-id">
+        <label class="form-label fw-bold">Subnet <span class="text-danger">*</span></label>
+        <select id="attach-subnet-select" class="form-select"><option value="">Loading…</option></select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitAttachSubnet()"><i class="bi bi-link-45deg me-1"></i>Attach</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Route Table Modal ──────────────────────────────────────────────────── -->
+<div class="modal fade" id="routeTableModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-table me-2"></i>Route Table — <span id="route-table-router-name"></span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="route-table-router-id">
+        <div class="row g-2 mb-3 align-items-end" style="background:#f8f9fa;padding:12px;border-radius:6px">
+          <div class="col-5">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px">Destination CIDR <span class="text-danger">*</span></label>
+            <input type="text" id="route-destination" class="form-control form-control-sm" placeholder="e.g. 10.20.0.0/24">
+          </div>
+          <div class="col-5">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px">Next Hop IP <span class="text-danger">*</span></label>
+            <input type="text" id="route-nexthop" class="form-control form-control-sm" placeholder="e.g. 192.168.1.1">
+          </div>
+          <div class="col-2">
+            <button class="btn-primary-act w-100" style="padding:6px 0;font-size:13px" onclick="submitAddRoute()"><i class="bi bi-plus-lg"></i> Add</button>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Destination</th><th>Next Hop</th><th>Type</th><th>Action</th></tr></thead>
+          <tbody id="route-table-body"><tr><td colspan="4" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create Key Pair Modal ───────────────────────────────────────────────── -->
+<div class="modal fade" id="createKpModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-key me-2"></i>Create Key Pair</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Key Pair Name <span class="text-danger">*</span></label>
+          <input type="text" id="kp-name" class="form-control" placeholder="e.g. my-project-key">
+        </div>
+        <div class="alert alert-warning" style="font-size:13px;padding:8px 12px;margin-bottom:0">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          The private key downloads <strong>once only</strong> when you click Create. It cannot be retrieved later.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitCreateKeypair()"><i class="bi bi-download me-1"></i>Create &amp; Download</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Add Rule Modal ──────────────────────────────────────────────────────── -->
 <div class="modal fade" id="addRuleModal" tabindex="-1">
   <div class="modal-dialog">
@@ -544,23 +1010,202 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header" style="background:#232f3e;color:white;">
-        <h5 class="modal-title"><i class="bi bi-shield-lock me-2"></i>Attach Security Group</h5>
+        <h5 class="modal-title"><i class="bi bi-shield-lock me-2"></i>Security Groups — <span id="attach-sg-server-name"></span></h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="attach-sg-server-id">
         <div class="mb-3">
-          <label class="form-label fw-bold">Instance</label>
-          <input type="text" id="attach-sg-server-name" class="form-control" disabled>
+          <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:6px">Attached Security Groups</div>
+          <div id="attached-sgs-list" style="min-height:28px"></div>
         </div>
+        <hr style="margin:12px 0">
         <div class="mb-0">
-          <label class="form-label fw-bold">Security Group <span class="text-danger">*</span></label>
-          <select id="attach-sg-select" class="form-select"><option value="">Loading…</option></select>
+          <label class="form-label fw-bold">Add Security Group</label>
+          <div style="display:flex;gap:8px">
+            <select id="attach-sg-select" class="form-select"><option value="">Loading…</option></select>
+            <button class="btn-primary-act" style="white-space:nowrap;padding:6px 14px" onclick="submitAttachSg()"><i class="bi bi-plus-lg"></i> Attach</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Edit ASG Modal ─────────────────────────────────────────────────────── -->
+<div class="modal fade" id="editAsgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Edit Auto Scaling Group</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-asg-name">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Group</label>
+          <input type="text" id="edit-asg-display" class="form-control" disabled>
+        </div>
+        <div class="row mb-3">
+          <div class="col-4">
+            <label class="form-label fw-bold">Min Size</label>
+            <input type="number" id="edit-asg-min" class="form-control" min="1" max="10">
+          </div>
+          <div class="col-4">
+            <label class="form-label fw-bold">Max Size</label>
+            <input type="number" id="edit-asg-max" class="form-control" min="1" max="10">
+          </div>
+          <div class="col-4">
+            <label class="form-label fw-bold">Desired Capacity</label>
+            <input type="number" id="edit-asg-desired" class="form-control" min="1" max="10">
+          </div>
+        </div>
+        <div class="alert alert-info" style="font-size:13px;padding:8px 12px;margin-bottom:0">
+          <i class="bi bi-info-circle me-1"></i>
+          If desired capacity changes, instances will be launched or terminated immediately to match.
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn-primary-act" onclick="submitAttachSg()"><i class="bi bi-link-45deg me-1"></i>Attach</button>
+        <button class="btn-primary-act" onclick="submitEditAsg()"><i class="bi bi-check-lg me-1"></i>Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Scaling Policies Modal ─────────────────────────────────────────────── -->
+<div class="modal fade" id="policiesModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-gear me-2"></i>Scaling Policies — <span id="policies-asg-name-display"></span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="policies-asg-name">
+        <div id="policies-list-wrap" style="margin-bottom:20px">
+          <div class="loading-td"><span class="spinner"></span> Loading…</div>
+        </div>
+        <hr style="margin:0 0 16px">
+        <h6 style="font-weight:700;margin-bottom:12px"><i class="bi bi-plus-lg me-1"></i>Add Policy</h6>
+        <div class="row mb-3">
+          <div class="col-5">
+            <label class="form-label fw-bold">Policy Name <span class="text-danger">*</span></label>
+            <input type="text" id="policy-name" class="form-control" placeholder="e.g. scale-out">
+          </div>
+          <div class="col-4">
+            <label class="form-label fw-bold">Adjustment Type</label>
+            <select id="policy-adj-type" class="form-select" onchange="onPolicyTypeChange()">
+              <option value="ChangeInCapacity">ChangeInCapacity</option>
+              <option value="ExactCapacity">ExactCapacity</option>
+            </select>
+          </div>
+          <div class="col-3">
+            <label class="form-label fw-bold">Adjustment <span class="text-danger">*</span></label>
+            <input type="number" id="policy-adj-value" class="form-control" value="1">
+            <div class="form-text" id="policy-adj-hint">e.g. +1 or -1</div>
+          </div>
+        </div>
+        <div class="mb-0" style="max-width:200px">
+          <label class="form-label fw-bold">Cooldown (seconds)</label>
+          <input type="number" id="policy-cooldown" class="form-control" value="0" min="0">
+          <div class="form-text">Informational only — not enforced automatically.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Close</button>
+        <button class="btn-primary-act" onclick="submitAddPolicy()"><i class="bi bi-plus-lg me-1"></i>Add Policy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create ASG Modal ───────────────────────────────────────────────────── -->
+<div class="modal fade" id="createAsgModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-arrows-expand me-2"></i>Create Auto Scaling Group</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Group Name <span class="text-danger">*</span></label>
+          <input type="text" id="asg-name" class="form-control" placeholder="e.g. web-servers">
+          <div class="form-text">Instances will be named {name}-1, {name}-2, …</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Image (OS) <span class="text-danger">*</span></label>
+          <select id="asg-image" class="form-select"><option value="">Loading images…</option></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Flavor (Size) <span class="text-danger">*</span></label>
+          <select id="asg-flavor" class="form-select"><option value="">Loading flavors…</option></select>
+        </div>
+        <div class="row mb-3">
+          <div class="col-6">
+            <label class="form-label fw-bold">Key Pair</label>
+            <select id="asg-keypair" class="form-select"><option value="">Loading keypairs…</option></select>
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-bold">Network <span class="text-danger">*</span></label>
+            <select id="asg-network" class="form-select"><option value="">Loading networks…</option></select>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Security Groups <span class="text-danger">*</span></label>
+          <select id="asg-sg" class="form-select" multiple style="height:100px"><option value="">Loading…</option></select>
+          <div class="form-text">Hold Ctrl / Cmd to select multiple.</div>
+        </div>
+        <div class="row mb-0">
+          <div class="col-4">
+            <label class="form-label fw-bold">Min Size</label>
+            <input type="number" id="asg-min" class="form-control" value="1" min="1" max="10">
+          </div>
+          <div class="col-4">
+            <label class="form-label fw-bold">Max Size</label>
+            <input type="number" id="asg-max" class="form-control" value="3" min="1" max="10">
+          </div>
+          <div class="col-4">
+            <label class="form-label fw-bold">Desired Capacity</label>
+            <input type="number" id="asg-desired" class="form-control" value="1" min="1" max="10">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitCreateAsg()"><i class="bi bi-rocket-takeoff me-1"></i>Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Scale ASG Modal ────────────────────────────────────────────────────── -->
+<div class="modal fade" id="scaleAsgModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-arrows-expand me-2"></i>Scale Group</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="scale-asg-name">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Group</label>
+          <input type="text" id="scale-asg-display" class="form-control" disabled>
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold">New Desired Capacity <span class="text-danger">*</span></label>
+          <input type="number" id="scale-desired" class="form-control" min="1" max="10">
+          <div class="form-text" id="scale-asg-range"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitScaleAsg()"><i class="bi bi-arrows-expand me-1"></i>Scale</button>
       </div>
     </div>
   </div>
@@ -584,28 +1229,364 @@
   </div>
 </div>
 
+<!-- ── Create Load Balancer Modal ─────────────────────────────────────────── -->
+<div class="modal fade" id="createLbModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-distribute-vertical me-2"></i>Create Load Balancer</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+          <input type="text" id="lb-name" class="form-control" placeholder="my-load-balancer">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Subnet <span class="text-danger">*</span></label>
+          <select id="lb-subnet" class="form-select"><option value="">Loading subnets…</option></select>
+          <div class="form-text">The VIP address will be allocated from this subnet.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Description</label>
+          <input type="text" id="lb-description" class="form-control" placeholder="Optional description">
+        </div>
+        <div class="form-text text-muted"><i class="bi bi-info-circle me-1"></i>A default HTTP/ROUND_ROBIN pool is created automatically.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitCreateLb()">Create Load Balancer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── LB Listeners (Routing Rules) Modal ─────────────────────────────────── -->
+<div class="modal fade" id="lbListenersModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-arrow-left-right me-2"></i>Routing Rules — <span id="lb-listeners-name"></span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3 align-items-end" style="background:#f8f9fa;padding:12px;border-radius:6px;">
+          <div class="col-4">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">Listener Name</label>
+            <input type="text" id="listener-name" class="form-control form-control-sm" placeholder="http-listener">
+          </div>
+          <div class="col-3">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">Protocol</label>
+            <select id="listener-protocol" class="form-select form-select-sm">
+              <option value="HTTP">HTTP</option>
+              <option value="HTTPS">HTTPS</option>
+              <option value="TCP">TCP</option>
+              <option value="UDP">UDP</option>
+            </select>
+          </div>
+          <div class="col-3">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">Port</label>
+            <input type="number" id="listener-port" class="form-control form-control-sm" value="80" min="1" max="65535">
+          </div>
+          <div class="col-2">
+            <button class="btn-primary-act w-100" style="padding:6px 8px;font-size:12px;" onclick="submitAddListener()">Add</button>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Protocol</th><th>Port</th><th>Status</th><th></th></tr></thead>
+          <tbody id="lb-listeners-body"><tr><td colspan="5" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── LB Members (Attach Instances) Modal ────────────────────────────────── -->
+<div class="modal fade" id="lbMembersModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-pc-display me-2"></i>Attached Instances — <span id="lb-members-name"></span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3 align-items-end" style="background:#f8f9fa;padding:12px;border-radius:6px;">
+          <div class="col-5">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">Instance</label>
+            <select id="member-instance" class="form-select form-select-sm"><option value="">Loading instances…</option></select>
+          </div>
+          <div class="col-3">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">Port</label>
+            <input type="number" id="member-port" class="form-control form-control-sm" value="80" min="1" max="65535">
+          </div>
+          <div class="col-4">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">Subnet (optional)</label>
+            <select id="member-subnet" class="form-select form-select-sm"><option value="">Auto-detect</option></select>
+          </div>
+        </div>
+        <div class="mb-3">
+          <button class="btn-primary-act" style="font-size:12px;padding:6px 12px;" onclick="submitAttachMember()">Attach Instance</button>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Instance Name</th><th>IP Address</th><th>Port</th><th>Status</th><th></th></tr></thead>
+          <tbody id="lb-members-body"><tr><td colspan="5" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── LB Health Check Modal ──────────────────────────────────────────────── -->
+<div class="modal fade" id="lbHealthModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-heart-pulse me-2"></i>Health Check — <span id="lb-health-name"></span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="lb-health-existing" style="display:none;margin-bottom:16px;">
+          <div style="background:#d4edda;border-radius:6px;padding:12px 16px;font-size:13px;">
+            <strong><i class="bi bi-check-circle me-1"></i>Health monitor active</strong>
+            <div id="lb-health-details" style="margin-top:6px;color:#555;line-height:1.7;"></div>
+            <button class="btn-delete btn-act" style="margin-top:8px;" onclick="submitDeleteHealthMonitor()">Remove Monitor</button>
+          </div>
+        </div>
+        <div id="lb-health-form">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Type</label>
+            <select id="hm-type" class="form-select">
+              <option value="HTTP">HTTP</option>
+              <option value="HTTPS">HTTPS</option>
+              <option value="TCP">TCP</option>
+              <option value="PING">PING</option>
+            </select>
+          </div>
+          <div class="row g-3">
+            <div class="col-4">
+              <label class="form-label fw-semibold">Delay (s)</label>
+              <input type="number" id="hm-delay" class="form-control" value="5" min="1">
+              <div class="form-text">Check interval</div>
+            </div>
+            <div class="col-4">
+              <label class="form-label fw-semibold">Timeout (s)</label>
+              <input type="number" id="hm-timeout" class="form-control" value="3" min="1">
+              <div class="form-text">Per-check timeout</div>
+            </div>
+            <div class="col-4">
+              <label class="form-label fw-semibold">Max Retries</label>
+              <input type="number" id="hm-retries" class="form-control" value="3" min="1">
+              <div class="form-text">Before marking DOWN</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Close</button>
+        <button id="hm-save-btn" class="btn-primary-act" onclick="submitCreateHealthMonitor()">Save Health Check</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create Snapshot Modal ───────────────────────────────────────────────── -->
+<div class="modal fade" id="createSnapshotModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-camera me-2"></i>Create Snapshot</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Source Volume <span class="text-danger">*</span></label>
+          <select id="snap-volume-id" class="form-select"><option value="">Loading volumes…</option></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Snapshot Name <span class="text-danger">*</span></label>
+          <input type="text" id="snap-name" class="form-control" placeholder="e.g. data-disk-backup">
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold">Description</label>
+          <input type="text" id="snap-description" class="form-control" placeholder="Optional">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitCreateSnapshot()"><i class="bi bi-camera me-1"></i>Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Restore Snapshot Modal ──────────────────────────────────────────────── -->
+<div class="modal fade" id="restoreSnapshotModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-arrow-counterclockwise me-2"></i>Restore Snapshot to Volume</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="restore-snapshot-id">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Snapshot</label>
+          <input type="text" id="restore-snapshot-name" class="form-control" disabled>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">New Volume Name <span class="text-danger">*</span></label>
+          <input type="text" id="restore-volume-name" class="form-control" placeholder="e.g. restored-disk-01">
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold">Size (GB) <span class="text-danger">*</span></label>
+          <input type="number" id="restore-volume-size" class="form-control" min="1">
+          <div class="form-text">Must be ≥ original snapshot size. Cinder cannot create smaller volumes.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitRestoreSnapshot()"><i class="bi bi-arrow-counterclockwise me-1"></i>Restore</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create Port Modal ───────────────────────────────────────────────────── -->
+<div class="modal fade" id="createPortModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-ethernet me-2"></i>Create Network Interface</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Network <span class="text-danger">*</span></label>
+          <select id="port-network-id" class="form-select"><option value="">Loading…</option></select>
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold">Name</label>
+          <input type="text" id="port-name" class="form-control" placeholder="e.g. eni-web-01">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitCreatePort()"><i class="bi bi-plus-lg me-1"></i>Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Attach Interface Modal ──────────────────────────────────────────────── -->
+<div class="modal fade" id="attachInterfaceModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-link-45deg me-2"></i>Attach Interface — <span id="attach-iface-server-name"></span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="attach-iface-server-id">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Existing Port</label>
+          <select id="attach-iface-port" class="form-select"><option value="">Loading ports…</option></select>
+          <div class="form-text">Select a free port, or leave empty and pick a network to auto-create one.</div>
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-bold">Or: New port on Network</label>
+          <select id="attach-iface-network" class="form-select"><option value="">None (use port above)</option></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitAttachInterface()"><i class="bi bi-link-45deg me-1"></i>Attach</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Instance Console Modal ─────────────────────────────────────────────── -->
+<div class="modal fade" id="consoleModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-terminal me-2"></i>Console — <span id="console-server-name"></span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:0">
+        <div style="background:#1a2332;padding:10px 16px;border-bottom:1px solid #2d3a4a;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font-size:12px;color:#8892a0;white-space:nowrap">VNC Console:</div>
+          <a id="console-vnc-url" href="#" target="_blank" style="font-size:11px;font-family:monospace;color:#ff9900;word-break:break-all">Requesting…</a>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <select id="console-lines" class="form-select form-select-sm" style="width:110px;font-size:12px" onchange="loadConsoleOutput()">
+              <option value="50">50 lines</option>
+              <option value="100">100 lines</option>
+              <option value="250">250 lines</option>
+              <option value="500">500 lines</option>
+            </select>
+            <button class="btn-secondary-act" style="font-size:12px;padding:4px 10px;white-space:nowrap" onclick="loadConsoleOutput()">
+              <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+          </div>
+        </div>
+        <div id="console-output" style="background:#0d1117;padding:16px 20px;font-family:monospace;font-size:12px;line-height:1.6;min-height:200px;max-height:500px;overflow-y:auto;white-space:pre-wrap;color:#c9d1d9">
+          <div style="color:#6b7785;text-align:center;padding:20px">Loading console output…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   let currentSection = 'overview';
   const loaded = {};
   const launchModal    = new bootstrap.Modal(document.getElementById('launchModal'));
   const modifyModal    = new bootstrap.Modal(document.getElementById('modifyModal'));
-  const volumeModal    = new bootstrap.Modal(document.getElementById('volumeModal'));
-  const createAmiModal = new bootstrap.Modal(document.getElementById('createAmiModal'));
+  const volumeModal        = new bootstrap.Modal(document.getElementById('volumeModal'));
+  const attachVolumeModal  = new bootstrap.Modal(document.getElementById('attachVolumeModal'));
+  const detachVolumeModal  = new bootstrap.Modal(document.getElementById('detachVolumeModal'));
+  const resizeVolumeModal  = new bootstrap.Modal(document.getElementById('resizeVolumeModal'));
+  const createAmiModal     = new bootstrap.Modal(document.getElementById('createAmiModal'));
   const copyAmiModal   = new bootstrap.Modal(document.getElementById('copyAmiModal'));
   const confirmModal   = new bootstrap.Modal(document.getElementById('confirmModal'));
-  const createSgModal  = new bootstrap.Modal(document.getElementById('createSgModal'));
-  const addRuleModal   = new bootstrap.Modal(document.getElementById('addRuleModal'));
+  const createSgModal       = new bootstrap.Modal(document.getElementById('createSgModal'));
+  const addRuleModal        = new bootstrap.Modal(document.getElementById('addRuleModal'));
+  const createNetworkModal  = new bootstrap.Modal(document.getElementById('createNetworkModal'));
+  const createSubnetModal   = new bootstrap.Modal(document.getElementById('createSubnetModal'));
+  const createRouterModal   = new bootstrap.Modal(document.getElementById('createRouterModal'));
+  const attachSubnetModal   = new bootstrap.Modal(document.getElementById('attachSubnetModal'));
+  const routeTableModal     = new bootstrap.Modal(document.getElementById('routeTableModal'));
   const attachSgModal  = new bootstrap.Modal(document.getElementById('attachSgModal'));
+  const createKpModal  = new bootstrap.Modal(document.getElementById('createKpModal'));
+  const createAsgModal  = new bootstrap.Modal(document.getElementById('createAsgModal'));
+  const scaleAsgModal   = new bootstrap.Modal(document.getElementById('scaleAsgModal'));
+  const editAsgModal    = new bootstrap.Modal(document.getElementById('editAsgModal'));
+  const policiesModal        = new bootstrap.Modal(document.getElementById('policiesModal'));
+  const createSnapshotModal  = new bootstrap.Modal(document.getElementById('createSnapshotModal'));
+  const restoreSnapshotModal = new bootstrap.Modal(document.getElementById('restoreSnapshotModal'));
+  const createPortModal      = new bootstrap.Modal(document.getElementById('createPortModal'));
+  const attachInterfaceModal = new bootstrap.Modal(document.getElementById('attachInterfaceModal'));
+  const consoleModal         = new bootstrap.Modal(document.getElementById('consoleModal'));
 
   // ── Navigation ────────────────────────────────────────────────────────────
   function showSection(name) {
+    // Stop devstack auto-refresh when leaving that section
+    if (currentSection === 'devstack' && name !== 'devstack') {
+      clearInterval(_dsAutoRefreshTimer);
+      _dsAutoRefreshTimer = null;
+    }
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('section-' + name).classList.add('active');
     document.getElementById('nav-' + name).classList.add('active');
     currentSection = name;
     if (!loaded[name]) loadSection(name);
+    // Start auto-refresh when entering devstack section
+    if (name === 'devstack' && document.getElementById('ds-auto-refresh').checked) {
+      clearInterval(_dsAutoRefreshTimer);
+      _dsAutoRefreshTimer = setInterval(loadDevstack, 5000);
+    }
   }
 
   function refreshCurrent() { delete loaded[currentSection]; loadSection(currentSection); }
@@ -616,9 +1597,12 @@
     btn.disabled = true;
     const map = {
       'overview': fetchOverview, 'instances': fetchInstances,
-      'images': fetchImages, 'volumes': fetchVolumes,
-      'networks': fetchNetworks, 'floating-ips': fetchFloatingIps,
-      'security-groups': fetchSecurityGroups, 'users': fetchUsers,
+      'images': fetchImages, 'auto-scaling': fetchAutoScalingGroups,
+      'volumes': fetchVolumes, 'networks': fetchNetworks, 'routers': fetchRouters,
+      'floating-ips': fetchFloatingIps, 'load-balancers': loadLoadBalancers,
+      'devstack': loadDevstack, 'security-groups': fetchSecurityGroups,
+      'key-pairs': fetchKeyPairs, 'users': fetchUsers,
+      'snapshots': fetchSnapshots, 'ports': fetchPorts, 'quotas': fetchQuotas,
     };
     (map[name] || (() => Promise.resolve()))().finally(() => {
       btn.disabled = false;
@@ -716,7 +1700,9 @@
           if (s.status === 'SHUTOFF')       actions += `<button class="btn-act btn-start me-1"   onclick="startInstance('${s.id}','${s.name}')">&#9654; Start</button>`;
           if (s.status === 'SHUTOFF')       actions += `<button class="btn-act btn-modify me-1"  onclick="openModifyModal('${s.id}','${s.name}','${s.flavor}')">&#9881; Modify</button>`;
           if (s.status === 'ACTIVE' || s.status === 'SHUTOFF') actions += `<button class="btn-act btn-snapshot me-1" onclick="openCreateAmiModal('${s.id}','${s.name}')">&#128247; AMI</button>`;
-          if (s.status === 'ACTIVE')        actions += `<button class="btn-act btn-modify me-1"   onclick="openAttachSgModal('${s.id}','${s.name}')">&#128737; SG</button>`;
+          if (s.status === 'ACTIVE')        actions += `<button class="btn-act btn-modify me-1"   onclick="openAttachSgModal('${s.id}','${s.name}',${JSON.stringify(s.security_groups)})">&#128737; SG</button>`;
+          if (s.status === 'ACTIVE')        actions += `<button class="btn-act btn-modify me-1"   onclick="openConsoleModal('${s.id}','${s.name}')">&#128187; Console</button>`;
+          if (s.status === 'ACTIVE')        actions += `<button class="btn-act btn-modify me-1"   onclick="openAttachInterfaceModal('${s.id}','${s.name}')">&#128268; NIC</button>`;
           if (s.status === 'VERIFY_RESIZE') actions += `<button class="btn-act btn-confirm me-1" onclick="confirmResize('${s.id}','${s.name}')">&#10003; Confirm</button>`;
           if (s.status !== 'BUILD')         actions += `<button class="btn-act btn-delete"        onclick="deleteInstance('${s.id}','${s.name}')">&#128465; Delete</button>`;
           return `<tr>
@@ -816,7 +1802,7 @@
     document.getElementById('launch-flavor').innerHTML =
       flavors.map(f => `<option value="${f.id}">${f.name} — ${f.vcpus} vCPU · ${f.ram >= 1024 ? (f.ram/1024)+'GB' : f.ram+'MB'} RAM · ${f.disk}GB Disk</option>`).join('');
     document.getElementById('launch-keypair').innerHTML =
-      ['<option value="">No key pair</option>', ...keypairs.map(k => `<option value="${k}" ${k === 'project-key' ? 'selected' : ''}>${k}</option>`)].join('');
+      ['<option value="">No key pair</option>', ...keypairs.map(k => `<option value="${k.name}" ${k.name === 'project-key' ? 'selected' : ''}>${k.name}</option>`)].join('');
 
     // Only internal (non-external) networks can be attached to an instance
     const internalNets = networks.filter(n => !n.external);
@@ -985,17 +1971,38 @@
     document.getElementById('volumes-body').innerHTML = data.length === 0
       ? '<tr><td colspan="10" class="empty-state"><i class="bi bi-inbox"></i>No volumes — click Create Volume to add one</td></tr>'
       : data.map(v => {
-          const canDelete = v.status === 'available';
+          const isAvailable = v.status === 'available';
+          const isInUse     = v.status === 'in-use';
+          // attached_to contains short server IDs; store full attachments for detach
+          const attachedIds = v.attached_to || [];
+          const attachedCell = attachedIds.length
+            ? attachedIds.map(id => `<span class="ip-chip">${id}</span>`).join('')
+            : '<span style="color:#aaa">—</span>';
+
+          let actions = '';
+          if (isAvailable) {
+            actions = `
+              <button class="btn-act btn-start"  onclick="openAttachVolumeModal('${v.id}','${v.name}')">&#128279; Attach</button>
+              <button class="btn-act btn-modify" onclick="openResizeVolumeModal('${v.id}','${v.name}',${v.size_gb})" style="margin-left:4px">&#8617; Resize</button>
+              <button class="btn-act btn-delete" onclick="deleteVolume('${v.id}','${v.name}')" style="margin-left:4px">&#128465; Delete</button>`;
+          } else if (isInUse) {
+            actions = `
+              <button class="btn-act btn-stop" onclick="openDetachVolumeModal('${v.id}','${v.name}','${v.server_id}','${attachedIds[0] || ''}')">&#9986; Detach</button>
+              <button class="btn-act btn-modify" onclick="openResizeVolumeModal('${v.id}','${v.name}',${v.size_gb})" style="margin-left:4px">&#8617; Resize</button>`;
+          } else {
+            actions = `<span style="color:#aaa;font-size:12px">${v.status}</span>`;
+          }
+
           return `<tr>
             <td class="id-col">${shortId(v.id)}</td>
             <td><strong>${v.name}</strong></td><td>${badge(v.status)}</td>
             <td><strong>${v.size_gb} GB</strong></td>
             <td style="font-size:12px">${v.volume_type || '—'}</td>
             <td style="text-align:center">${v.bootable ? '<i class="bi bi-check-circle-fill text-success"></i>' : '—'}</td>
-            <td>${v.attached_to.length ? v.attached_to.map(id => `<span class="ip-chip">${id}</span>`).join('') : '<span style="color:#aaa">—</span>'}</td>
+            <td>${attachedCell}</td>
             <td><span class="project-chip">${v.project}</span></td>
             <td style="color:#8892a0;font-size:12px">${v.created_at}</td>
-            <td>${canDelete ? `<button class="btn-act btn-delete" onclick="deleteVolume('${v.id}','${v.name}')">&#128465; Delete</button>` : '<span style="color:#aaa;font-size:12px">in-use</span>'}</td></tr>`;
+            <td style="white-space:nowrap">${actions}</td></tr>`;
         }).join('');
   }
 
@@ -1004,7 +2011,7 @@
   async function submitCreateVolume() {
     const name = document.getElementById('vol-name').value.trim();
     const size = parseInt(document.getElementById('vol-size').value);
-    if (!name)       { toast('error', 'Validation', 'Volume name is required'); return; }
+    if (!name)            { toast('error', 'Validation', 'Volume name is required'); return; }
     if (!size || size < 1) { toast('error', 'Validation', 'Size must be at least 1 GB'); return; }
 
     volumeModal.hide();
@@ -1030,21 +2037,136 @@
     });
   }
 
+  // ── Attach Volume ─────────────────────────────────────────────────────────
+  async function openAttachVolumeModal(volumeId, volumeName) {
+    document.getElementById('attach-volume-id').value   = volumeId;
+    document.getElementById('attach-volume-name').value = volumeName;
+    document.getElementById('attach-device').value      = '';
+
+    // Populate instance dropdown from live data
+    const select = document.getElementById('attach-server-id');
+    select.innerHTML = '<option value="">Loading instances…</option>';
+    attachVolumeModal.show();
+
+    const instances = await fetch('/api/instances').then(r => r.json());
+    if (instances.error) {
+      select.innerHTML = '<option value="">Failed to load instances</option>';
+      return;
+    }
+    // Only running instances can accept a volume attachment
+    const running = instances.filter(i => i.status === 'ACTIVE');
+    select.innerHTML = running.length === 0
+      ? '<option value="">No running instances</option>'
+      : '<option value="">— select an instance —</option>' +
+        running.map(i => `<option value="${i.id}">${i.name} (${shortId(i.id)})</option>`).join('');
+  }
+
+  async function submitAttachVolume() {
+    const volumeId  = document.getElementById('attach-volume-id').value;
+    const serverId  = document.getElementById('attach-server-id').value.trim();
+    const device    = document.getElementById('attach-device').value.trim();
+    const volumeName = document.getElementById('attach-volume-name').value;
+    if (!serverId) { toast('error', 'Validation', 'Select an instance'); return; }
+
+    attachVolumeModal.hide();
+    toast('info', 'Attaching volume…', `"${volumeName}" → instance`);
+    const body = {server_id: serverId};
+    if (device) body.device = device;
+
+    const r = await fetch(`/api/volumes/${volumeId}/attach`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    }).then(r => r.json());
+
+    if (r.error) { toast('error', 'Attach failed', r.error); return; }
+    toast('success', 'Attaching', `"${volumeName}" is being attached`);
+    scheduleRefresh('volumes', 4000);
+  }
+
+  // ── Detach Volume ─────────────────────────────────────────────────────────
+  function openDetachVolumeModal(volumeId, volumeName, serverId, serverShortId) {
+    document.getElementById('detach-volume-id').value      = volumeId;
+    document.getElementById('detach-volume-name').value    = volumeName;
+    document.getElementById('detach-server-id').value      = serverId;
+    document.getElementById('detach-server-display').value = serverShortId || serverId || 'unknown';
+    detachVolumeModal.show();
+  }
+
+  async function submitDetachVolume() {
+    const volumeId   = document.getElementById('detach-volume-id').value;
+    const serverId   = document.getElementById('detach-server-id').value;
+    const volumeName = document.getElementById('detach-volume-name').value;
+    if (!serverId) { toast('error', 'Error', 'Server ID is missing — cannot detach'); return; }
+
+    detachVolumeModal.hide();
+    toast('info', 'Detaching volume…', `"${volumeName}"`);
+    const r = await fetch(`/api/volumes/${volumeId}/detach`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({server_id: serverId})
+    }).then(r => r.json());
+
+    if (r.error) { toast('error', 'Detach failed', r.error); return; }
+    toast('success', 'Detaching', `"${volumeName}" is being detached`);
+    scheduleRefresh('volumes', 4000);
+  }
+
+  // ── Resize Volume ─────────────────────────────────────────────────────────
+  function openResizeVolumeModal(volumeId, volumeName, currentSizeGb) {
+    document.getElementById('resize-volume-id').value    = volumeId;
+    document.getElementById('resize-volume-name').value  = volumeName;
+    document.getElementById('resize-current-size').value = currentSizeGb + ' GB';
+    const input = document.getElementById('resize-new-size');
+    input.min   = currentSizeGb + 1;
+    input.value = currentSizeGb + 1;
+    resizeVolumeModal.show();
+  }
+
+  async function submitResizeVolume() {
+    const volumeId   = document.getElementById('resize-volume-id').value;
+    const volumeName = document.getElementById('resize-volume-name').value;
+    const newSize    = parseInt(document.getElementById('resize-new-size').value);
+    const currentSizeText = document.getElementById('resize-current-size').value;
+    const currentSize = parseInt(currentSizeText);
+
+    if (!newSize || newSize <= currentSize) {
+      toast('error', 'Validation', `New size must be larger than ${currentSize} GB`);
+      return;
+    }
+
+    resizeVolumeModal.hide();
+    toast('info', 'Resizing volume…', `"${volumeName}" → ${newSize} GB`);
+    const r = await fetch(`/api/volumes/${volumeId}/resize`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({new_size: newSize})
+    }).then(r => r.json());
+
+    if (r.error) { toast('error', 'Resize failed', r.error); return; }
+    toast('success', 'Resizing', `"${volumeName}" is being extended to ${newSize} GB`);
+    scheduleRefresh('volumes', 4000);
+  }
+
   // ── Networks ──────────────────────────────────────────────────────────────
   async function fetchNetworks() {
     const data = await fetch('/api/networks').then(r => r.json());
     const grid = document.getElementById('networks-grid');
     if (data.error) { grid.innerHTML = `<div style="color:#dc3545">${data.error}</div>`; return; }
+    if (data.length === 0) { grid.innerHTML = '<div class="empty-state"><i class="bi bi-diagram-3"></i>No networks — click Create Network to add one</div>'; return; }
     grid.innerHTML = data.map(n => `
       <div class="net-card">
-        <h6><i class="bi bi-diagram-3" style="color:#ff9900"></i> ${n.name}
-          ${n.external ? '<span class="tag-ext">EXTERNAL</span>' : ''}
-          ${n.shared   ? '<span class="tag-shared">SHARED</span>' : ''}
-        </h6>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <h6 style="margin:0"><i class="bi bi-diagram-3" style="color:#ff9900"></i> ${n.name}
+            ${n.external ? '<span class="tag-ext">EXTERNAL</span>' : ''}
+            ${n.shared   ? '<span class="tag-shared">SHARED</span>' : ''}
+          </h6>
+          ${!n.external ? `<button class="btn-act btn-delete" style="padding:2px 8px;font-size:11px" onclick="deleteNetwork('${n.uuid}','${n.name}')">&#128465;</button>` : ''}
+        </div>
         <div style="margin-bottom:8px">${badge(n.status)}</div>
         ${n.subnets.map(s => `
           <div style="border-top:1px solid #eee;padding-top:8px;margin-top:8px">
-            <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:4px">${s.name || 'Subnet'}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+              <div style="font-size:12px;font-weight:700;color:#555">${s.name || 'Subnet'}</div>
+              <button class="btn-act btn-delete" style="padding:1px 6px;font-size:11px" onclick="deleteSubnet('${s.id}','${s.name||s.cidr}')">&#128465;</button>
+            </div>
             <div class="subnet-row">
               <span class="subnet-label">CIDR</span><span>${s.cidr||'—'}</span>
               <span class="subnet-label">Gateway</span><span>${s.gateway||'—'}</span>
@@ -1055,6 +2177,295 @@
       </div>`).join('');
   }
 
+  // ── Networks CRUD ─────────────────────────────────────────────────────────
+  function openCreateNetworkModal() {
+    document.getElementById('net-name').value = '';
+    document.getElementById('net-shared').checked = false;
+    createNetworkModal.show();
+  }
+
+  async function submitCreateNetwork() {
+    const name   = document.getElementById('net-name').value.trim();
+    const shared = document.getElementById('net-shared').checked;
+    if (!name) { toast('error', 'Validation', 'Name is required'); return; }
+    const r = await fetch('/api/networks', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, shared})
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Create failed', r.error); return; }
+    toast('success', 'Created', `Network "${name}" created`);
+    createNetworkModal.hide();
+    delete loaded['networks'];
+    loadSection('networks');
+  }
+
+  function deleteNetwork(uuid, name) {
+    confirm(`Delete network "${name}"? All subnets must be removed first.`, async () => {
+      const r = await fetch(`/api/networks/${uuid}`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'Deleted', `Network "${name}" removed`);
+      delete loaded['networks'];
+      loadSection('networks');
+    });
+  }
+
+  // ── Subnets CRUD ──────────────────────────────────────────────────────────
+  async function openCreateSubnetModal() {
+    document.getElementById('subnet-name').value    = '';
+    document.getElementById('subnet-cidr').value    = '';
+    document.getElementById('subnet-gateway').value = '';
+    document.getElementById('subnet-dhcp').checked  = true;
+    // Populate network dropdown with non-external networks
+    const nets = await fetch('/api/networks').then(r => r.json());
+    const sel  = document.getElementById('subnet-network');
+    if (nets.error || nets.length === 0) {
+      sel.innerHTML = '<option value="">No networks available</option>';
+    } else {
+      sel.innerHTML = nets.filter(n => !n.external).map(n => `<option value="${n.uuid}">${n.name}</option>`).join('');
+    }
+    createSubnetModal.show();
+  }
+
+  async function submitCreateSubnet() {
+    const network_id  = document.getElementById('subnet-network').value;
+    const name        = document.getElementById('subnet-name').value.trim();
+    const cidr        = document.getElementById('subnet-cidr').value.trim();
+    const gateway_ip  = document.getElementById('subnet-gateway').value.trim();
+    const enable_dhcp = document.getElementById('subnet-dhcp').checked;
+    if (!network_id || !cidr) { toast('error', 'Validation', 'Network and CIDR are required'); return; }
+    const r = await fetch('/api/subnets', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, network_id, cidr, gateway_ip, enable_dhcp})
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Create failed', r.error); return; }
+    toast('success', 'Created', `Subnet "${cidr}" created`);
+    createSubnetModal.hide();
+    delete loaded['networks'];
+    loadSection('networks');
+  }
+
+  function deleteSubnet(subnetId, label) {
+    confirm(`Delete subnet "${label}"? It must not have any ports attached.`, async () => {
+      const r = await fetch(`/api/subnets/${subnetId}`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'Deleted', `Subnet "${label}" removed`);
+      delete loaded['networks'];
+      loadSection('networks');
+    });
+  }
+
+  // ── Routers ───────────────────────────────────────────────────────────────
+  async function fetchRouters() {
+    const data = await fetch('/api/routers').then(r => r.json());
+    const tbody = document.getElementById('routers-body');
+    if (data.error) { tbody.innerHTML = errRow(data.error, 6); return; }
+    if (data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="bi bi-signpost-split"></i>No routers — click Create Router to add one</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td><strong>${r.name}</strong></td>
+        <td>${badge(r.status)}</td>
+        <td>${r.has_gateway
+          ? `<span style="font-size:12px;color:#1a6b35"><i class="bi bi-check-circle-fill me-1"></i>Attached</span>
+             <button class="btn-act btn-release ms-2" style="font-size:11px;padding:2px 7px" onclick="clearRouterGateway('${r.id}','${r.name}')">Clear</button>`
+          : `<span style="color:#aaa;font-size:12px">None</span>
+             <button class="btn-act btn-modify ms-2" style="font-size:11px;padding:2px 7px" onclick="openSetGatewayModal('${r.id}','${r.name}')">Set</button>`}
+        </td>
+        <td>
+          ${r.subnets.length === 0
+            ? '<span style="color:#aaa;font-size:12px">None</span>'
+            : r.subnets.map(s => `<span class="rule-pill">${s.name} <span style="cursor:pointer;opacity:0.6;margin-left:4px" onclick="detachSubnet('${r.id}','${s.id}','${s.name}')">&#10005;</span></span>`).join('')}
+        </td>
+        <td>
+          <button class="btn-act btn-modify" style="font-size:11px;padding:2px 8px" onclick="openRouteTableModal('${r.id}','${r.name}')">
+            <i class="bi bi-table me-1"></i>Routes ${r.route_count > 0 ? `<span style="background:#ff9900;color:#fff;border-radius:8px;padding:0 5px;font-size:10px;margin-left:3px">${r.route_count}</span>` : ''}
+          </button>
+        </td>
+        <td style="white-space:nowrap">
+          <button class="btn-act btn-modify me-1" onclick="openAttachSubnetModal('${r.id}','${r.name}')"><i class="bi bi-link-45deg"></i> Subnet</button>
+          <button class="btn-act btn-delete" onclick="deleteRouter('${r.id}','${r.name}')">&#128465; Delete</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  // ── Route Table ───────────────────────────────────────────────────────────
+  async function openRouteTableModal(routerId, routerName) {
+    document.getElementById('route-table-router-id').value      = routerId;
+    document.getElementById('route-table-router-name').textContent = routerName;
+    document.getElementById('route-destination').value = '';
+    document.getElementById('route-nexthop').value     = '';
+    routeTableModal.show();
+    await refreshRouteTable(routerId);
+  }
+
+  async function refreshRouteTable(routerId) {
+    const tbody = document.getElementById('route-table-body');
+    const data  = await fetch(`/api/routers/${routerId}/routes`).then(r => r.json());
+    if (data.error) { tbody.innerHTML = `<tr><td colspan="4" style="color:#dc3545;padding:10px">${data.error}</td></tr>`; return; }
+    // Always show the local route (non-deletable) plus any static routes
+    const staticRows = data.routes.map(rt => `
+      <tr>
+        <td><span class="ip-chip">${rt.destination}</span></td>
+        <td><span class="ip-chip">${rt.nexthop}</span></td>
+        <td><span style="font-size:11px;color:#6b7785">Static</span></td>
+        <td><button class="btn-act btn-delete" style="font-size:11px;padding:2px 7px" onclick="deleteRoute('${routerId}','${rt.destination}','${rt.nexthop}')">&#128465;</button></td>
+      </tr>`).join('');
+    tbody.innerHTML = `
+      <tr style="background:#f8f9fa">
+        <td><span class="ip-chip">local</span></td>
+        <td><span style="color:#aaa;font-size:12px">— (local network)</span></td>
+        <td><span style="font-size:11px;color:#6b7785">Local</span></td>
+        <td><span style="color:#aaa;font-size:12px">system</span></td>
+      </tr>
+      ${staticRows || '<tr><td colspan="4" style="color:#aaa;font-size:12px;padding:10px;text-align:center">No static routes</td></tr>'}`;
+  }
+
+  async function submitAddRoute() {
+    const routerId    = document.getElementById('route-table-router-id').value;
+    const destination = document.getElementById('route-destination').value.trim();
+    const nexthop     = document.getElementById('route-nexthop').value.trim();
+    if (!destination || !nexthop) { toast('error', 'Validation', 'Destination CIDR and Next Hop are required'); return; }
+    const r = await fetch(`/api/routers/${routerId}/routes`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({destination, nexthop})
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Add route failed', r.error); return; }
+    toast('success', 'Route added', `${destination} → ${nexthop}`);
+    document.getElementById('route-destination').value = '';
+    document.getElementById('route-nexthop').value     = '';
+    await refreshRouteTable(routerId);
+    delete loaded['routers'];
+  }
+
+  function deleteRoute(routerId, destination, nexthop) {
+    confirm(`Delete static route ${destination} → ${nexthop}?`, async () => {
+      const r = await fetch(`/api/routers/${routerId}/routes`, {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({destination, nexthop})
+      }).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'Route deleted', `${destination} removed`);
+      await refreshRouteTable(routerId);
+      delete loaded['routers'];
+    });
+  }
+
+  async function openCreateRouterModal() {
+    document.getElementById('router-name').value = '';
+    // Populate external network options
+    const nets = await fetch('/api/networks').then(r => r.json());
+    const sel  = document.getElementById('router-gateway-net');
+    sel.innerHTML = '<option value="">None — set later</option>';
+    if (!nets.error) {
+      nets.filter(n => n.external).forEach(n => {
+        sel.innerHTML += `<option value="${n.uuid}">${n.name}</option>`;
+      });
+    }
+    createRouterModal.show();
+  }
+
+  async function submitCreateRouter() {
+    const name              = document.getElementById('router-name').value.trim();
+    const gateway_network_id = document.getElementById('router-gateway-net').value;
+    if (!name) { toast('error', 'Validation', 'Name is required'); return; }
+    const r = await fetch('/api/routers', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, gateway_network_id})
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Create failed', r.error); return; }
+    toast('success', 'Created', `Router "${name}" created`);
+    createRouterModal.hide();
+    delete loaded['routers'];
+    loadSection('routers');
+  }
+
+  function deleteRouter(routerId, name) {
+    confirm(`Delete router "${name}"? Detach all subnets and clear the gateway first.`, async () => {
+      const r = await fetch(`/api/routers/${routerId}`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'Deleted', `Router "${name}" removed`);
+      delete loaded['routers'];
+      loadSection('routers');
+    });
+  }
+
+  async function openSetGatewayModal(routerId, routerName) {
+    // Reuse the create router modal just for setting the gateway on an existing router.
+    // Simpler: use a quick inline prompt via existing confirm pattern with fetch.
+    const nets = await fetch('/api/networks').then(r => r.json());
+    const extNets = (nets.error ? [] : nets).filter(n => n.external);
+    if (extNets.length === 0) { toast('error', 'No external network', 'Create an external network first'); return; }
+    // Auto-pick the first external network (most setups have exactly one).
+    const net = extNets[0];
+    confirm(`Attach external gateway "${net.name}" to router "${routerName}"?`, async () => {
+      const r = await fetch(`/api/routers/${routerId}/gateway`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({network_id: net.uuid})
+      }).then(r => r.json());
+      if (r.error) { toast('error', 'Gateway failed', r.error); return; }
+      toast('success', 'Gateway set', `Router "${routerName}" now connected to "${net.name}"`);
+      delete loaded['routers'];
+      loadSection('routers');
+    });
+  }
+
+  function clearRouterGateway(routerId, routerName) {
+    confirm(`Detach external gateway from router "${routerName}"?`, async () => {
+      const r = await fetch(`/api/routers/${routerId}/gateway`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Clear failed', r.error); return; }
+      toast('success', 'Gateway cleared', `Router "${routerName}" disconnected from external network`);
+      delete loaded['routers'];
+      loadSection('routers');
+    });
+  }
+
+  async function openAttachSubnetModal(routerId, routerName) {
+    document.getElementById('attach-subnet-router-id').value   = routerId;
+    document.getElementById('attach-subnet-router-name').textContent = routerName;
+    const subnets = await fetch('/api/subnets').then(r => r.json());
+    const sel = document.getElementById('attach-subnet-select');
+    if (subnets.error || subnets.length === 0) {
+      sel.innerHTML = '<option value="">No subnets available</option>';
+    } else {
+      sel.innerHTML = subnets.map(s => `<option value="${s.id}">${s.name} (${s.cidr})</option>`).join('');
+    }
+    attachSubnetModal.show();
+  }
+
+  async function submitAttachSubnet() {
+    const routerId = document.getElementById('attach-subnet-router-id').value;
+    const subnetId = document.getElementById('attach-subnet-select').value;
+    if (!subnetId) { toast('error', 'Validation', 'Select a subnet'); return; }
+    const r = await fetch(`/api/routers/${routerId}/subnets`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({subnet_id: subnetId})
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Attach failed', r.error); return; }
+    toast('success', 'Attached', 'Subnet interface added to router');
+    attachSubnetModal.hide();
+    delete loaded['routers'];
+    loadSection('routers');
+  }
+
+  function detachSubnet(routerId, subnetId, subnetName) {
+    confirm(`Detach subnet "${subnetName}" from this router?`, async () => {
+      const r = await fetch(`/api/routers/${routerId}/subnets/${subnetId}`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Detach failed', r.error); return; }
+      toast('success', 'Detached', `Subnet "${subnetName}" removed from router`);
+      delete loaded['routers'];
+      loadSection('routers');
+    });
+  }
+
   // ── Floating IPs ──────────────────────────────────────────────────────────
   async function fetchFloatingIps() {
     const data = await fetch('/api/floating-ips').then(r => r.json());
@@ -1063,13 +2474,18 @@
     document.getElementById('fips-body').innerHTML = data.length === 0
       ? '<tr><td colspan="5" class="empty-state"><i class="bi bi-globe2"></i>No floating IPs — click Allocate IP to create one</td></tr>'
       : data.map(f => {
-          const canRelease = f.fixed_ip === '—';
+          const isAttached = f.fixed_ip !== '—';
           return `<tr>
             <td class="id-col">${shortId(f.id)}</td>
             <td><strong><span class="ip-chip">${f.floating_ip}</span></strong></td>
-            <td>${f.fixed_ip !== '—' ? `<span class="ip-chip">${f.fixed_ip}</span>` : '<span style="color:#aaa">Not attached</span>'}</td>
+            <td>${isAttached ? `<span class="ip-chip">${f.fixed_ip}</span>` : '<span style="color:#aaa">Not attached</span>'}</td>
             <td>${badge(f.status)}</td>
-            <td>${canRelease ? `<button class="btn-act btn-release" onclick="releaseFloatingIp('${f.id}','${f.floating_ip}')">Release</button>` : '<span style="color:#aaa;font-size:12px">in use</span>'}</td></tr>`;
+            <td style="white-space:nowrap">
+              ${isAttached
+                ? `<button class="btn-act btn-release me-1" onclick="disassociateFloatingIp('${f.id}','${f.floating_ip}')">Detach</button>`
+                : `<button class="btn-act btn-modify me-1" onclick="openAssociateFipPanel('${f.id}')">Attach</button>`}
+              <button class="btn-act btn-delete" onclick="releaseFloatingIp('${f.id}','${f.floating_ip}')">Release</button>
+            </td></tr>`;
         }).join('');
   }
 
@@ -1090,23 +2506,74 @@
     });
   }
 
+  async function openAssociateFipPanel(preselectedFipId) {
+    const panel = document.getElementById('fips-associate-panel');
+    panel.style.display = 'block';
+
+    // Populate unattached FIPs dropdown
+    const fips    = await fetch('/api/floating-ips').then(r => r.json());
+    const fipSel  = document.getElementById('fip-associate-fip');
+    const freeFips = (fips.error ? [] : fips).filter(f => f.fixed_ip === '—');
+    fipSel.innerHTML = freeFips.length === 0
+      ? '<option value="">No free floating IPs</option>'
+      : freeFips.map(f => `<option value="${f.id}" ${f.id === preselectedFipId ? 'selected' : ''}>${f.floating_ip}</option>`).join('');
+
+    // Populate instances dropdown
+    const servers  = await fetch('/api/instances').then(r => r.json());
+    const srvSel   = document.getElementById('fip-associate-server');
+    srvSel.innerHTML = (servers.error || servers.length === 0)
+      ? '<option value="">No running instances</option>'
+      : servers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  }
+
+  async function submitAssociateFip() {
+    const fipId    = document.getElementById('fip-associate-fip').value;
+    const serverId = document.getElementById('fip-associate-server').value;
+    if (!fipId || !serverId) { toast('error', 'Validation', 'Select both a floating IP and an instance'); return; }
+    const r = await fetch(`/api/floating-ips/${fipId}/associate`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({server_id: serverId})
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Associate failed', r.error); return; }
+    toast('success', 'Associated', 'Floating IP attached to instance');
+    document.getElementById('fips-associate-panel').style.display = 'none';
+    scheduleRefresh('floating-ips', 2000);
+  }
+
+  function disassociateFloatingIp(fipId, ip) {
+    confirm(`Detach floating IP ${ip} from its instance? The IP will remain allocated.`, async () => {
+      const r = await fetch(`/api/floating-ips/${fipId}/disassociate`, {method:'PUT'}).then(r => r.json());
+      if (r.error) { toast('error', 'Detach failed', r.error); return; }
+      toast('success', 'Detached', `Floating IP ${ip} is now free`);
+      scheduleRefresh('floating-ips', 2000);
+    });
+  }
+
   // ── Security Groups ───────────────────────────────────────────────────────
   async function fetchSecurityGroups() {
     const data = await fetch('/api/security-groups').then(r => r.json());
-    if (data.error) { document.getElementById('sgs-body').innerHTML = errRow(data.error, 6); return; }
+    if (data.error) { document.getElementById('sgs-body').innerHTML = errRow(data.error, 7); return; }
     document.getElementById('sgs-count').textContent = data.length + ' groups';
+
+    // Render a list of rule pills for a given direction; each has an ✕ delete button.
+    function rulePills(rules, sgUuid, arrow) {
+      if (rules.length === 0) return '<span style="color:#aaa;font-size:12px">Default</span>';
+      return rules.map(r => {
+        const port = r.port_min ? (r.port_min === r.port_max ? r.port_min : `${r.port_min}-${r.port_max}`) : 'any';
+        return `<span class="rule-pill">${r.protocol} ${port} ${arrow} ${r.remote_ip} <span style="cursor:pointer;margin-left:4px;opacity:0.6" onclick="deleteRule('${sgUuid}','${r.uuid}')">&#10005;</span></span>`;
+      }).join('');
+    }
+
     document.getElementById('sgs-body').innerHTML = data.length === 0
-      ? '<tr><td colspan="6" class="empty-state">No security groups</td></tr>'
+      ? '<tr><td colspan="7" class="empty-state">No security groups</td></tr>'
       : data.map(sg => `<tr>
           <td class="id-col">${sg.id}</td>
           <td><strong>${sg.name}</strong></td>
           <td style="font-size:12px;color:#6b7785">${sg.description || '—'}</td>
           <td style="text-align:center">${sg.rule_count}</td>
-          <td>${sg.ingress_rules.length === 0 ? '<span style="color:#aaa;font-size:12px">No ingress rules</span>'
-            : sg.ingress_rules.map(r => {
-                const port = r.port_min ? (r.port_min === r.port_max ? r.port_min : `${r.port_min}-${r.port_max}`) : 'any';
-                return `<span class="rule-pill">${r.protocol} ${port} ← ${r.remote_ip} <span style="cursor:pointer;margin-left:4px;opacity:0.6" onclick="deleteRule('${sg.uuid}','${r.uuid}')">&#10005;</span></span>`;
-              }).join('')}</td>
+          <td>${rulePills(sg.ingress_rules, sg.uuid, '←')}</td>
+          <td>${rulePills(sg.egress_rules,  sg.uuid, '→')}</td>
           <td style="white-space:nowrap">
             <button class="btn-act btn-modify me-1" onclick="openAddRuleModal('${sg.uuid}','${sg.name}')"><i class="bi bi-plus-lg"></i> Rule</button>
             <button class="btn-act btn-delete" onclick="deleteSg('${sg.uuid}','${sg.name}')">&#128465; Delete</button>
@@ -1203,18 +2670,43 @@
     });
   }
 
-  // Fetches current SG list to populate the dropdown before showing the modal.
-  async function openAttachSgModal(serverId, serverName) {
-    document.getElementById('attach-sg-server-id').value   = serverId;
-    document.getElementById('attach-sg-server-name').value = serverName;
-    const sgs = await fetch('/api/security-groups').then(r => r.json());
+  // Opens SG management modal — shows currently attached SGs (with detach) and a dropdown to add more.
+  async function openAttachSgModal(serverId, serverName, currentSgs) {
+    document.getElementById('attach-sg-server-id').value       = serverId;
+    document.getElementById('attach-sg-server-name').textContent = serverName;
+    await refreshAttachedSgsList(serverId, currentSgs || []);
+    const allSgs = await fetch('/api/security-groups').then(r => r.json());
     const sel = document.getElementById('attach-sg-select');
-    if (sgs.error || sgs.length === 0) {
+    if (allSgs.error || allSgs.length === 0) {
       sel.innerHTML = '<option value="">No security groups available</option>';
     } else {
-      sel.innerHTML = sgs.map(sg => `<option value="${sg.name}">${sg.name}</option>`).join('');
+      sel.innerHTML = allSgs.map(sg => `<option value="${sg.name}">${sg.name}</option>`).join('');
     }
     attachSgModal.show();
+  }
+
+  function refreshAttachedSgsList(serverId, sgNames) {
+    const div = document.getElementById('attached-sgs-list');
+    if (!sgNames || sgNames.length === 0) {
+      div.innerHTML = '<span style="color:#aaa;font-size:12px">No security groups attached</span>';
+      return;
+    }
+    div.innerHTML = sgNames.map(name =>
+      `<span class="rule-pill">${name}
+         <span style="cursor:pointer;margin-left:4px;opacity:0.6" onclick="detachSgFromInstance('${serverId}','${name}')">&#10005;</span>
+       </span>`
+    ).join('');
+  }
+
+  async function detachSgFromInstance(serverId, sgName) {
+    const r = await fetch(`/api/instances/${serverId}/security-groups/${encodeURIComponent(sgName)}`, {method:'DELETE'}).then(r => r.json());
+    if (r.error) { toast('error', 'Detach failed', r.error); return; }
+    toast('success', 'Detached', `Security group "${sgName}" removed from instance`);
+    // Refresh the attached list from the live API
+    const instances = await fetch('/api/instances').then(r => r.json());
+    const inst = (instances.error ? [] : instances).find(i => i.id === serverId);
+    refreshAttachedSgsList(serverId, inst ? inst.security_groups : []);
+    delete loaded['instances'];
   }
 
   async function submitAttachSg() {
@@ -1227,8 +2719,12 @@
       body: JSON.stringify({name})
     }).then(r => r.json());
     if (r.error) { toast('error', 'Attach failed', r.error); return; }
-    toast('success', 'Attached', `Security group "${name}" attached to instance`);
-    attachSgModal.hide();
+    toast('success', 'Attached', `Security group "${name}" attached`);
+    // Refresh attached list without closing modal — user may want to add more.
+    const instances = await fetch('/api/instances').then(r => r.json());
+    const inst = (instances.error ? [] : instances).find(i => i.id === serverId);
+    refreshAttachedSgsList(serverId, inst ? inst.security_groups : []);
+    delete loaded['instances'];
   }
 
   // ── Users ─────────────────────────────────────────────────────────────────
@@ -1243,6 +2739,1015 @@
           <td><strong>${u.name}</strong></td>
           <td>${u.enabled ? '<span class="badge-s s-active">Enabled</span>' : '<span class="badge-s s-SHUTOFF">Disabled</span>'}</td>
           <td>${u.projects.length ? u.projects.map(p => `<span class="project-chip">${p}</span>`).join(' ') : '<span style="color:#aaa;font-size:12px">No assignments</span>'}</td></tr>`).join('');
+  }
+
+  // ── Key Pairs ─────────────────────────────────────────────────────────────
+  async function fetchKeyPairs() {
+    const data = await fetch('/api/keypairs').then(r => r.json());
+    if (data.error) { document.getElementById('kps-body').innerHTML = errRow(data.error, 5); return; }
+    document.getElementById('kps-count').textContent = data.length + ' key pairs';
+    document.getElementById('badge-key-pairs').textContent = data.length;
+    document.getElementById('kps-body').innerHTML = data.length === 0
+      ? '<tr><td colspan="5" class="empty-state"><i class="bi bi-key"></i>No key pairs — click Create Key Pair to generate one</td></tr>'
+      : data.map(kp => `<tr>
+          <td><strong>${kp.name}</strong></td>
+          <td style="font-size:11px;font-family:monospace;color:#6b7785;max-width:260px;overflow:hidden;text-overflow:ellipsis">${kp.fingerprint || '—'}</td>
+          <td style="color:#8892a0;font-size:12px">${kp.created_at || '—'}</td>
+          <td style="font-size:12px"><code>ssh -i ${kp.name}.pem &lt;user&gt;@&lt;floating-ip&gt;</code></td>
+          <td><button class="btn-act btn-delete" onclick="deleteKeypair('${kp.name}')">&#128465; Delete</button></td>
+        </tr>`).join('');
+  }
+
+  function openCreateKeypairModal() {
+    document.getElementById('kp-name').value = '';
+    createKpModal.show();
+  }
+
+  async function submitCreateKeypair() {
+    const name = document.getElementById('kp-name').value.trim();
+    if (!name) { toast('error', 'Validation', 'Key pair name is required'); return; }
+    createKpModal.hide();
+    toast('info', 'Creating…', `Generating key pair "${name}"`);
+    const r = await fetch('/api/keypairs', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name})
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Create failed', r.error); return; }
+
+    // Nova returns the private key only at creation — trigger immediate browser download.
+    const blob = new Blob([r.private_key], {type: 'text/plain'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = name + '.pem';
+    a.click();
+    URL.revokeObjectURL(url);
+
+    toast('success', 'Key pair created', `"${name}.pem" downloaded — store it safely, it cannot be retrieved again`);
+    scheduleRefresh('key-pairs', 2000);
+  }
+
+  function deleteKeypair(name) {
+    confirm(`Delete key pair "${name}"? Running instances using this key are not affected, but new instances cannot use it.`, async () => {
+      const r = await fetch(`/api/keypairs/${name}`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'Deleted', `Key pair "${name}" has been removed`);
+      scheduleRefresh('key-pairs', 2000);
+    });
+  }
+
+  // ── Auto Scaling Groups ───────────────────────────────────────────────────
+  async function fetchAutoScalingGroups() {
+    const data = await fetch('/api/auto-scaling-groups').then(r => r.json());
+    if (data.error) { document.getElementById('asg-body').innerHTML = errRow(data.error, 9); return; }
+    document.getElementById('asg-count').textContent = data.length + ' groups';
+    document.getElementById('asg-body').innerHTML = data.length === 0
+      ? '<tr><td colspan="9" class="empty-state"><i class="bi bi-inbox"></i>No auto scaling groups — click Create ASG to add one</td></tr>'
+      : data.map(g => {
+          // Running count is green when it matches desired, amber when it doesn't
+          const runningColor = g.running === g.desired_capacity ? 'color:#1a6b35' : 'color:#856404';
+          const policyBadge  = g.policy_count > 0
+            ? `<span class="nav-badge" style="margin-left:4px">${g.policy_count}</span>` : '';
+          return `<tr>
+            <td><strong>${g.name}</strong></td>
+            <td style="font-size:12px">${g.image_name}</td>
+            <td><code style="font-size:12px">${g.flavor_name}</code></td>
+            <td style="text-align:center">${g.min_size}</td>
+            <td style="text-align:center">${g.max_size}</td>
+            <td style="text-align:center;font-weight:700">${g.desired_capacity}</td>
+            <td style="text-align:center;font-weight:700;${runningColor}">${g.running}</td>
+            <td style="color:#8892a0;font-size:12px">${g.created_at}</td>
+            <td style="white-space:nowrap">
+              <button class="btn-act btn-modify me-1"  onclick="openEditAsgModal('${g.name}',${g.min_size},${g.max_size},${g.desired_capacity})">&#9881; Edit</button>
+              <button class="btn-act btn-modify me-1"  onclick="openScaleAsgModal('${g.name}',${g.min_size},${g.max_size},${g.desired_capacity})">&#8645; Scale</button>
+              <button class="btn-act btn-snapshot me-1" onclick="openPoliciesModal('${g.name}')">&#9965; Policies${policyBadge}</button>
+              <button class="btn-act btn-delete"        onclick="deleteAsg('${g.name}',${g.total_instances})">&#128465; Delete</button>
+            </td></tr>`;
+        }).join('');
+  }
+
+  async function openCreateAsgModal() {
+    createAsgModal.show();
+    const [imgs, flavors, keypairs, networks, sgs] = await Promise.all([
+      fetch('/api/images').then(r => r.json()),
+      fetch('/api/flavors').then(r => r.json()),
+      fetch('/api/keypairs').then(r => r.json()),
+      fetch('/api/networks').then(r => r.json()),
+      fetch('/api/security-groups').then(r => r.json()),
+    ]);
+
+    document.getElementById('asg-image').innerHTML =
+      imgs.filter(i => i.status === 'active').map(i => `<option value="${i.id}">${i.name} (${i.size})</option>`).join('');
+    document.getElementById('asg-flavor').innerHTML =
+      flavors.map(f => `<option value="${f.id}">${f.name} — ${f.vcpus} vCPU · ${f.ram >= 1024 ? (f.ram/1024)+'GB' : f.ram+'MB'} RAM</option>`).join('');
+    document.getElementById('asg-keypair').innerHTML =
+      ['<option value="">No key pair</option>', ...keypairs.map(k => `<option value="${k.name}">${k.name}</option>`)].join('');
+    document.getElementById('asg-network').innerHTML =
+      networks.filter(n => !n.external).map(n => `<option value="${n.uuid}">${n.name}</option>`).join('') ||
+      '<option value="">No networks available</option>';
+    document.getElementById('asg-sg').innerHTML = sgs.length
+      ? sgs.map(sg => `<option value="${sg.name}" ${sg.name === 'default' ? 'selected' : ''}>${sg.name}</option>`).join('')
+      : '<option value="">No security groups available</option>';
+  }
+
+  async function submitCreateAsg() {
+    const name             = document.getElementById('asg-name').value.trim();
+    const image_id         = document.getElementById('asg-image').value;
+    const flavor_id        = document.getElementById('asg-flavor').value;
+    const key_name         = document.getElementById('asg-keypair').value;
+    const network_id       = document.getElementById('asg-network').value;
+    const min_size         = parseInt(document.getElementById('asg-min').value) || 1;
+    const max_size         = parseInt(document.getElementById('asg-max').value) || 3;
+    const desired_capacity = parseInt(document.getElementById('asg-desired').value) || 1;
+    const security_groups  = Array.from(document.getElementById('asg-sg').selectedOptions).map(o => o.value);
+
+    if (!name)                   { toast('error', 'Validation', 'Group name is required'); return; }
+    if (!image_id)               { toast('error', 'Validation', 'Select an image'); return; }
+    if (!flavor_id)              { toast('error', 'Validation', 'Select a flavor'); return; }
+    if (!network_id)             { toast('error', 'Validation', 'Select a network'); return; }
+    if (!security_groups.length) { toast('error', 'Validation', 'Select at least one security group'); return; }
+    if (max_size < min_size)     { toast('error', 'Validation', 'Max size must be ≥ min size'); return; }
+    if (desired_capacity < min_size || desired_capacity > max_size) {
+      toast('error', 'Validation', `Desired (${desired_capacity}) must be between ${min_size} and ${max_size}`);
+      return;
+    }
+
+    createAsgModal.hide();
+    toast('info', 'Creating ASG…', `"${name}" — launching ${desired_capacity} instance(s)`);
+
+    const r = await fetch('/api/auto-scaling-groups', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        name, image_id, flavor_id, key_name, network_id, security_groups,
+        min_size, max_size, desired_capacity,
+        created_at: new Date().toISOString().slice(0, 10),
+      })
+    }).then(r => r.json());
+
+    if (r.error) { toast('error', 'Create failed', r.error); return; }
+    toast('success', 'ASG created', `"${name}" created — ${r.launched} instance(s) launching`);
+    document.getElementById('asg-name').value = '';
+    scheduleRefresh('auto-scaling', 5000);
+  }
+
+  function openScaleAsgModal(name, minSize, maxSize, currentDesired) {
+    document.getElementById('scale-asg-name').value    = name;
+    document.getElementById('scale-asg-display').value = name;
+    const input = document.getElementById('scale-desired');
+    input.min   = minSize;
+    input.max   = maxSize;
+    input.value = currentDesired;
+    document.getElementById('scale-asg-range').textContent = `Allowed range: ${minSize} – ${maxSize}`;
+    scaleAsgModal.show();
+  }
+
+  async function submitScaleAsg() {
+    const name    = document.getElementById('scale-asg-name').value;
+    const desired = parseInt(document.getElementById('scale-desired').value);
+    if (!desired || desired < 1) { toast('error', 'Validation', 'Enter a valid desired capacity'); return; }
+
+    scaleAsgModal.hide();
+    toast('info', 'Scaling…', `"${name}" → ${desired} instance(s)`);
+
+    const r = await fetch(`/api/auto-scaling-groups/${name}/scale`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({desired})
+    }).then(r => r.json());
+
+    if (r.error) { toast('error', 'Scale failed', r.error); return; }
+    const direction = r.desired_capacity > r.previous_desired ? 'up' : 'down';
+    toast('success', `Scaled ${direction}`, `"${name}" → ${r.desired_capacity} instance(s)`);
+    scheduleRefresh('auto-scaling', 5000);
+  }
+
+  function deleteAsg(name, instanceCount) {
+    const msg = instanceCount > 0
+      ? `Delete ASG "${name}"? All ${instanceCount} instance(s) will be terminated.`
+      : `Delete ASG "${name}"?`;
+    confirm(msg, async () => {
+      const r = await fetch(`/api/auto-scaling-groups/${name}`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'Deleted', `ASG "${name}" removed — ${r.instances_terminated} instance(s) terminated`);
+      scheduleRefresh('auto-scaling', 3000);
+    });
+  }
+
+  // ── Edit ASG ──────────────────────────────────────────────────────────────
+  function openEditAsgModal(name, minSize, maxSize, desired) {
+    document.getElementById('edit-asg-name').value    = name;
+    document.getElementById('edit-asg-display').value = name;
+    document.getElementById('edit-asg-min').value     = minSize;
+    document.getElementById('edit-asg-max').value     = maxSize;
+    document.getElementById('edit-asg-desired').value = desired;
+    editAsgModal.show();
+  }
+
+  async function submitEditAsg() {
+    const name     = document.getElementById('edit-asg-name').value;
+    const min_size = parseInt(document.getElementById('edit-asg-min').value) || 1;
+    const max_size = parseInt(document.getElementById('edit-asg-max').value) || 1;
+    const desired  = parseInt(document.getElementById('edit-asg-desired').value) || 1;
+
+    if (max_size < min_size) { toast('error', 'Validation', 'Max size must be ≥ min size'); return; }
+    if (desired < min_size || desired > max_size) {
+      toast('error', 'Validation', `Desired (${desired}) must be between ${min_size} and ${max_size}`);
+      return;
+    }
+
+    editAsgModal.hide();
+    toast('info', 'Updating…', `Saving changes to "${name}"`);
+
+    const r = await fetch(`/api/auto-scaling-groups/${name}`, {
+      method: 'PUT', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({min_size, max_size, desired_capacity: desired})
+    }).then(r => r.json());
+
+    if (r.error) { toast('error', 'Update failed', r.error); return; }
+    toast('success', 'Updated', `"${name}" — min: ${r.min_size}, max: ${r.max_size}, desired: ${r.desired_capacity}`);
+    scheduleRefresh('auto-scaling', 4000);
+  }
+
+  // ── Scaling Policies ──────────────────────────────────────────────────────
+  async function openPoliciesModal(asgName) {
+    document.getElementById('policies-asg-name').value          = asgName;
+    document.getElementById('policies-asg-name-display').textContent = asgName;
+    document.getElementById('policy-name').value     = '';
+    document.getElementById('policy-adj-type').value = 'ChangeInCapacity';
+    document.getElementById('policy-adj-value').value = '1';
+    document.getElementById('policy-cooldown').value  = '0';
+    onPolicyTypeChange();
+    policiesModal.show();
+    await loadPoliciesList(asgName);
+  }
+
+  async function loadPoliciesList(asgName) {
+    const wrap = document.getElementById('policies-list-wrap');
+    wrap.innerHTML = '<div class="loading-td"><span class="spinner"></span> Loading…</div>';
+    const policies = await fetch(`/api/auto-scaling-groups/${asgName}/policies`).then(r => r.json());
+    if (policies.error) { wrap.innerHTML = `<div style="color:#dc3545">${policies.error}</div>`; return; }
+    if (policies.length === 0) {
+      wrap.innerHTML = '<div class="empty-state" style="padding:16px"><i class="bi bi-inbox"></i><br>No policies yet — add one below</div>';
+      return;
+    }
+    wrap.innerHTML = `
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Type</th><th>Adjustment</th><th>Cooldown</th><th>Actions</th></tr></thead>
+        <tbody>${policies.map(p => {
+          const adjLabel = p.adjustment_type === 'ChangeInCapacity'
+            ? (p.scaling_adjustment >= 0 ? `+${p.scaling_adjustment}` : `${p.scaling_adjustment}`)
+            : `= ${p.scaling_adjustment}`;
+          return `<tr>
+            <td><strong>${p.policy_name}</strong></td>
+            <td style="font-size:12px"><code>${p.adjustment_type}</code></td>
+            <td style="text-align:center;font-weight:700">${adjLabel}</td>
+            <td style="text-align:center;color:#6b7785">${p.cooldown}s</td>
+            <td style="white-space:nowrap">
+              <button class="btn-act btn-start me-1" onclick="executePolicy('${asgName}','${p.policy_name}')">&#9654; Execute</button>
+              <button class="btn-act btn-delete" onclick="deletePolicyRow('${asgName}','${p.policy_name}')">&#128465;</button>
+            </td></tr>`;
+        }).join('')}</tbody>
+      </table>`;
+  }
+
+  // Hint text changes based on type so the user knows what the value means
+  function onPolicyTypeChange() {
+    const type = document.getElementById('policy-adj-type').value;
+    document.getElementById('policy-adj-hint').textContent =
+      type === 'ChangeInCapacity' ? 'e.g. +1 (scale out) or -1 (scale in)' : 'e.g. 3 (set desired to 3)';
+  }
+
+  async function submitAddPolicy() {
+    const asgName    = document.getElementById('policies-asg-name').value;
+    const policyName = document.getElementById('policy-name').value.trim();
+    const adjType    = document.getElementById('policy-adj-type').value;
+    const adjValue   = parseInt(document.getElementById('policy-adj-value').value);
+    const cooldown   = parseInt(document.getElementById('policy-cooldown').value) || 0;
+
+    if (!policyName) { toast('error', 'Validation', 'Policy name is required'); return; }
+    if (isNaN(adjValue)) { toast('error', 'Validation', 'Adjustment value must be a number'); return; }
+
+    const r = await fetch(`/api/auto-scaling-groups/${asgName}/policies`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        policy_name: policyName, adjustment_type: adjType,
+        scaling_adjustment: adjValue, cooldown,
+        created_at: new Date().toISOString().slice(0, 10),
+      })
+    }).then(r => r.json());
+
+    if (r.error) { toast('error', 'Add policy failed', r.error); return; }
+    toast('success', 'Policy added', `"${policyName}" added to ${asgName}`);
+    document.getElementById('policy-name').value = '';
+    await loadPoliciesList(asgName);
+    scheduleRefresh('auto-scaling', 1000);
+  }
+
+  async function executePolicy(asgName, policyName) {
+    toast('info', 'Executing…', `Policy "${policyName}" on "${asgName}"`);
+    const r = await fetch(`/api/auto-scaling-groups/${asgName}/policies/${policyName}/execute`, {
+      method: 'POST'
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Execute failed', r.error); return; }
+    const direction = r.desired_capacity > r.previous_desired ? 'up' : r.desired_capacity < r.previous_desired ? 'down' : 'unchanged';
+    toast('success', 'Policy executed', `"${asgName}" scaled ${direction} → ${r.desired_capacity} instance(s)`);
+    scheduleRefresh('auto-scaling', 5000);
+  }
+
+  async function deletePolicyRow(asgName, policyName) {
+    const r = await fetch(`/api/auto-scaling-groups/${asgName}/policies/${policyName}`, {method:'DELETE'}).then(r => r.json());
+    if (r.error) { toast('error', 'Delete failed', r.error); return; }
+    toast('success', 'Deleted', `Policy "${policyName}" removed`);
+    await loadPoliciesList(asgName);
+    scheduleRefresh('auto-scaling', 1000);
+  }
+
+  // ── DevStack Monitor ──────────────────────────────────────────────────────
+
+  let _dsAutoRefreshTimer = null;
+
+  const DS_PHASES = [
+    { key: 'apt',              label: 'APT update',       match: ['apt-get', 'dpkg'] },
+    { key: 'git-clone',        label: 'Git clone',        match: ['git clone', 'git_clone'] },
+    { key: 'pip-install',      label: 'pip install',      match: ['pip install', 'pip3 install'] },
+    { key: 'installing-octavia', label: 'Octavia setup',  match: ['octavia'] },
+    { key: 'starting-services',  label: 'Start services', match: ['starting', 'started'] },
+    { key: 'completed',        label: 'Complete',         match: ['this is your host', 'stack.sh completed'] },
+  ];
+
+  const PHASE_COLORS = {
+    running: { dot: '#ff9900', label: 'Running', bg: '#fff3cd', text: '#856404' },
+    'installing-octavia': { dot: '#ff9900', label: 'Installing Octavia', bg: '#fff3cd', text: '#856404' },
+    'git-clone':  { dot: '#ff9900', label: 'Cloning repos', bg: '#fff3cd', text: '#856404' },
+    'pip-install':{ dot: '#ff9900', label: 'Installing Python packages', bg: '#fff3cd', text: '#856404' },
+    'starting-services': { dot: '#17a2b8', label: 'Starting services', bg: '#d1ecf1', text: '#0c5460' },
+    completed: { dot: '#28a745', label: 'Completed', bg: '#d4edda', text: '#1a6b35' },
+    error:     { dot: '#dc3545', label: 'Error', bg: '#f8d7da', text: '#842029' },
+    stopped:   { dot: '#6c757d', label: 'Stopped', bg: '#e9ecef', text: '#495057' },
+  };
+
+  function colorLogLine(line) {
+    const l = line.toLowerCase();
+    let color = '#c9d1d9';  // default grey-white
+    if (l.includes('error') || l.includes('failed') || l.includes('traceback'))
+      color = '#ff6b6b';
+    else if (l.includes('warn'))
+      color = '#ffa94d';
+    else if (l.includes('octavia') || l.includes('o-api') || l.includes('o-hm'))
+      color = '#74c0fc';
+    else if (l.includes('started') || l.includes('complete') || l.includes('this is your host'))
+      color = '#69db7c';
+    else if (l.includes('git clone') || l.includes('pip install') || l.includes('apt-get'))
+      color = '#da77f2';
+    else if (l.includes('creating') || l.includes('configuring') || l.includes('installing'))
+      color = '#ffd43b';
+    const escaped = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<span style="color:${color}">${escaped}</span>`;
+  }
+
+  async function loadDevstack() {
+    const n = document.getElementById('ds-lines-count').value;
+    const [statusResp, logResp] = await Promise.all([
+      fetch('/api/devstack/status').then(r => r.json()),
+      fetch(`/api/devstack/log?lines=${n}`).then(r => r.json()),
+    ]);
+
+    // Status bar
+    const phase = statusResp.phase || 'stopped';
+    const meta  = PHASE_COLORS[phase] || PHASE_COLORS.stopped;
+    document.getElementById('ds-status-dot').style.background   = meta.dot;
+    document.getElementById('ds-status-label').textContent      = meta.label;
+    document.getElementById('ds-status-label').style.color      = meta.text;
+    document.getElementById('ds-phase').textContent             = phase;
+    document.getElementById('ds-pid').textContent               = statusResp.pid || '—';
+    document.getElementById('ds-log-path').textContent          = statusResp.log_path || '—';
+    document.getElementById('ds-last-refresh').textContent      = 'Refreshed ' + new Date().toLocaleTimeString();
+
+    // Stop button visibility
+    document.getElementById('ds-stop-btn').style.display = statusResp.running ? '' : 'none';
+
+    // Phase progress bar
+    const logText = (logResp.lines || []).join('\n').toLowerCase();
+    const phaseEl = document.getElementById('ds-phases');
+    phaseEl.innerHTML = DS_PHASES.map(p => {
+      const done = p.match.some(m => logText.includes(m));
+      const isCurrent = done && p.key === phase;
+      return `<div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;
+        background:${done ? '#d4edda' : '#f0f2f5'};color:${done ? '#1a6b35' : '#8892a0'};">
+        <i class="bi ${done ? 'bi-check-circle-fill' : 'bi-circle'}" style="font-size:13px;${isCurrent ? 'color:#ff9900' : ''}"></i>
+        ${p.label}
+      </div>`;
+    }).join('');
+
+    // Log viewer
+    const container = document.getElementById('ds-log-container');
+    const lines = logResp.lines || [];
+    if (!lines.length) {
+      container.innerHTML = '<div style="color:#6b7785;text-align:center;padding:20px;">No log output yet.</div>';
+    } else {
+      container.innerHTML = lines.map(colorLogLine).join('<br>');
+      if (document.getElementById('ds-scroll-bottom').checked) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+
+    // Completion / error toasts (one-shot)
+    if (phase === 'completed' && !window._dsCompletedToasted) {
+      window._dsCompletedToasted = true;
+      toast('success', 'stack.sh complete!', 'Octavia is now installed. Reload the page.');
+    } else if (phase === 'error' && !window._dsErrorToasted) {
+      window._dsErrorToasted = true;
+      toast('error', 'stack.sh failed', 'Check the log for ERROR lines.');
+    }
+  }
+
+  function toggleDsAutoRefresh() {
+    clearInterval(_dsAutoRefreshTimer);
+    if (document.getElementById('ds-auto-refresh').checked) {
+      _dsAutoRefreshTimer = setInterval(loadDevstack, 5000);
+    }
+  }
+
+  async function stopDevstack() {
+    confirm('Stop the running stack.sh process?', async () => {
+      const r = await fetch('/api/devstack/stop', {method:'POST'}).then(r => r.json());
+      if (r.error) { toast('error', 'Stop failed', r.error); return; }
+      toast('info', 'Stopped', `stack.sh (PID ${(r.pids||[]).join(', ')}) killed`);
+      await loadDevstack();
+    });
+  }
+
+  // ── Load Balancers ────────────────────────────────────────────────────────
+
+  let _activeLbId   = null;
+  let _activeLbName = null;
+
+  async function loadLoadBalancers() {
+    const tbody = document.getElementById('lb-body');
+    tbody.innerHTML = '<tr><td colspan="8" class="loading-td"><span class="spinner"></span>Loading…</td></tr>';
+    const lbs = await fetch('/api/load-balancers').then(r => r.json());
+
+    if (lbs.error) {
+      tbody.innerHTML = `<tr><td colspan="8" class="loading-td" style="color:#842029">${lbs.error}</td></tr>`;
+      return;
+    }
+    document.getElementById('badge-load-balancers').textContent = lbs.length || '0';
+    document.getElementById('lb-count').textContent = `${lbs.length} load balancer${lbs.length !== 1 ? 's' : ''}`;
+    document.getElementById('lb-stat-total').textContent     = lbs.length;
+    document.getElementById('lb-stat-active').textContent    = lbs.filter(l => l.provisioning_status === 'ACTIVE').length;
+    document.getElementById('lb-stat-listeners').textContent = lbs.reduce((s, l) => s + l.listener_count, 0);
+    document.getElementById('lb-stat-members').textContent   = lbs.reduce((s, l) => s + l.member_count, 0);
+
+    if (!lbs.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty-state" style="padding:32px;text-align:center;color:#8892a0">No load balancers yet. Click <strong>Create Load Balancer</strong> to start.</td></tr>';
+      return;
+    }
+
+    const PSTATUS = {
+      ACTIVE: 's-active', ERROR: 's-ERROR', PENDING_CREATE: 's-BUILD',
+      PENDING_UPDATE: 's-BUILD', PENDING_DELETE: 's-BUILD',
+    };
+    const OSTATUS = { ONLINE: 's-active', OFFLINE: 's-SHUTOFF', ERROR: 's-ERROR', DRAINING: 's-PAUSED', NO_MONITOR: 's-SHUTOFF' };
+
+    tbody.innerHTML = lbs.map(lb => `
+      <tr>
+        <td><strong>${lb.name}</strong>${lb.description ? `<br><span style="font-size:11px;color:#6b7785">${lb.description}</span>` : ''}</td>
+        <td><span class="ip-chip">${lb.vip_address || '—'}</span></td>
+        <td><span style="font-size:12px;color:#555">${lb.provider || '—'}</span></td>
+        <td><span class="badge-s ${PSTATUS[lb.provisioning_status] || ''}">${lb.provisioning_status}</span></td>
+        <td><span class="badge-s ${OSTATUS[lb.operating_status] || ''}">${lb.operating_status}</span></td>
+        <td>${lb.listener_count}</td>
+        <td>${lb.member_count}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn-act btn-reboot" style="margin-right:3px" onclick="openLbListenersModal('${lb.id}','${lb.name}')"><i class="bi bi-arrow-left-right"></i> Rules</button>
+          <button class="btn-act btn-modify" style="margin-right:3px" onclick="openLbMembersModal('${lb.id}','${lb.name}')"><i class="bi bi-pc-display"></i> Members</button>
+          <button class="btn-act btn-snapshot" style="margin-right:3px" onclick="openLbHealthModal('${lb.id}','${lb.name}')"><i class="bi bi-heart-pulse"></i> Health</button>
+          <button class="btn-act btn-delete" onclick="deleteLb('${lb.id}','${lb.name}')"><i class="bi bi-trash"></i></button>
+        </td>
+      </tr>`).join('');
+  }
+
+  async function openCreateLbModal() {
+    // Populate subnet dropdown
+    const subnetSel = document.getElementById('lb-subnet');
+    subnetSel.innerHTML = '<option value="">Loading…</option>';
+    const subnets = await fetch('/api/subnets').then(r => r.json());
+    if (!subnets.error && subnets.length) {
+      subnetSel.innerHTML = subnets.map(s =>
+        `<option value="${s.id}">${s.name} (${s.cidr})</option>`).join('');
+    } else {
+      subnetSel.innerHTML = '<option value="">No subnets found</option>';
+    }
+    document.getElementById('lb-name').value        = '';
+    document.getElementById('lb-description').value = '';
+    new bootstrap.Modal(document.getElementById('createLbModal')).show();
+  }
+
+  async function submitCreateLb() {
+    const name      = document.getElementById('lb-name').value.trim();
+    const subnet_id = document.getElementById('lb-subnet').value;
+    const description = document.getElementById('lb-description').value.trim();
+    if (!name || !subnet_id) { toast('error', 'Validation', 'Name and subnet are required'); return; }
+
+    toast('info', 'Creating…', `Load balancer "${name}"`);
+    bootstrap.Modal.getInstance(document.getElementById('createLbModal')).hide();
+
+    const r = await fetch('/api/load-balancers', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, subnet_id, description}),
+    }).then(r => r.json());
+
+    if (r.error) { toast('error', 'Create failed', r.error); return; }
+    toast('success', 'Created', `Load balancer "${name}" is ready`);
+    scheduleRefresh('load-balancers', 2000);
+  }
+
+  function deleteLb(lb_id, name) {
+    confirm(`Delete load balancer "${name}"? All listeners, members, and health monitors will be removed.`, async () => {
+      toast('info', 'Deleting…', name);
+      const r = await fetch(`/api/load-balancers/${lb_id}`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'Deleted', `"${name}" removed`);
+      scheduleRefresh('load-balancers', 1500);
+    });
+  }
+
+  // ── Listeners ──────────────────────────────────────────────────────────────
+
+  async function openLbListenersModal(lb_id, lb_name) {
+    _activeLbId   = lb_id;
+    _activeLbName = lb_name;
+    document.getElementById('lb-listeners-name').textContent = lb_name;
+    document.getElementById('listener-name').value  = '';
+    document.getElementById('listener-port').value  = '80';
+    new bootstrap.Modal(document.getElementById('lbListenersModal')).show();
+    await loadLbListeners();
+  }
+
+  async function loadLbListeners() {
+    const tbody = document.getElementById('lb-listeners-body');
+    tbody.innerHTML = '<tr><td colspan="5" class="loading-td"><span class="spinner"></span>Loading…</td></tr>';
+    const list = await fetch(`/api/load-balancers/${_activeLbId}/listeners`).then(r => r.json());
+    if (list.error) {
+      tbody.innerHTML = `<tr><td colspan="5" class="loading-td" style="color:#842029">${list.error}</td></tr>`;
+      return;
+    }
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="loading-td">No listeners yet. Add one above.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(l => `
+      <tr>
+        <td><strong>${l.name}</strong></td>
+        <td><span class="badge-s s-active">${l.protocol}</span></td>
+        <td><span class="ip-chip">${l.protocol_port}</span></td>
+        <td><span class="badge-s ${l.provisioning_status === 'ACTIVE' ? 's-active' : 's-BUILD'}">${l.provisioning_status}</span></td>
+        <td><button class="btn-act btn-delete" onclick="deleteLbListener('${l.id}')"><i class="bi bi-trash"></i></button></td>
+      </tr>`).join('');
+  }
+
+  async function submitAddListener() {
+    const name          = document.getElementById('listener-name').value.trim();
+    const protocol      = document.getElementById('listener-protocol').value;
+    const protocol_port = parseInt(document.getElementById('listener-port').value);
+    if (!name) { toast('error', 'Validation', 'Listener name is required'); return; }
+
+    toast('info', 'Adding listener…', name);
+    const r = await fetch(`/api/load-balancers/${_activeLbId}/listeners`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, protocol, protocol_port}),
+    }).then(r => r.json());
+
+    if (r.error) { toast('error', 'Failed', r.error); return; }
+    toast('success', 'Listener added', `${protocol}:${protocol_port}`);
+    document.getElementById('listener-name').value = '';
+    await loadLbListeners();
+    scheduleRefresh('load-balancers', 1000);
+  }
+
+  function deleteLbListener(listener_id) {
+    confirm('Remove this listener?', async () => {
+      const r = await fetch(`/api/load-balancers/${_activeLbId}/listeners/${listener_id}`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Failed', r.error); return; }
+      toast('success', 'Deleted', 'Listener removed');
+      await loadLbListeners();
+      scheduleRefresh('load-balancers', 1000);
+    });
+  }
+
+  // ── Members ────────────────────────────────────────────────────────────────
+
+  async function openLbMembersModal(lb_id, lb_name) {
+    _activeLbId   = lb_id;
+    _activeLbName = lb_name;
+    document.getElementById('lb-members-name').textContent = lb_name;
+    document.getElementById('member-port').value = '80';
+
+    // Populate instance dropdown
+    const instSel = document.getElementById('member-instance');
+    instSel.innerHTML = '<option value="">Loading…</option>';
+    const instances = await fetch('/api/instances').then(r => r.json());
+    const running = (instances.error ? [] : instances).filter(i => i.status === 'ACTIVE');
+    instSel.innerHTML = running.length
+      ? running.map(i => `<option value="${i.id}">${i.name}</option>`).join('')
+      : '<option value="">No running instances</option>';
+
+    // Populate subnet dropdown (optional)
+    const subnetSel = document.getElementById('member-subnet');
+    subnetSel.innerHTML = '<option value="">Auto-detect</option>';
+    const subnets = await fetch('/api/subnets').then(r => r.json());
+    if (!subnets.error) {
+      subnetSel.innerHTML += subnets.map(s =>
+        `<option value="${s.id}">${s.name} (${s.cidr})</option>`).join('');
+    }
+
+    new bootstrap.Modal(document.getElementById('lbMembersModal')).show();
+    await loadLbMembers();
+  }
+
+  async function loadLbMembers() {
+    const tbody = document.getElementById('lb-members-body');
+    tbody.innerHTML = '<tr><td colspan="5" class="loading-td"><span class="spinner"></span>Loading…</td></tr>';
+    const list = await fetch(`/api/load-balancers/${_activeLbId}/members`).then(r => r.json());
+    if (list.error) {
+      tbody.innerHTML = `<tr><td colspan="5" class="loading-td" style="color:#842029">${list.error}</td></tr>`;
+      return;
+    }
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="loading-td">No members yet. Attach an instance above.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(m => `
+      <tr>
+        <td><strong>${m.name || '—'}</strong></td>
+        <td><span class="ip-chip">${m.address}</span></td>
+        <td>${m.protocol_port}</td>
+        <td><span class="badge-s ${m.operating_status === 'ONLINE' ? 's-active' : 's-SHUTOFF'}">${m.operating_status || m.provisioning_status}</span></td>
+        <td><button class="btn-act btn-delete" onclick="removeLbMember('${m.id}')"><i class="bi bi-trash"></i></button></td>
+      </tr>`).join('');
+  }
+
+  async function submitAttachMember() {
+    const instance_id   = document.getElementById('member-instance').value;
+    const protocol_port = parseInt(document.getElementById('member-port').value);
+    const subnet_id     = document.getElementById('member-subnet').value;
+    if (!instance_id) { toast('error', 'Validation', 'Select an instance'); return; }
+
+    toast('info', 'Attaching instance…', '');
+    const r = await fetch(`/api/load-balancers/${_activeLbId}/members`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({instance_id, protocol_port, subnet_id}),
+    }).then(r => r.json());
+
+    if (r.error) { toast('error', 'Failed', r.error); return; }
+    toast('success', 'Attached', `Instance added as member (${r.address}:${protocol_port})`);
+    await loadLbMembers();
+    scheduleRefresh('load-balancers', 1000);
+  }
+
+  function removeLbMember(member_id) {
+    confirm('Remove this instance from the load balancer?', async () => {
+      const r = await fetch(`/api/load-balancers/${_activeLbId}/members/${member_id}`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Failed', r.error); return; }
+      toast('success', 'Removed', 'Member detached');
+      await loadLbMembers();
+      scheduleRefresh('load-balancers', 1000);
+    });
+  }
+
+  // ── Health Monitor ─────────────────────────────────────────────────────────
+
+  async function openLbHealthModal(lb_id, lb_name) {
+    _activeLbId   = lb_id;
+    _activeLbName = lb_name;
+    document.getElementById('lb-health-name').textContent = lb_name;
+    new bootstrap.Modal(document.getElementById('lbHealthModal')).show();
+    await loadLbHealthMonitor();
+  }
+
+  async function loadLbHealthMonitor() {
+    const existingDiv = document.getElementById('lb-health-existing');
+    const formDiv     = document.getElementById('lb-health-form');
+    const saveBtn     = document.getElementById('hm-save-btn');
+    const details     = document.getElementById('lb-health-details');
+
+    const hm = await fetch(`/api/load-balancers/${_activeLbId}/health-monitor`).then(r => r.json());
+
+    if (hm.error || !hm.id) {
+      existingDiv.style.display = 'none';
+      formDiv.style.display     = '';
+      saveBtn.style.display     = '';
+    } else {
+      existingDiv.style.display = '';
+      formDiv.style.display     = 'none';
+      saveBtn.style.display     = 'none';
+      details.innerHTML = `Type: <strong>${hm.type}</strong> &nbsp;|&nbsp; Delay: <strong>${hm.delay}s</strong> &nbsp;|&nbsp; Timeout: <strong>${hm.timeout}s</strong> &nbsp;|&nbsp; Max retries: <strong>${hm.max_retries}</strong><br>Status: <span class="badge-s ${hm.provisioning_status === 'ACTIVE' ? 's-active' : 's-BUILD'}">${hm.provisioning_status}</span>`;
+    }
+  }
+
+  async function submitCreateHealthMonitor() {
+    const type        = document.getElementById('hm-type').value;
+    const delay       = parseInt(document.getElementById('hm-delay').value);
+    const timeout     = parseInt(document.getElementById('hm-timeout').value);
+    const max_retries = parseInt(document.getElementById('hm-retries').value);
+
+    toast('info', 'Configuring health check…', '');
+    const r = await fetch(`/api/load-balancers/${_activeLbId}/health-monitor`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({type, delay, timeout, max_retries}),
+    }).then(r => r.json());
+
+    if (r.error) { toast('error', 'Failed', r.error); return; }
+    toast('success', 'Health check active', `${type} every ${delay}s`);
+    await loadLbHealthMonitor();
+    scheduleRefresh('load-balancers', 1000);
+  }
+
+  function submitDeleteHealthMonitor() {
+    confirm('Remove health monitor?', async () => {
+      const r = await fetch(`/api/load-balancers/${_activeLbId}/health-monitor`, {method:'DELETE'}).then(r => r.json());
+      if (r.error) { toast('error', 'Failed', r.error); return; }
+      toast('success', 'Removed', 'Health monitor deleted');
+      await loadLbHealthMonitor();
+      scheduleRefresh('load-balancers', 1000);
+    });
+  }
+
+  // ── Snapshots ─────────────────────────────────────────────────────────────
+  async function fetchSnapshots() {
+    const tbody = document.getElementById('snapshots-body');
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><span class="spinner-border spinner-border-sm"></span> Loading…</td></tr>';
+    const data = await apiFetch('/api/snapshots');
+    if (data.error) { tbody.innerHTML = `<tr><td colspan="8" class="empty-state text-danger">${data.error}</td></tr>`; return; }
+    tbody.innerHTML = data.length === 0
+      ? '<tr><td colspan="8" class="empty-state"><i class="bi bi-inbox"></i> No snapshots found</td></tr>'
+      : data.map(s => `<tr>
+          <td class="id-col">${shortId(s.id)}</td>
+          <td><strong>${s.name}</strong></td>
+          <td>${badge(s.status)}</td>
+          <td>${s.size_gb} GB</td>
+          <td class="id-col">${s.volume_id ? shortId(s.volume_id) : '—'}</td>
+          <td>${s.project}</td>
+          <td>${s.created_at}</td>
+          <td>
+            <button class="btn-act btn-modify me-1" onclick="openRestoreSnapshotModal('${s.id}','${s.name}',${s.size_gb})">&#8635; Restore</button>
+            <button class="btn-act btn-delete" onclick="deleteSnapshot('${s.id}','${s.name}')">&#128465; Delete</button>
+          </td>
+        </tr>`).join('');
+  }
+
+  async function openCreateSnapshotModal() {
+    // Populate volumes dropdown fresh each open
+    document.getElementById('snap-name').value = '';
+    document.getElementById('snap-description').value = '';
+    const sel = document.getElementById('snap-volume-id');
+    sel.innerHTML = '<option value="">Loading…</option>';
+    createSnapshotModal.show();
+    const vols = await apiFetch('/api/volumes');
+    sel.innerHTML = vols.error
+      ? '<option value="">Failed to load volumes</option>'
+      : vols.map(v => `<option value="${v.id}">${v.name || v.id.slice(0,8)} (${v.size} GB)</option>`).join('');
+  }
+
+  async function submitCreateSnapshot() {
+    const volumeId   = document.getElementById('snap-volume-id').value;
+    const name        = document.getElementById('snap-name').value.trim();
+    const description = document.getElementById('snap-description').value.trim();
+    if (!volumeId || !name) { toast('error', 'Required', 'Select a volume and enter a name'); return; }
+    createSnapshotModal.hide();
+    toast('info', 'Creating…', `Snapshot "${name}" is being created`);
+    const res = await apiFetch('/api/snapshots', { method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ volume_id: volumeId, name, description }) });
+    if (res.error) { toast('error', 'Failed', res.error); return; }
+    toast('success', 'Snapshot created', `"${name}" is now available`);
+    delete loaded['snapshots'];
+    if (currentSection === 'snapshots') loadSection('snapshots');
+  }
+
+  function openRestoreSnapshotModal(snapshotId, snapshotName, sizeGb) {
+    document.getElementById('restore-snapshot-id').value   = snapshotId;
+    document.getElementById('restore-snapshot-name').value = snapshotName;
+    document.getElementById('restore-volume-name').value   = '';
+    document.getElementById('restore-volume-size').value   = sizeGb;
+    restoreSnapshotModal.show();
+  }
+
+  async function submitRestoreSnapshot() {
+    const snapshotId = document.getElementById('restore-snapshot-id').value;
+    const name       = document.getElementById('restore-volume-name').value.trim();
+    const size       = parseInt(document.getElementById('restore-volume-size').value, 10);
+    if (!name || !size) { toast('error', 'Required', 'Enter a volume name and size'); return; }
+    restoreSnapshotModal.hide();
+    toast('info', 'Restoring…', `Creating volume "${name}" from snapshot`);
+    const res = await apiFetch('/api/volumes/from-snapshot', { method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ snapshot_id: snapshotId, name, size }) });
+    if (res.error) { toast('error', 'Failed', res.error); return; }
+    toast('success', 'Volume created', `"${name}" is available`);
+    delete loaded['volumes'];
+  }
+
+  async function deleteSnapshot(snapshotId, snapshotName) {
+    if (!confirm(`Delete snapshot "${snapshotName}"? This cannot be undone.`)) return;
+    const res = await apiFetch(`/api/snapshots/${snapshotId}`, { method: 'DELETE' });
+    if (res && res.error) { toast('error', 'Failed', res.error); return; }
+    toast('success', 'Deleted', `Snapshot "${snapshotName}" removed`);
+    delete loaded['snapshots'];
+    if (currentSection === 'snapshots') loadSection('snapshots');
+  }
+
+  // ── Instance Console ───────────────────────────────────────────────────────
+  let _consoleServerId = null;
+
+  async function openConsoleModal(serverId, serverName) {
+    _consoleServerId = serverId;
+    document.getElementById('console-server-name').textContent = serverName;
+    document.getElementById('console-vnc-url').textContent = 'Requesting…';
+    document.getElementById('console-vnc-url').href = '#';
+    document.getElementById('console-output').innerHTML =
+      '<div style="color:#6b7785;text-align:center;padding:20px">Loading console output…</div>';
+    document.getElementById('console-lines').value = '50';
+    consoleModal.show();
+    // Fetch VNC URL and console output in parallel
+    const [vncRes] = await Promise.all([
+      apiFetch(`/api/instances/${serverId}/console`, { method: 'POST',
+        headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'novnc' }) }),
+      loadConsoleOutput(),
+    ]);
+    if (vncRes && !vncRes.error && vncRes.url) {
+      const link = document.getElementById('console-vnc-url');
+      link.href = vncRes.url;
+      link.textContent = vncRes.url;
+    } else {
+      document.getElementById('console-vnc-url').textContent = vncRes.error || 'VNC not available';
+    }
+  }
+
+  async function loadConsoleOutput() {
+    if (!_consoleServerId) return;
+    const lines = parseInt(document.getElementById('console-lines').value, 10);
+    const res = await apiFetch(`/api/instances/${_consoleServerId}/console-output?lines=${lines}`);
+    renderConsoleOutput(res.error ? `Error: ${res.error}` : (res.output || '(no output)'));
+  }
+
+  function renderConsoleOutput(text) {
+    // Escape HTML to prevent XSS from raw console log content
+    const escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const el = document.getElementById('console-output');
+    el.innerHTML = `<span style="color:#c9d1d9">${escaped}</span>`;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  // ── Ports / Network Interfaces ─────────────────────────────────────────────
+  async function fetchPorts() {
+    const tbody = document.getElementById('ports-body');
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><span class="spinner-border spinner-border-sm"></span> Loading…</td></tr>';
+    const data = await apiFetch('/api/ports');
+    if (data.error) { tbody.innerHTML = `<tr><td colspan="7" class="empty-state text-danger">${data.error}</td></tr>`; return; }
+    tbody.innerHTML = data.length === 0
+      ? '<tr><td colspan="7" class="empty-state"><i class="bi bi-inbox"></i> No ports found</td></tr>'
+      : data.map(p => {
+          const ips = (p.fixed_ips || []).map(f => f.ip_address).join(', ') || '—';
+          const device = p.device_owner ? `<small class="text-muted">${p.device_owner}</small>` : '—';
+          // Only allow deletion of ports not owned by a router/DHCP agent — those are managed by Neutron
+          const canDelete = !p.device_owner || p.device_owner === '';
+          return `<tr>
+            <td class="id-col">${shortId(p.id)}</td>
+            <td><strong>${p.name || '—'}</strong></td>
+            <td>${badge(p.status)}</td>
+            <td style="font-family:monospace;font-size:11px">${p.mac_address || '—'}</td>
+            <td>${ips}</td>
+            <td>${device}</td>
+            <td>${canDelete
+              ? `<button class="btn-act btn-delete" onclick="deletePort('${p.id}','${p.name || p.id.slice(0,8)}')">&#128465; Delete</button>`
+              : '<span class="text-muted" style="font-size:12px">In use</span>'
+            }</td>
+          </tr>`;
+        }).join('');
+  }
+
+  async function openCreatePortModal() {
+    document.getElementById('port-name').value = '';
+    const sel = document.getElementById('port-network-id');
+    sel.innerHTML = '<option value="">Loading…</option>';
+    createPortModal.show();
+    const nets = await apiFetch('/api/networks');
+    sel.innerHTML = nets.error
+      ? '<option value="">Failed to load networks</option>'
+      : nets.map(n => `<option value="${n.id}">${n.name}</option>`).join('');
+  }
+
+  async function submitCreatePort() {
+    const networkId = document.getElementById('port-network-id').value;
+    const name      = document.getElementById('port-name').value.trim();
+    if (!networkId) { toast('error', 'Required', 'Select a network'); return; }
+    createPortModal.hide();
+    const res = await apiFetch('/api/ports', { method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ network_id: networkId, name }) });
+    if (res.error) { toast('error', 'Failed', res.error); return; }
+    toast('success', 'Port created', `Interface "${name || res.id.slice(0,8)}" is ready`);
+    delete loaded['ports'];
+    if (currentSection === 'ports') loadSection('ports');
+  }
+
+  async function deletePort(portId, portName) {
+    if (!confirm(`Delete port "${portName}"? Any attached device will lose this interface.`)) return;
+    const res = await apiFetch(`/api/ports/${portId}`, { method: 'DELETE' });
+    if (res && res.error) { toast('error', 'Failed', res.error); return; }
+    toast('success', 'Deleted', `Port "${portName}" removed`);
+    delete loaded['ports'];
+    if (currentSection === 'ports') loadSection('ports');
+  }
+
+  async function openAttachInterfaceModal(serverId, serverName) {
+    document.getElementById('attach-iface-server-id').value   = serverId;
+    document.getElementById('attach-iface-server-name').textContent = serverName;
+    const portSel = document.getElementById('attach-iface-port');
+    const netSel  = document.getElementById('attach-iface-network');
+    portSel.innerHTML = '<option value="">Loading…</option>';
+    netSel.innerHTML  = '<option value="">None (use port above)</option>';
+    attachInterfaceModal.show();
+    const [ports, nets] = await Promise.all([ apiFetch('/api/ports'), apiFetch('/api/networks') ]);
+    // Only show free ports (no device owner) for attachment
+    const freePorts = ports.error ? [] : ports.filter(p => !p.device_owner || p.device_owner === '');
+    portSel.innerHTML = '<option value="">— None —</option>' +
+      freePorts.map(p => `<option value="${p.id}">${p.name || p.id.slice(0,8)}</option>`).join('');
+    netSel.innerHTML = '<option value="">None (use port above)</option>' +
+      (nets.error ? '' : nets.map(n => `<option value="${n.id}">${n.name}</option>`).join(''));
+  }
+
+  async function submitAttachInterface() {
+    const serverId = document.getElementById('attach-iface-server-id').value;
+    const portId   = document.getElementById('attach-iface-port').value;
+    const netId    = document.getElementById('attach-iface-network').value;
+    if (!portId && !netId) { toast('error', 'Required', 'Select an existing port or a network'); return; }
+    attachInterfaceModal.hide();
+    const body = portId ? { port_id: portId } : { network_id: netId };
+    const res = await apiFetch(`/api/instances/${serverId}/interfaces`, { method: 'POST',
+      headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (res.error) { toast('error', 'Failed', res.error); return; }
+    toast('success', 'Interface attached', 'NIC added to instance');
+  }
+
+  // ── Resource Quotas ────────────────────────────────────────────────────────
+  async function fetchQuotas() {
+    const grid = document.getElementById('quotas-grid');
+    grid.innerHTML = '<div style="text-align:center;padding:32px"><span class="spinner-border"></span></div>';
+    const data = await apiFetch('/api/quotas');
+    if (data.error) { grid.innerHTML = `<div class="empty-state text-danger">${data.error}</div>`; return; }
+    if (!data.length) { grid.innerHTML = '<div class="empty-state">No quota data available</div>'; return; }
+    grid.innerHTML = data.map(project => `
+      <div class="card-box" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h5 style="margin:0;font-size:16px;font-weight:600">${project.project_name}</h5>
+          <small class="text-muted id-col">${shortId(project.project_id)}</small>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+          ${quotaSection('Compute', [
+            { label: 'Instances',    used: project.instances?.in_use,    limit: project.instances?.limit    },
+            { label: 'vCPUs',        used: project.vcpus?.in_use,        limit: project.vcpus?.limit        },
+            { label: 'RAM (GB)',     used: project.ram_mb?.in_use != null ? Math.round(project.ram_mb.in_use/1024) : null, limit: project.ram_mb?.limit != null ? Math.round(project.ram_mb.limit/1024) : null },
+            { label: 'Key Pairs',    used: project.key_pairs?.in_use,    limit: project.key_pairs?.limit    },
+          ])}
+          ${quotaSection('Storage', [
+            { label: 'Volumes',      used: project.volumes?.in_use,      limit: project.volumes?.limit      },
+            { label: 'Snapshots',    used: project.snapshots?.in_use,    limit: project.snapshots?.limit    },
+            { label: 'Storage (GB)', used: project.gigabytes?.in_use,    limit: project.gigabytes?.limit    },
+          ])}
+          ${quotaSection('Network', [
+            { label: 'Networks',     used: project.networks?.used,       limit: project.networks?.limit     },
+            { label: 'Subnets',      used: project.subnets?.used,        limit: project.subnets?.limit      },
+            { label: 'Routers',      used: project.routers?.used,        limit: project.routers?.limit      },
+            { label: 'Floating IPs', used: project.floating_ips?.used,   limit: project.floating_ips?.limit },
+            { label: 'Security Grps',used: project.security_groups?.used,limit: project.security_groups?.limit },
+            { label: 'Ports',        used: project.ports?.used,          limit: project.ports?.limit        },
+          ])}
+        </div>
+      </div>`).join('');
+  }
+
+  // Renders individual quota progress bars; color-codes by utilization.
+  function quotaSection(groupTitle, rows) {
+    return rows.filter(r => r.used != null).map(r => {
+      const limit   = r.limit === -1 ? null : r.limit;
+      const pct     = limit ? Math.min(100, Math.round((r.used / limit) * 100)) : 0;
+      const color   = pct >= 90 ? '#dc3545' : pct >= 70 ? '#fd7e14' : '#198754';
+      const barText = limit ? `${r.used} / ${limit}` : `${r.used} / ∞`;
+      return `<div style="background:#f8f9fa;border-radius:6px;padding:10px 12px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+          <span style="color:#495057;font-weight:600">${r.label}</span>
+          <span style="color:#6c757d">${barText}</span>
+        </div>
+        ${limit ? `<div style="background:#e9ecef;border-radius:3px;height:6px">
+          <div style="background:${color};width:${pct}%;height:6px;border-radius:3px;transition:width .3s"></div>
+        </div>` : '<div style="font-size:11px;color:#198754">Unlimited</div>'}
+      </div>`;
+    }).join('');
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
