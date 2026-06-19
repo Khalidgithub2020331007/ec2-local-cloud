@@ -1102,6 +1102,967 @@ Expected: `ui-test-key` does NOT appear.
 
 ---
 
+### UI Test 17 — Create a Security Group from the Browser
+
+**What this tests:** Can you add a new firewall rule set?
+
+**Steps:**
+1. Click **Security Groups** in the left sidebar
+2. Click the orange **Create Security Group** button
+3. Fill in the form:
+   - Name: `ui-test-sg`
+   - Description: `Test security group`
+4. Click **Create**
+
+**Expected result:**
+- Toast: *"Created security group ui-test-sg"*
+- `ui-test-sg` appears in the Security Groups table with 0 rules
+
+**Pass:** New group row appears in the table.
+**Fail:** Error toast, or group does not appear.
+
+---
+
+### UI Test 18 — Add Inbound Rules to a Security Group
+
+**What this tests:** Can you open specific ports in a firewall?
+
+**Steps:**
+1. In the Security Groups table, find `ui-test-sg`
+2. Click the blue **+ Rule** button
+3. In the modal, add an HTTP rule:
+   - Protocol: `TCP`
+   - Port From: `80`
+   - Port To: `80`
+   - Remote IP: `0.0.0.0/0`
+4. Click **Add Rule**
+5. Repeat for SSH: Protocol `TCP`, Port `22`, Remote IP `0.0.0.0/0`
+
+**Expected result:**
+- After each addition, a toast confirms the rule was added
+- The rule count badge on `ui-test-sg` increases
+
+**Verify from CLI:**
+```bash
+openstack security group rule list ui-test-sg
+```
+Expected: TCP port 22 and TCP port 80 rules appear.
+
+**Pass:** Both rules visible in CLI output.
+**Fail:** Error toast, or rules missing from CLI.
+
+---
+
+### UI Test 19 — Attach a Security Group to a Running Instance
+
+**What this tests:** Can you apply a different firewall to an existing VM without restarting it?
+
+**Steps:**
+1. Click **Instances** in the sidebar
+2. Find an `ACTIVE` instance
+3. Click the **🛡 SG** button on that row
+4. In the modal, check the box next to `ui-test-sg`
+5. Click **Save**
+
+**Expected result:**
+- Toast: *"Security groups updated"*
+- The instance now has `ui-test-sg` applied (verify below)
+
+**Verify from CLI:**
+```bash
+openstack server show <instance-name> | grep security_groups
+```
+Expected: `ui-test-sg` appears alongside any previous groups.
+
+**Pass:** Instance now has the new security group attached.
+**Fail:** Error toast, or CLI shows old groups only.
+
+---
+
+### UI Test 20 — Delete a Security Group Rule
+
+**What this tests:** Can you remove a specific firewall rule without deleting the whole group?
+
+**Steps:**
+1. Click **Security Groups** in the sidebar
+2. Find `ui-test-sg` and click its **+ Rule** button to open the rules view
+3. Find the TCP port 80 rule
+4. Click the red **🗑** delete button on that rule row
+5. Confirm in the dialog
+
+**Expected result:**
+- Toast: *"Rule deleted"*
+- The port 80 rule disappears; port 22 rule remains
+
+**Pass:** Port 80 rule gone; port 22 rule still present.
+**Fail:** Error toast, or both rules disappear, or neither disappear.
+
+---
+
+### UI Test 21 — Delete a Security Group
+
+**What this tests:** Can you remove an entire security group when it is no longer needed?
+
+**Steps:**
+1. Click **Security Groups** in the sidebar
+2. Find `ui-test-sg`
+3. Click the red **Delete** button on that row
+4. Confirm in the dialog
+
+**Expected result:**
+- `ui-test-sg` disappears from the table
+
+**Note:** If the security group is still attached to a running instance, OpenStack will refuse the delete and return a 409 error. Detach it from all instances first.
+
+**Pass:** Group removed from the table.
+**Fail:** Error toast about the group being in use (expected if still attached — detach first).
+
+---
+
+### UI Test 22 — Create a Volume Snapshot
+
+**What this tests:** Can you take a point-in-time backup of a volume?
+
+**Steps:**
+1. Click **Snapshots** in the left sidebar (under Storage)
+2. Click the orange **Create Snapshot** button
+3. Fill in the form:
+   - Source Volume: select any existing volume from the dropdown
+   - Snapshot Name: `ui-test-snapshot`
+   - Description: `Before config change`
+4. Click **Create**
+
+**Expected result:**
+- Toast: *"Snapshot ui-test-snapshot is being created"*
+- After a few seconds, click **Refresh**
+- `ui-test-snapshot` appears in the Snapshots table with status `available`
+
+**Verify from CLI:**
+```bash
+openstack volume snapshot list
+```
+Expected: `ui-test-snapshot` appears with `available` status.
+
+**Pass:** Snapshot appears with `available` status.
+**Fail:** Error toast, or snapshot shows `error` status.
+
+---
+
+### UI Test 23 — Restore a Volume from a Snapshot
+
+**What this tests:** Can you create a new volume from a snapshot backup?
+
+**Steps:**
+1. Click **Snapshots** in the sidebar
+2. Find `ui-test-snapshot` with status `available`
+3. Click the **↩ Restore** button on that row
+4. Fill in the form:
+   - New Volume Name: `restored-from-snap`
+   - Size (GB): `2` (must be ≥ original snapshot size)
+5. Click **Restore**
+
+**Expected result:**
+- Toast: *"Creating volume restored-from-snap from snapshot"*
+- Click **Volumes** in the sidebar
+- `restored-from-snap` appears with status `available`
+
+**Verify from CLI:**
+```bash
+openstack volume list
+```
+Expected: `restored-from-snap` appears with `available` status.
+
+**Pass:** New volume appears in Volumes section.
+**Fail:** Error toast (check if size entered is smaller than the original snapshot — increase it).
+
+---
+
+### UI Test 24 — Delete a Snapshot
+
+**What this tests:** Can you remove a snapshot backup that is no longer needed?
+
+**Steps:**
+1. Click **Snapshots** in the sidebar
+2. Find `ui-test-snapshot`
+3. Click the red **🗑 Delete** button
+4. Confirm in the dialog
+
+**Expected result:**
+- `ui-test-snapshot` disappears from the table
+- The original volume is not affected (the snapshot was a copy)
+
+**Pass:** Snapshot row removed from the table.
+**Fail:** Error toast, or snapshot remains.
+
+---
+
+### UI Test 25 — Open the Instance Console (Serial Log)
+
+**What this tests:** Can you view the boot log and serial output of a running VM?
+
+**Steps:**
+1. Click **Instances** in the sidebar
+2. Find an `ACTIVE` instance
+3. Click the **💻 Console** button on that row
+4. The Console modal opens
+
+**Expected result:**
+- The modal shows a dark terminal-style output area
+- Text from the VM's serial port appears (Linux boot messages, login prompt, etc.)
+- The VNC Console URL appears at the top as a clickable link
+- The line count selector (50/100/250/500) lets you load more history
+
+**Actions to test inside the modal:**
+- Change the line selector to `100` — the output refreshes automatically
+- Click **↻ Refresh** — output reloads with fresh content
+- Click the VNC URL link — it opens in a new browser tab showing the graphical console
+
+**Pass:** Console output shows boot messages or login prompt; VNC link is valid.
+**Fail:** Console shows blank or error; VNC link is missing or broken.
+
+---
+
+### UI Test 26 — Attach a Network Interface to an Instance
+
+**What this tests:** Can you add a second virtual network card (ENI) to a running instance?
+
+**Steps:**
+1. Click **Instances** in the sidebar
+2. Find an `ACTIVE` instance
+3. Click the **🔌 NIC** button on that row
+4. In the Attach Interface modal:
+   - Either select an existing free port from the dropdown
+   - Or leave that empty and select a network from the "New port on Network" dropdown
+5. Click **Attach**
+
+**Expected result:**
+- Toast: *"Interface attached — NIC added to instance"*
+
+**Verify from CLI:**
+```bash
+openstack server show <instance-name> | grep addresses
+```
+Expected: A second IP address appears in the output.
+
+**Pass:** New IP/interface visible in server details.
+**Fail:** Error toast (check if the selected port is already in use by another instance).
+
+---
+
+### UI Test 27 — Create a Standalone Network Interface (Port)
+
+**What this tests:** Can you pre-create a port on a network before attaching it to an instance?
+
+**Steps:**
+1. Click **Network Interfaces** in the left sidebar (under Networking)
+2. Click the orange **Create Interface** button
+3. Fill in the form:
+   - Network: `private-network`
+   - Name: `ui-test-eni`
+4. Click **Create**
+
+**Expected result:**
+- Toast: *"Interface ui-test-eni is ready"*
+- `ui-test-eni` appears in the Network Interfaces table with status `DOWN` and a MAC address
+
+**Verify from CLI:**
+```bash
+openstack port list
+```
+Expected: `ui-test-eni` appears with `DOWN` status.
+
+**Pass:** Port appears in the table with a MAC address.
+**Fail:** Error toast, or port does not appear.
+
+---
+
+### UI Test 28 — Delete a Network Interface (Port)
+
+**What this tests:** Can you remove an unattached network interface?
+
+**Steps:**
+1. Click **Network Interfaces** in the sidebar
+2. Find `ui-test-eni` with status `DOWN` and no device owner shown
+3. Click the red **🗑 Delete** button
+4. Confirm in the dialog
+
+**Expected result:**
+- `ui-test-eni` disappears from the table
+
+**Note:** Ports that show a device owner (e.g. `compute:nova` or `network:dhcp`) have "In use" text instead of a Delete button — they are managed by OpenStack and cannot be manually deleted.
+
+**Pass:** Port removed from the table.
+**Fail:** Error toast, or port remains.
+
+---
+
+### UI Test 29 — View Resource Quotas by Project
+
+**What this tests:** Can you see how much of each resource limit each project has consumed?
+
+**Steps:**
+1. Click **Quotas** in the left sidebar (under Identity)
+2. The page loads quota cards for each project automatically
+
+**Expected result:**
+- One card per project (e.g., `admin`, `demo`, `dev-project`, `prod-project`)
+- Each card shows progress bars for:
+  - **Compute:** Instances, vCPUs, RAM, Key Pairs
+  - **Storage:** Volumes, Snapshots, Storage GB
+  - **Network:** Networks, Subnets, Routers, Floating IPs, Security Groups, Ports
+- Progress bars are color coded:
+  - Green — under 70% used
+  - Amber — 70–89% used
+  - Red — 90%+ used (approaching limit)
+- Unlimited quotas show "Unlimited" text instead of a bar
+
+**Pass:** All projects have cards; bars show correct used/limit numbers.
+**Fail:** Error message, blank page, or bars show 0/0 for all resources.
+
+---
+
+### UI Test 30 — Create a Network
+
+**What this tests:** Can you add a new private network (VPC equivalent)?
+
+**Steps:**
+1. Click **Networks** in the left sidebar
+2. Click the orange **Create Network** button
+3. Fill in the form:
+   - Name: `ui-test-net`
+4. Click **Create**
+
+**Expected result:**
+- Toast: *"Network ui-test-net created"*
+- `ui-test-net` appears in the Networks table
+
+**Pass:** Network row appears in the table.
+**Fail:** Error toast.
+
+---
+
+### UI Test 31 — Create a Subnet on a Network
+
+**What this tests:** Can you define an IP address range within a network?
+
+**Steps:**
+1. Click **Networks** in the sidebar
+2. Find `ui-test-net` and click its **+ Subnet** button
+3. Fill in the form:
+   - Subnet Name: `ui-test-subnet`
+   - CIDR: `10.99.0.0/24`
+   - Gateway IP: `10.99.0.1`
+   - DNS: `8.8.8.8`
+4. Click **Create**
+
+**Expected result:**
+- Toast: *"Subnet ui-test-subnet created"*
+- The subnet count badge on `ui-test-net` increases by 1
+
+**Pass:** Subnet badge increments; subnet visible in CLI (`openstack subnet list`).
+**Fail:** Error toast (check if CIDR overlaps an existing subnet).
+
+---
+
+### UI Test 32 — Create a Router and Set Its Gateway
+
+**What this tests:** Can you create an internet gateway for a private network?
+
+**Steps:**
+1. Click **Routers** in the left sidebar
+2. Click the orange **Create Router** button
+3. Fill in the form:
+   - Name: `ui-test-router`
+4. Click **Create**
+5. Find `ui-test-router` in the Routers table
+6. Click the **Set Gateway** button
+7. Select `public` as the external network
+8. Click **Set Gateway**
+
+**Expected result:**
+- Router appears with a gateway IP from the public network
+
+**Pass:** Router has an external gateway IP in the table.
+**Fail:** Error setting gateway (check if `public` network exists in `openstack network list`).
+
+---
+
+### UI Test 33 — Attach a Subnet to a Router
+
+**What this tests:** Can you connect a private subnet through a router so its VMs can reach the internet?
+
+**Steps:**
+1. In the Routers table, find `ui-test-router`
+2. Click the **+ Subnet** button
+3. Select `ui-test-subnet` from the dropdown
+4. Click **Attach**
+
+**Expected result:**
+- Toast: *"Subnet attached to router"*
+- The interface/subnet count on the router increases
+
+**Pass:** Subnet listed in the router's interface count.
+**Fail:** Error toast.
+
+---
+
+### UI Test 34 — Allocate and Associate a Floating IP
+
+**What this tests:** Can you give an instance a reachable public IP from the UI?
+
+**Steps:**
+1. Click **Floating IPs** in the left sidebar
+2. Click the orange **Allocate IP** button — a new unattached IP appears
+3. On that new IP row, click the green **Associate** button
+4. Select a running instance from the dropdown
+5. Click **Associate**
+
+**Expected result:**
+- Toast: *"IP associated with [instance]"*
+- The row now shows the instance name and its private IP in the Fixed IP column
+
+**Pass:** IP row shows instance name; ping to that IP succeeds from the host.
+**Fail:** Error toast; IP row stays unattached.
+
+---
+
+### UI Test 35 — Disassociate and Release a Floating IP
+
+**What this tests:** Can you detach a public IP from an instance and return it to the pool?
+
+**Steps:**
+1. Click **Floating IPs** in the sidebar
+2. Find the IP associated in UI Test 34
+3. Click the orange **Disassociate** button on that row — IP stays in pool but is now unattached
+4. Find the same IP (now unattached) and click the red **Release** button
+5. Confirm in the dialog
+
+**Expected result:**
+- After Disassociate: Fixed IP column shows "Not attached"
+- After Release: IP row disappears from the table
+
+**Pass:** IP detached then removed.
+**Fail:** Disassociate or Release throws an error.
+
+---
+
+### UI Test 36 — Create a Load Balancer
+
+**What this tests:** Can you provision a load balancer to distribute traffic across multiple instances?
+
+**Steps:**
+1. Click **Load Balancers** in the left sidebar
+2. Click the orange **Create Load Balancer** button
+3. Fill in the form:
+   - Name: `ui-test-lb`
+   - Subnet: select `private-subnet` (or any existing subnet)
+4. Click **Create**
+
+**Expected result:**
+- Toast: *"Load balancer ui-test-lb is provisioning"*
+- `ui-test-lb` appears in the table with status `PENDING_CREATE`, then `ACTIVE` after 10–30 seconds
+- Click **Refresh** to update
+
+**Pass:** LB reaches `ACTIVE` within 30 seconds.
+**Fail:** Stays `PENDING_CREATE` for over 2 minutes, or shows `ERROR`.
+
+---
+
+### UI Test 37 — Add a Listener to a Load Balancer
+
+**What this tests:** Can you define what port the load balancer listens on?
+
+**Steps:**
+1. In the Load Balancers table, find `ui-test-lb` (must be `ACTIVE`)
+2. Click the **Listeners** button on that row
+3. In the Listeners modal, click **Add Listener**
+4. Fill in:
+   - Name: `ui-test-lb-http`
+   - Protocol: `HTTP`
+   - Port: `80`
+5. Click **Add**
+
+**Expected result:**
+- Toast: *"Listener created"*
+- The listener list in the modal shows `ui-test-lb-http` on port 80
+
+**Pass:** Listener row appears in the modal.
+**Fail:** Error toast; check if LB is in `ACTIVE` state first.
+
+---
+
+### UI Test 38 — Add Backend Members to a Load Balancer
+
+**What this tests:** Can you register instances as targets behind the load balancer?
+
+**Steps:**
+1. In the Load Balancers table, find `ui-test-lb`
+2. Click the **Members** button on that row
+3. In the Members modal, each active instance is listed with a checkbox
+4. Check any running instance and set its port to `80`
+5. Click **Add Members**
+
+**Expected result:**
+- Toast: *"Member(s) added"*
+- The selected instance(s) appear as members
+
+**Pass:** Member row appears in the members list.
+**Fail:** Error toast; check if the instance is in the same subnet as the LB.
+
+---
+
+### UI Test 39 — Configure a Health Monitor on a Load Balancer
+
+**What this tests:** Does the load balancer automatically stop sending traffic to unhealthy instances?
+
+**Steps:**
+1. In the Load Balancers table, find `ui-test-lb`
+2. Click the **Health** button on that row
+3. In the Health Monitor modal, fill in:
+   - Type: `HTTP`
+   - Delay: `10` (seconds between checks)
+   - Timeout: `5`
+   - Max Retries: `3`
+4. Click **Create**
+
+**Expected result:**
+- Toast: *"Health monitor created"*
+- The Health button row shows current monitor type, delay, and status
+
+**Pass:** Monitor details appear in the modal.
+**Fail:** Error toast.
+
+---
+
+### UI Test 40 — Delete a Load Balancer
+
+**What this tests:** Can you remove a load balancer and all its components?
+
+**Steps:**
+1. In the Load Balancers table, find `ui-test-lb`
+2. Click the red **Delete** button
+3. Confirm in the dialog
+
+**Note:** OpenStack requires you to delete listeners and members before deleting the LB. The dashboard sends the delete request — if it fails, check the LB is in `ACTIVE` state and has no pending operations.
+
+**Expected result:**
+- `ui-test-lb` disappears from the table
+
+**Pass:** LB row removed.
+**Fail:** Error toast (wait until LB is `ACTIVE`, then retry).
+
+---
+
+### UI Test 41 — Create an Auto Scaling Group
+
+**What this tests:** Can you define a group of instances that scales automatically?
+
+**Steps:**
+1. Click **Auto Scaling** in the left sidebar
+2. Click the orange **Create ASG** button
+3. Fill in the form:
+   - Group Name: `ui-test-asg`
+   - Image: `cirros-0.6.2-x86_64-disk`
+   - Flavor: `m1.tiny`
+   - Network: `private-network`
+   - Min Instances: `1`
+   - Desired Instances: `2`
+   - Max Instances: `3`
+4. Click **Create**
+
+**Expected result:**
+- `ui-test-asg` appears in the Auto Scaling table
+- After ~30 seconds, 2 instances launch (Desired = 2)
+- Click **Instances** section — 2 new instances with ASG-prefixed names appear
+
+**Pass:** ASG row appears; correct instance count reaches `ACTIVE`.
+**Fail:** Error toast, or instance count does not match Desired.
+
+---
+
+### UI Test 42 — Manually Scale an Auto Scaling Group
+
+**What this tests:** Can you manually change the number of running instances in a group?
+
+**Steps:**
+1. In the Auto Scaling table, find `ui-test-asg`
+2. Click the blue **Scale** button
+3. In the modal, change Desired to `3`
+4. Click **Scale**
+
+**Expected result:**
+- Toast: *"Scaling ui-test-asg to 3 instances"*
+- After ~30 seconds, a 3rd instance appears in the Instances section with the ASG prefix
+
+**Pass:** Instance count goes from 2 → 3.
+**Fail:** Instance count does not change, or an instance shows `ERROR`.
+
+---
+
+### UI Test 43 — Add a Scaling Policy to an Auto Scaling Group
+
+**What this tests:** Can you define a rule to automatically trigger scaling?
+
+**Steps:**
+1. In the Auto Scaling table, find `ui-test-asg`
+2. Click the purple **Policies** button
+3. In the modal, click **Add Policy**
+4. Fill in:
+   - Policy Name: `scale-up-policy`
+   - Adjustment Type: `change_in_capacity`
+   - Scaling Adjustment: `1`
+   - Cooldown: `60`
+5. Click **Add**
+
+**Expected result:**
+- Toast: *"Policy scale-up-policy added"*
+- Policy appears in the policies list
+
+**Pass:** Policy row appears with correct values.
+**Fail:** Error toast.
+
+---
+
+### UI Test 44 — Delete an Auto Scaling Group
+
+**What this tests:** Can you remove an ASG and all its managed instances?
+
+**Steps:**
+1. In the Auto Scaling table, find `ui-test-asg`
+2. Click the red **Delete** button
+3. Confirm in the dialog
+
+**Expected result:**
+- `ui-test-asg` disappears from the table
+- All ASG-managed instances are also terminated (visible in Instances section)
+
+**Pass:** ASG and its instances removed.
+**Fail:** Error toast, or ASG remains with partial instance count.
+
+---
+
+### UI Test 45 — Resize an Instance
+
+**What this tests:** Can you change the CPU/RAM allocation of a stopped instance?
+
+**Steps:**
+1. Click **Instances** in the sidebar
+2. Find an instance with status `SHUTOFF`
+3. Click the **⚙ Modify** button on that row
+4. In the modal, select a larger flavor (e.g. change from `m1.tiny` to `m1.small`)
+5. Click **Resize**
+
+**Expected result:**
+- Toast: *"Resize initiated for [name]"*
+- Instance status changes to `VERIFY_RESIZE`
+- A yellow **✓ Confirm** button appears on the row
+
+**Steps to confirm:**
+6. Click the **✓ Confirm** button on the instance row
+7. Toast: *"Resize confirmed"*
+8. Status returns to `SHUTOFF`
+
+**Pass:** Instance changes flavor; status goes SHUTOFF → VERIFY_RESIZE → SHUTOFF.
+**Fail:** Error toast; resize may fail if host lacks resources.
+
+---
+
+### UI Test 46 — Attach a Volume to an Instance
+
+**What this tests:** Can you connect a disk to a running VM?
+
+**Steps:**
+1. Create a volume first: Click **Volumes** → **Create Volume**, name `attach-test-vol`, size `1`
+2. Wait for status `available`
+3. Click the green **Attach** button on `attach-test-vol`
+4. In the modal, select a running instance
+5. Click **Attach**
+
+**Expected result:**
+- Toast: *"Volume attached"*
+- Volume status changes from `available` to `in-use`
+- The Attached To column shows the instance name
+
+**Pass:** Status changes to `in-use`; instance name shown in table.
+**Fail:** Error toast (check if instance is `ACTIVE` — cannot attach to stopped instances in some configurations).
+
+---
+
+### UI Test 47 — Detach a Volume from an Instance
+
+**What this tests:** Can you safely unmount a disk from a VM?
+
+**Steps:**
+1. Click **Volumes** in the sidebar
+2. Find `attach-test-vol` with status `in-use`
+3. Click the orange **Detach** button
+4. Confirm in the dialog
+
+**Expected result:**
+- Toast: *"Volume detached"*
+- Status changes from `in-use` back to `available`
+
+**Pass:** Status returns to `available`.
+**Fail:** Error toast; make sure the volume is unmounted inside the VM before detaching.
+
+---
+
+### UI Test 48 — Resize a Volume
+
+**What this tests:** Can you increase the storage capacity of an existing volume?
+
+**Steps:**
+1. Click **Volumes** in the sidebar
+2. Find any volume with status `available`
+3. Click the blue **Resize** button
+4. In the modal, enter a new size larger than the current size (e.g. if current is 1 GB, enter `2`)
+5. Click **Resize**
+
+**Expected result:**
+- Toast: *"Resize request submitted"*
+- After a few seconds, the size column updates to the new value
+
+**Note:** Volumes can only grow, never shrink. Entering a smaller value than the current size will return an error.
+
+**Pass:** Size column shows the new value.
+**Fail:** Error toast (check if the new size is larger than current).
+
+---
+
+### UI Test 49 — Add a Static Route to a Router
+
+**What this tests:** Can you manually define where specific network traffic should go?
+
+**Steps:**
+1. Click **Routers** in the left sidebar
+2. Find `main-router` (or any router with a gateway)
+3. Click the **Routes** button on that row
+4. In the modal, click **Add Route**
+5. Fill in:
+   - Destination: `10.50.0.0/24`
+   - Next Hop: `192.168.100.1`
+6. Click **Add**
+
+**Expected result:**
+- Toast: *"Static route added"*
+- The route appears in the route list for that router
+
+**Pass:** Route row appears with the correct destination and next hop.
+**Fail:** Error toast (check if the next hop IP is reachable from the router's subnet).
+
+---
+
+### UI Test 50 — Reboot an Instance
+
+**What this tests:** Can you restart an instance OS without deleting it?
+
+**Steps:**
+1. Click **Instances** in the sidebar
+2. Find an `ACTIVE` instance
+3. Click the **↺ Reboot** button on that row
+4. Confirm in the dialog (note: soft reboot — OS restarts cleanly)
+
+**Expected result:**
+- Toast: *"Rebooting [name]"*
+- Status briefly changes to `REBOOT` then returns to `ACTIVE` within 30 seconds
+
+**Pass:** Instance returns to `ACTIVE` after reboot.
+**Fail:** Instance stays in `REBOOT` for more than 2 minutes or goes to `ERROR`.
+
+---
+
+## Section 3C — Complete Operation Reference (All Services)
+
+This table covers every operation available in the dashboard — use it as a quick checklist.
+
+### Instances (EC2 Compute)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List instances | Click **Instances** in sidebar | Shows all VMs with status, IP, flavor |
+| Launch instance | **Launch Instance** button | Creates new VM from image + flavor |
+| Stop instance | **■ Stop** button on row | Graceful shutdown — disk preserved |
+| Start instance | **▶ Start** button on row | Powers on a stopped VM |
+| Reboot instance | **↺ Reboot** button on row | Soft-restarts the OS |
+| Resize instance | **⚙ Modify** on SHUTOFF row | Changes CPU/RAM allocation |
+| Confirm resize | **✓ Confirm** on VERIFY_RESIZE row | Finalizes a pending resize |
+| Delete instance | **🗑 Delete** button on row | Permanently destroys the VM |
+| Create AMI | **📷 AMI** on ACTIVE/SHUTOFF row | Snapshots the VM into a reusable image |
+| Open Console | **💻 Console** on ACTIVE row | Shows serial log + VNC link |
+| Attach NIC | **🔌 NIC** on ACTIVE row | Adds a second network interface |
+| Manage SGs | **🛡 SG** on ACTIVE row | Attach/detach security groups |
+
+---
+
+### Images (AMI — Glance)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List images | Click **Images** in sidebar | Shows all OS templates with status |
+| Launch from image | **▶ Launch** button on row | Opens launch wizard pre-filled with this image |
+| Copy image | **⛧ Copy** button on row | Duplicates image under a new name |
+| Delete image | **🗑 Delete** button on row | Removes the image template |
+
+---
+
+### Volumes (EBS — Cinder)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List volumes | Click **Volumes** in sidebar | Shows all disks with status, size, attachment |
+| Create volume | **Create Volume** button | Provisions a new empty disk |
+| Attach to instance | **Attach** button on `available` row | Mounts disk to a VM as `/dev/vdX` |
+| Detach from instance | **Detach** button on `in-use` row | Safely unmounts disk |
+| Resize volume | **Resize** button on row | Increases disk size (never shrink) |
+| Delete volume | **🗑 Delete** button on `available` row | Permanently destroys the disk |
+
+---
+
+### Snapshots (EBS Snapshot — Cinder)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List snapshots | Click **Snapshots** in sidebar | Shows all point-in-time backups |
+| Create snapshot | **Create Snapshot** button | Takes a backup of a volume right now |
+| Restore snapshot | **↩ Restore** button on row | Creates a new volume from the backup |
+| Delete snapshot | **🗑 Delete** button on row | Removes the backup |
+
+---
+
+### Key Pairs (SSH Keys — Nova)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List key pairs | Click **Key Pairs** in sidebar | Shows all SSH keys with fingerprints |
+| Create key pair | **Create Key Pair** button | Generates key + auto-downloads `.pem` file |
+| Use in launch | Key Pair dropdown in launch wizard | Injects public key into new VM at boot |
+| Delete key pair | **Delete** button on row | Removes key from system (running VMs unaffected) |
+
+---
+
+### Security Groups (Firewall — Neutron)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List security groups | Click **Security Groups** in sidebar | Shows all firewall rule sets |
+| Create security group | **Create Security Group** button | Adds a new empty firewall |
+| Add inbound rule | **+ Rule** button on row | Opens specific port/protocol |
+| Delete rule | **🗑** on rule row in modal | Removes a specific port rule |
+| Attach to instance | **🛡 SG** button on instance row | Applies firewall to a running VM |
+| Detach from instance | Uncheck in SG modal on instance row | Removes firewall from VM |
+| Delete security group | **Delete** button on row | Removes the firewall (must detach first) |
+
+---
+
+### Floating IPs (Elastic IP — Neutron)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List floating IPs | Click **Floating IPs** in sidebar | Shows all public IPs and their attachments |
+| Allocate IP | **Allocate IP** button | Reserves a new public IP from the pool |
+| Associate to instance | **Associate** button on unattached IP row | Links public IP to a VM |
+| Disassociate | **Disassociate** button on attached IP row | Detaches IP (VM loses public access) |
+| Release IP | **Release** button on unattached row | Returns IP to pool permanently |
+
+---
+
+### Networks (VPC — Neutron)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List networks | Click **Networks** in sidebar | Shows all private networks |
+| Create network | **Create Network** button | Adds a new isolated network |
+| Add subnet | **+ Subnet** button on row | Defines IP range within a network |
+| Delete subnet | **Delete** on subnet row in modal | Removes subnet (must remove dependencies) |
+| Delete network | **Delete** button on row | Removes the network |
+
+---
+
+### Routers (Internet Gateway — Neutron)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List routers | Click **Routers** in sidebar | Shows all routers with gateway status |
+| Create router | **Create Router** button | Adds a new virtual router |
+| Set external gateway | **Set Gateway** button on row | Connects router to public network |
+| Remove gateway | **Remove Gateway** button | Disconnects router from public network |
+| Attach subnet | **+ Subnet** button on row | Connects a private subnet through the router |
+| Detach subnet | **Remove** on interface row | Disconnects subnet from router |
+| View static routes | **Routes** button on row | Shows custom routing table |
+| Add static route | **Add Route** in routes modal | Defines where specific traffic goes |
+| Delete static route | **Delete** on route row in modal | Removes a custom route |
+| Delete router | **Delete** button on row | Removes the router (remove interfaces first) |
+
+---
+
+### Network Interfaces / Ports (ENI — Neutron)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List ports | Click **Network Interfaces** in sidebar | Shows all virtual NICs |
+| Create port | **Create Interface** button | Pre-creates a NIC on a network |
+| Attach to instance | **🔌 NIC** on instance row | Adds NIC to a running VM |
+| Delete port | **🗑 Delete** on unattached port row | Removes the virtual NIC |
+
+---
+
+### Load Balancers (ELB — Octavia)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List load balancers | Click **Load Balancers** in sidebar | Shows all LBs with VIP and status |
+| Create load balancer | **Create Load Balancer** button | Provisions a new LB on a subnet |
+| Add listener | **Listeners** button → **Add Listener** | Sets which port/protocol the LB accepts |
+| Remove listener | **Delete** on listener row in modal | Removes a listen port |
+| Add backend member | **Members** button → **Add Members** | Registers an instance as a traffic target |
+| Remove member | **Remove** on member row in modal | Deregisters an instance |
+| Create health monitor | **Health** button → **Create** | Enables health checking of members |
+| Delete health monitor | **Delete** in health modal | Removes automatic health checking |
+| Delete load balancer | **Delete** button on LB row | Removes the entire LB |
+
+---
+
+### Auto Scaling Groups (ASG — Nova)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List ASGs | Click **Auto Scaling** in sidebar | Shows all groups with instance counts |
+| Create ASG | **Create ASG** button | Defines a group with min/desired/max counts |
+| Edit ASG | **Edit** button on row | Updates min, desired, max counts |
+| Manual scale | **Scale** button on row | Immediately sets a new desired count |
+| Add scaling policy | **Policies** button → **Add Policy** | Defines an auto-trigger rule |
+| Execute policy | **Execute** on policy row in modal | Manually fires the scaling rule |
+| Delete policy | **Delete** on policy row in modal | Removes the trigger rule |
+| Delete ASG | **Delete** button on row | Removes group and terminates its instances |
+
+---
+
+### Resource Quotas (Service Quotas — Nova/Cinder/Neutron)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| View all project quotas | Click **Quotas** in sidebar | Shows usage vs. limit for every resource |
+
+---
+
+### Users & Projects (IAM — Keystone)
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| List users | Click **Users & Projects** in sidebar | Shows all Keystone users and their projects |
+
+---
+
+### DevStack Monitor
+
+| Operation | How | What It Does |
+|-----------|-----|-------------|
+| View service status | Click **DevStack Monitor** in sidebar | Shows all `devstack@*` systemd units live |
+| View service log | **View Log** on any service row | Streams the last 50 lines of that service log |
+| Stop a service | **Stop** on any service row | Kills the systemd unit (for debugging only) |
+
+---
+
 ## Section 4 — What Exactly Should You Test?
 
 Here is a complete checklist. Go through each item and write **PASS** or **FAIL** next to it.
@@ -1126,28 +2087,132 @@ Here is a complete checklist. Go through each item and write **PASS** or **FAIL*
 
 ### UI Tests (run from browser at localhost:8080)
 
+#### Instances
 ```
-[ ] 14. Dashboard loads                 → Overview cards show correct counts
-[ ] 15. Launch Instance button          → ui-test-vm reaches ACTIVE in < 30 seconds
-[ ] 16. Stop button                     → ui-test-vm status changes to SHUTOFF
-[ ] 17. Start button                    → ui-test-vm status returns to ACTIVE
-[ ] 18. Delete button                   → ui-test-vm disappears from the table
-[ ] 19. Create Volume button            → ui-test-disk appears with status available
-[ ] 20. Delete Volume button            → ui-test-disk disappears from the table
-[ ] 21. Allocate IP button              → New floating IP appears in the list
-[ ] 22. Release IP button               → Unattached IP is removed from the list
-[ ] 23. Images section                  → 4 images listed (CirrOS, Ubuntu, 2 snapshots)
-[ ] 24. Security Groups section         → ssh-only shows TCP 22 and ICMP rules
-[ ] 25. Users & Projects section        → devuser shows dev-project, opsuser shows prod-project
-[ ] 26. Networks section                → 3 networks visible (private, public, lb-mgmt)
-[ ] 27. Create AMI button (Instances)   → snapshot modal opens; image appears in Images within 5 min
-[ ] 28. Launch from AMI (Images)        → launch modal opens with image pre-selected
-[ ] 29. Copy AMI button (Images)        → copy modal; cirros-copy-test appears active within 30s
-[ ] 30. Delete AMI button (Images)      → cirros-copy-test removed from Images table
-[ ] 31. Key Pairs section loads         → project-key visible with fingerprint and SSH hint
-[ ] 32. Create Key Pair button          → ui-test-key.pem downloads; key appears in table
-[ ] 33. Launch wizard key pair dropdown → ui-test-key appears; SSH login works with .pem
-[ ] 34. Delete Key Pair button          → ui-test-key removed from table
+[ ] 14. Dashboard loads                   → Overview cards show correct counts
+[ ] 15. Launch Instance button            → ui-test-vm reaches ACTIVE in < 30 seconds
+[ ] 16. Stop button                       → ui-test-vm status changes to SHUTOFF
+[ ] 17. Start button                      → ui-test-vm status returns to ACTIVE
+[ ] 18. Reboot button (UI Test 50)        → status goes REBOOT → ACTIVE within 30s
+[ ] 19. Resize + Confirm (UI Test 45)     → flavor changes; VERIFY_RESIZE → SHUTOFF
+[ ] 20. Delete button                     → ui-test-vm disappears from the table
+[ ] 21. Create AMI button                 → snapshot modal opens; image appears in Images within 5 min
+[ ] 22. Console button (UI Test 25)       → boot log visible; VNC link present
+[ ] 23. NIC button (UI Test 26)           → second interface attached; new IP visible in server details
+[ ] 24. SG button (UI Test 19)            → attach ui-test-sg; visible in openstack server show
+```
+
+#### Images (AMI)
+```
+[ ] 25. Images section loads              → CirrOS and Ubuntu images listed and active
+[ ] 26. Launch from AMI (UI Test 10)      → launch modal opens with image pre-selected
+[ ] 27. Copy AMI button (UI Test 11)      → cirros-copy-test appears active within 30s
+[ ] 28. Delete AMI button (UI Test 12)    → cirros-copy-test removed from Images table
+```
+
+#### Volumes (EBS)
+```
+[ ] 29. Create Volume button              → ui-test-disk appears with status available
+[ ] 30. Attach to instance (UI Test 46)   → status changes to in-use; instance shown
+[ ] 31. Detach from instance (UI Test 47) → status returns to available
+[ ] 32. Resize volume (UI Test 48)        → size column updates to new value
+[ ] 33. Delete Volume button              → ui-test-disk disappears from the table
+```
+
+#### Snapshots (EBS Snapshot)
+```
+[ ] 34. Create Snapshot button (UI Test 22)        → ui-test-snapshot appears available
+[ ] 35. Restore snapshot (UI Test 23)              → restored-from-snap appears in Volumes
+[ ] 36. Delete snapshot (UI Test 24)               → ui-test-snapshot removed from table
+```
+
+#### Key Pairs
+```
+[ ] 37. Key Pairs section loads           → project-key visible with fingerprint and SSH hint
+[ ] 38. Create Key Pair button            → ui-test-key.pem downloads; key appears in table
+[ ] 39. Key pair in launch wizard         → ui-test-key appears in dropdown
+[ ] 40. Delete Key Pair button            → ui-test-key removed from table
+```
+
+#### Security Groups
+```
+[ ] 41. Security Groups section loads     → ssh-only shows TCP 22 and ICMP rules
+[ ] 42. Create Security Group (Test 17)   → ui-test-sg appears in table
+[ ] 43. Add rules (UI Test 18)            → TCP 22 and TCP 80 rules appear in CLI
+[ ] 44. Delete a rule (UI Test 20)        → TCP 80 removed; TCP 22 remains
+[ ] 45. Delete Security Group (UI Test 21)→ ui-test-sg removed from table
+```
+
+#### Floating IPs (Elastic IP)
+```
+[ ] 46. Floating IPs section loads        → all IPs listed with attachment status
+[ ] 47. Allocate IP button                → new IP row appears (DOWN, not attached)
+[ ] 48. Associate IP (UI Test 34)         → IP linked to instance; instance name shown
+[ ] 49. Disassociate IP (UI Test 35)      → IP shown as Not attached
+[ ] 50. Release IP button                 → IP row removed from table
+```
+
+#### Networks & Subnets
+```
+[ ] 51. Networks section loads            → 3+ networks visible (private, public, lb-mgmt)
+[ ] 52. Create Network (UI Test 30)       → ui-test-net appears in table
+[ ] 53. Create Subnet (UI Test 31)        → subnet count badge on ui-test-net increases
+[ ] 54. Delete Network                    → ui-test-net removed from table
+```
+
+#### Routers
+```
+[ ] 55. Routers section loads             → main-router listed with gateway and subnet count
+[ ] 56. Create Router (UI Test 32)        → ui-test-router appears in table
+[ ] 57. Set Gateway (UI Test 32)          → router shows external gateway IP
+[ ] 58. Attach Subnet (UI Test 33)        → interface count increases
+[ ] 59. Add static route (UI Test 49)     → route visible in Routes modal
+[ ] 60. Delete Router                     → ui-test-router removed from table
+```
+
+#### Network Interfaces (ENI / Ports)
+```
+[ ] 61. Network Interfaces section loads  → all ports listed with MAC and IP
+[ ] 62. Create Interface (UI Test 27)     → ui-test-eni appears with DOWN status
+[ ] 63. Attach via NIC button (UI Test 26)→ port status changes to ACTIVE; device owner set
+[ ] 64. Delete Interface (UI Test 28)     → ui-test-eni removed from table
+```
+
+#### Load Balancers
+```
+[ ] 65. Load Balancers section loads      → any existing LBs listed with VIP
+[ ] 66. Create Load Balancer (Test 36)    → ui-test-lb reaches ACTIVE
+[ ] 67. Add Listener (UI Test 37)         → listener on port 80 listed in modal
+[ ] 68. Add Members (UI Test 38)          → instance registered as backend
+[ ] 69. Create Health Monitor (Test 39)   → monitor details shown in Health modal
+[ ] 70. Delete Load Balancer (Test 40)    → ui-test-lb removed from table
+```
+
+#### Auto Scaling Groups
+```
+[ ] 71. Auto Scaling section loads        → any existing ASGs listed with counts
+[ ] 72. Create ASG (UI Test 41)           → ui-test-asg appears; 2 instances launch
+[ ] 73. Manual scale (UI Test 42)         → instance count changes to 3
+[ ] 74. Add Scaling Policy (UI Test 43)   → scale-up-policy appears in Policies modal
+[ ] 75. Delete ASG (UI Test 44)           → ui-test-asg removed; instances terminated
+```
+
+#### Resource Quotas
+```
+[ ] 76. Quotas section loads              → project cards show progress bars for all resources
+[ ] 77. Color coding correct              → green < 70%, amber 70–89%, red ≥ 90%
+[ ] 78. Unlimited resources show text     → "Unlimited" label, not a broken bar
+```
+
+#### Users & Projects
+```
+[ ] 79. Users & Projects section loads    → devuser, opsuser, devadmin listed with projects
+```
+
+#### DevStack Monitor
+```
+[ ] 80. DevStack Monitor section loads    → all devstack@* services show active/inactive status
+[ ] 81. View Log button                   → last 50 lines of service log appear
 ```
 
 ---
