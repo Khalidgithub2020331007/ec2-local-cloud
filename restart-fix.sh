@@ -37,13 +37,23 @@ sudo systemctl restart ovn-controller
 sudo ovs-vsctl set-manager ptcp:6640
 
 # ── Step 4: Floating IP routing fix ──────────────────────────────────────────
-# PUBLIC_NETWORK_GATEWAY=10.200.192.1 puts br-ex in a different subnet than
-# OVN's public network (10.200.195.128/26). Adding .129 lets OVN route replies back.
-# br-ex starts DOWN after reboot — bring it up before adding the IP (connected route
-# only appears in the routing table when the interface is UP).
+# br-ex starts DOWN after reboot — bring it up and restore the gateway IP.
+# Public network is 172.24.4.0/24; br-ex must hold .1 as the gateway.
 sudo ip link set br-ex up 2>/dev/null || true
-sudo ip addr add 10.200.195.129/26 dev br-ex 2>/dev/null || true
-sudo ip route del 10.200.195.128/26 dev br-ex 2>/dev/null || true
+sudo ip addr add 172.24.4.1/24 dev br-ex 2>/dev/null || true
+
+# ── Step 4b: OVN gateway chassis fix for floating IPs ────────────────────────
+# OVN forgets gateway_chassis on the router external port after stack.sh re-runs.
+# Without it, NAT for floating IPs never completes — DNAT packets are dropped.
+# Router external port UUID is stable across reboots (not stack.sh re-runs).
+ROUTER_EXT_LRP=lrp-baff0f73-becd-4934-9dd1-3ef810a819a3
+CHASSIS_UUID=$(sudo ovn-sbctl --db=tcp:${CURRENT_IP}:6642 list chassis 2>/dev/null | grep "^_uuid" | awk '{print $3}')
+if [ -n "$CHASSIS_UUID" ]; then
+    sudo ovn-nbctl --db=tcp:${CURRENT_IP}:6641 lrp-set-gateway-chassis "$ROUTER_EXT_LRP" "$CHASSIS_UUID" 1
+    echo "gateway_chassis set: $CHASSIS_UUID"
+else
+    echo "WARNING: could not find chassis UUID — floating IPs will not work"
+fi
 
 # ── Step 5: OVN metadata agent ───────────────────────────────────────────────
 # DevStack never generated neutron_ovn_metadata_agent.ini — create it and run
@@ -97,8 +107,8 @@ sudo systemctl is-active devstack@q-ovn-metadata-agent.service && echo "OVN meta
 # manually once per stack.sh run. Idempotent: openstack port create fails silently
 # if port already exists; ovn-nbctl set is always safe to re-run.
 source /opt/stack/devstack/openrc admin admin 2>/dev/null
-PRIVATE_NET=9cb63257-fd44-47e0-bbf3-8e553975b7e5
-PRIVATE_SUBNET=7e985289-713a-4d5d-b86f-5d42fdbe944f
+PRIVATE_NET=1779a260-3cb2-4648-b797-e68aa998717d
+PRIVATE_SUBNET=14a5a4d1-fbc1-411d-a9a0-32c7856f47c4
 META_PORT_NAME=ovnmeta-${PRIVATE_NET}
 META_DEVICE_ID=ovnmeta-${PRIVATE_NET}
 
@@ -109,20 +119,24 @@ if ! openstack port show "$META_PORT_NAME" &>/dev/null; then
         --network "$PRIVATE_NET" \
         --device-owner network:distributed \
         --device "$META_DEVICE_ID" \
-        --fixed-ip subnet="$PRIVATE_SUBNET" \
+        --fixed-ip subnet="$PRIVATE_SUBNET",ip-address=192.168.100.10 \
         "$META_PORT_NAME"
 else
-    echo "OVN metadata port already exists — skipping"
+    # Ensure device_id is set — port create without --device leaves it blank,
+    # and the metadata agent only creates the ovnmeta namespace for ports whose
+    # device_id matches the expected "ovnmeta-<net-uuid>" pattern.
+    openstack port set "$META_PORT_NAME" --device "$META_DEVICE_ID" 2>/dev/null || true
+    echo "OVN metadata port already exists — device_id ensured"
 fi
 
 # Add classless_static_route DHCP option so instances can reach 169.254.169.254.
-# The metadata port gets IP 192.168.100.10; new instances learn this route at boot.
-# openstack port show -f value -c fixed_ips returns Python dict: [{'ip_address': '...', ...}]
+# The metadata port is always at 192.168.100.10 (fixed IP above).
+# grep on "192.168.100.0/24" cidr is more stable than matching the subnet UUID.
 META_IP=$(openstack port show "$META_PORT_NAME" -f value -c fixed_ips 2>/dev/null | grep -oP "'ip_address': '[^']+'" | grep -oP "[0-9.]+")
-DHCP_UUID=$(ovn-nbctl --db=tcp:${CURRENT_IP}:6641 list dhcp_options 2>/dev/null | grep -B3 "${PRIVATE_SUBNET}" | grep "_uuid" | awk '{print $3}')
+DHCP_UUID=$(sudo ovn-nbctl --db=tcp:${CURRENT_IP}:6641 list dhcp_options 2>/dev/null | grep -B2 "192.168.100.0/24" | grep "_uuid" | awk '{print $3}')
 if [ -n "$DHCP_UUID" ] && [ -n "$META_IP" ]; then
-    ovn-nbctl --db=tcp:${CURRENT_IP}:6641 set dhcp_options "$DHCP_UUID" \
-        options:classless_static_route="{169.254.169.254/32,${META_IP}, 0.0.0.0/0,192.168.100.1}"
+    sudo ovn-nbctl --db=tcp:${CURRENT_IP}:6641 set dhcp_options "$DHCP_UUID" \
+        "options:classless_static_route={169.254.169.254/32,${META_IP}, 0.0.0.0/0,192.168.100.1}"
     echo "DHCP classless_static_route set: 169.254.169.254/32 via ${META_IP}"
 else
     echo "WARNING: Could not set DHCP classless_static_route (DHCP_UUID=${DHCP_UUID}, META_IP=${META_IP})"
