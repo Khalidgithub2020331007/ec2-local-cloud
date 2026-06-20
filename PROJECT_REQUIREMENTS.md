@@ -65,7 +65,7 @@ This project builds a local cloud computing environment that replicates the core
 | **Placement** | `placement-api` | EC2 Resource Scheduler | Tracks and allocates compute resources |
 | ~~Swift~~ | ~~s-proxy~~ | ~~S3 Object Storage~~ | Disabled — saves ~1GB RAM on 8GB machine |
 | ~~Heat~~ | ~~h-api~~ | ~~CloudFormation~~ | Disabled — saves RAM |
-| ~~Ceilometer~~ | ~~ceilometer-*~~ | ~~CloudWatch~~ | Disabled — saves RAM |
+| ~~Ceilometer~~ | ~~ceilometer-*~~ | ~~CloudWatch~~ | Disabled — saves RAM; replaced by Nova diagnostics API (Option 3) |
 
 ---
 
@@ -141,12 +141,53 @@ This project builds a local cloud computing environment that replicates the core
 - **FR-08.7** — User can create a new volume from an existing snapshot
 
 ### FR-09: Identity & Multi-User Management (IAM Equivalent)
+
+#### FR-09A: OpenStack Keystone Users & Projects
 - **FR-09.1** — System shall have a default `admin` superuser
 - **FR-09.2** — Admin can create new user accounts with username and password
 - **FR-09.3** — Admin can create projects (like AWS accounts/namespaces)
 - **FR-09.4** — Admin can assign users to projects with specific roles (`admin`, `member`, `reader`)
 - **FR-09.5** — Users in different projects cannot see each other's instances or volumes
 - **FR-09.6** — Admin can disable or delete users
+
+#### FR-09B: AWS-Style IAM Layer (dashboard-managed, stored in `iam_data.json`)
+- **FR-09.7** — Dashboard shall provide an IAM section under the Identity sidebar group, reachable via the **IAM** nav item
+- **FR-09.8** — IAM section shall have four sub-tabs: **Users**, **Groups**, **Roles**, and **Policies**
+- **FR-09.9** — Admin can create **IAM Users** with a username; each user receives a unique ARN (`arn:aws:iam::123456789012:user/<name>`)
+- **FR-09.10** — Admin can delete IAM users; deletion auto-removes the user from all groups
+- **FR-09.11** — Admin can create **IAM Groups** (e.g. `Developers`, `ReadOnly`); each group receives a unique ARN
+- **FR-09.12** — Admin can add and remove IAM users from groups via a "Members" modal
+- **FR-09.13** — Admin can delete groups; deletion auto-removes the group from all user records
+- **FR-09.14** — Admin can create **IAM Roles** with a name, optional description, and a trusted service principal (EC2, Lambda, S3, ECS Tasks, or EKS); the trust policy document is auto-generated as `sts:AssumeRole`
+- **FR-09.15** — Admin can delete IAM roles
+- **FR-09.16** — System shall provide 7 pre-seeded **AWS Managed Policies** that cannot be deleted:
+
+  | Policy Name | Effect |
+  |---|---|
+  | `AdministratorAccess` | Allow `*` on `*` |
+  | `PowerUserAccess` | Allow all except `iam:*` and `organizations:*` |
+  | `ReadOnlyAccess` | Allow `ec2:Describe*`, `iam:Get*`, `iam:List*` |
+  | `AmazonEC2FullAccess` | Allow `ec2:*` |
+  | `AmazonEC2ReadOnlyAccess` | Allow `ec2:Describe*` |
+  | `IAMFullAccess` | Allow `iam:*` |
+  | `IAMReadOnlyAccess` | Allow `iam:Get*`, `iam:List*` |
+
+- **FR-09.17** — Admin can create **customer-managed policies** by providing a name, description, and a JSON policy document with `Version` and `Statement` fields; the JSON is validated before saving
+- **FR-09.18** — Customer-managed policies can be deleted; deletion auto-detaches the policy from all users, groups, and roles
+- **FR-09.19** — Any policy (managed or customer) can be **attached to** or **detached from** a user, group, or role via a searchable Attach Policy modal; already-attached policies show a "Detach" button inline
+- **FR-09.20** — Policy document JSON can be viewed in a formatted viewer modal via the **View JSON** action on any policy row
+- **FR-09.21** — IAM data persists across dashboard restarts via `dashboard/iam_data.json` (same pattern as `asg_groups.json`)
+- **FR-09.22** — AWS managed policies are visually distinguished from customer policies with a blue "AWS Managed" badge vs. an amber "Customer" badge
+
+### FR-12: Monitoring (CloudWatch Equivalent)
+- **FR-12.1** — Dashboard shall expose a **Monitoring** section in the sidebar under a dedicated "Monitoring" nav group
+- **FR-12.2** — Monitoring section shall display hypervisor resource utilization: vCPU (used / total), RAM (used / total), and Disk (used / total), each with a visual progress bar that turns orange above 60% and red above 80%
+- **FR-12.3** — Monitoring section shall display a per-instance metrics table for all instances; ACTIVE instances show live diagnostic counters (CPU time, memory allocated, disk read/write bytes, network RX/TX bytes); non-ACTIVE instances show a placeholder row
+- **FR-12.4** — Overview page shall include a compact Resource Utilization panel (vCPU, RAM, Disk bars) with a "View full metrics →" link to the Monitoring section
+- **FR-12.5** — Metrics are sourced from `GET /os-hypervisors/statistics` (aggregate) and `GET /servers/{id}/diagnostics` (per-instance) — no Ceilometer required
+- **FR-12.6** — All metric values are cumulative counters at time of request (not time-series rates); the page shows a note explaining this
+
+---
 
 ### FR-10: Web Dashboard (AWS Management Console Equivalent)
 - **FR-10.1** — Horizon dashboard accessible at `http://<HOST_IP>/dashboard`
@@ -209,13 +250,11 @@ This project builds a local cloud computing environment that replicates the core
 - [x] Multi-user and multi-project setup
 - [x] Web dashboard (Horizon)
 - [x] OpenStack CLI
+- [x] Monitoring/metrics — hypervisor resource utilization + per-instance diagnostics via Nova API (CloudWatch equivalent, no Ceilometer needed)
 
 ### Out of Scope
 - [ ] Object storage (S3 / Swift) — disabled for RAM constraints
-- [ ] Load balancing (ELB / Octavia)
-- [ ] Auto-scaling
 - [ ] CloudFormation / Heat orchestration
-- [ ] Monitoring/metrics (CloudWatch / Ceilometer)
 - [ ] High availability (multi-node cluster)
 - [ ] Production-grade TLS/HTTPS for API endpoints
 
@@ -252,6 +291,7 @@ ec2-local-cloud/
 | Identity | IAM | Keystone |
 | Dashboard | AWS Management Console | Horizon |
 | CLI | AWS CLI (`aws`) | OpenStack CLI (`openstack`) |
+| Monitoring | CloudWatch (Ceilometer) | Nova diagnostics API — no extra services needed |
 | Scale | Global, millions of nodes | Single machine (your laptop) |
 | HA / Redundancy | Multi-AZ, automatic failover | None — single node |
 | Setup time | Instant (managed service) | ~1 hour (`./stack.sh`) |

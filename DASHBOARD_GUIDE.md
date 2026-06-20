@@ -262,20 +262,134 @@ openstack volume show test-disk-01 -f value -c status
 
 ---
 
+### Test I — Monitoring: Resource Utilization and Instance Metrics
+
+**What it proves:** The dashboard can report live compute resource usage without CloudWatch or Ceilometer — using the Nova diagnostics API directly.
+
+**Steps:**
+1. Click **Monitoring** in the sidebar (under the Monitoring group)
+2. The **Hypervisor Resource Utilization** panel loads automatically showing three bars:
+   - **vCPU** — cores used vs. total
+   - **RAM** — GB used vs. total
+   - **Disk** — GB used vs. total
+
+**What to look for:**
+- Bars turn **orange** above 60% utilization and **red** above 80%
+- Current machine has 8 vCPUs and ~7.5 GB RAM — with no VMs running, bars will show near-zero
+
+**Instance Metrics table:**
+- Launch an instance (ACTIVE) and return to Monitoring → click Refresh
+- The table shows for each ACTIVE instance: CPU time (nanoseconds of CPU consumed), memory allocated, total disk read/write bytes, and total network RX/TX bytes
+
+**CLI verification:**
+```bash
+# Check the backend directly
+curl -s http://localhost:8080/api/metrics/summary | python3 -m json.tool
+# Expected: vcpus_total:8, ram_total_mb:7717, etc.
+```
+
+**Note:** All values are cumulative counters from boot — not rates. Disk read `5.2 MB` means the VM has read 5.2 MB total since it started, not per second.
+
+---
+
+### Test J — IAM: Create a User and Attach a Policy
+
+**What it proves:** The dashboard has a full AWS-style IAM layer — users, groups, roles, and JSON permission policies.
+
+**Steps:**
+1. Click **IAM** in the sidebar (under Identity)
+2. The **Users** sub-tab is active by default — click **Create User**
+3. Enter username `alice` and click **Create User**
+4. The new user appears in the table with an ARN `arn:aws:iam::123456789012:user/alice`
+5. Click **Attach Policy** on Alice's row
+6. In the searchable policy list, find `AmazonEC2ReadOnlyAccess` and click **Attach**
+7. Close the modal — Alice's row now shows the attached policy badge
+
+**How to verify it worked:**
+- Alice's row shows `AmazonEC2ReadOnlyAccess` in the Direct Policies column
+- Click **Attach Policy** again — Alice's policy shows a **Detach** button; other policies show **Attach**
+
+---
+
+### Test K — IAM: Create a Group and Add a Member
+
+**Steps:**
+1. In the IAM section, click the **Groups** tab
+2. Click **Create Group**, enter name `Developers`, click **Create Group**
+3. Click **Members** on the Developers row
+4. In the "Add User" dropdown, select `alice` and click **Add to Group**
+5. Alice appears in the "Current Members" list
+
+**How to verify it worked:**
+- Close the modal — the Developers row shows "1 (alice)" in the Members column
+- Go back to the **Users** tab — Alice's row now shows the `Developers` group badge
+
+---
+
+### Test L — IAM: Create a Role
+
+**Steps:**
+1. Click the **Roles** tab in IAM
+2. Click **Create Role**
+3. Fill in:
+   - **Name:** `EC2ServiceRole`
+   - **Description:** `Allows EC2 to read S3 on behalf of this service`
+   - **Trusted Service:** `EC2 — ec2.amazonaws.com`
+4. Click **Create Role**
+
+**How to verify it worked:**
+- `EC2ServiceRole` appears in the table with ARN `arn:aws:iam::123456789012:role/EC2ServiceRole`
+- Trusted Service column shows `ec2.amazonaws.com`
+
+---
+
+### Test M — IAM: Create a Custom Policy
+
+**Steps:**
+1. Click the **Policies** tab in IAM
+2. Click **Create Policy**
+3. Fill in:
+   - **Name:** `EC2StartStopOnly`
+   - **Description:** `Allows starting and stopping instances only`
+   - **Policy Document:**
+     ```json
+     {
+       "Version": "2012-10-17",
+       "Statement": [
+         {
+           "Sid": "AllowStartStop",
+           "Effect": "Allow",
+           "Action": ["ec2:StartInstances", "ec2:StopInstances"],
+           "Resource": "*"
+         }
+       ]
+     }
+     ```
+4. Click **Create Policy**
+
+**How to verify it worked:**
+- `EC2StartStopOnly` appears in the table with an amber **Customer** badge
+- Click **View JSON** — the formatted policy document is displayed in a modal
+- The 7 pre-seeded AWS policies show a blue **AWS Managed** badge and have no Delete button
+
+---
+
 ## Part 4 — What to Show Your Teacher
 
 Click through each sidebar section and explain:
 
 | Section | What to say |
 |---------|------------|
-| **Overview** | "This is the summary — 2 VMs, 4 images, 1 volume, users, and projects. All resources at a glance." |
+| **Overview** | "This is the summary — VMs, images, volumes, users, projects. The Resource Utilization panel shows vCPU, RAM, and disk usage from the hypervisor in real time." |
+| **Monitoring** | "This is my CloudWatch equivalent — built without Ceilometer by polling the Nova diagnostics API directly. It shows hypervisor utilization bars and per-instance CPU time, memory, disk I/O, and network bytes." |
 | **Instances** | "These are the virtual machines. I can launch, stop, start, and delete them from here. Same as EC2 on AWS." |
 | **Images** | "These are OS templates — CirrOS (tiny test OS), Ubuntu 22.04, and two snapshots I made. Same as AMI on AWS." |
 | **Volumes** | "Extra storage I can attach to any VM. Same as EBS on AWS. I can create and delete volumes from here." |
 | **Networks** | "The virtual network layer — private-network is the VPC where VMs communicate, public is where floating IPs come from." |
 | **Floating IPs** | "Public IPs I can assign to VMs — same as Elastic IP on AWS. I can allocate and release them from here." |
 | **Security Groups** | "Firewall rules — ssh-only allows port 22 and ICMP. web-server also allows port 80." |
-| **Users & Projects** | "Multi-tenant isolation — devuser only sees dev-project, opsuser only sees prod-project. Same as IAM on AWS." |
+| **Users & Projects** | "OpenStack multi-tenant isolation — devuser only sees dev-project, opsuser only sees prod-project." |
+| **IAM** | "This is a full AWS IAM replica I built on top — users, groups, roles, and JSON permission policies. The 7 pre-seeded policies mirror the real AWS managed policies. I can create custom policies with Allow/Deny statements, attach them to users or groups, and assign roles to trusted services like EC2 or Lambda." |
 
 ### Live proof — SSH into a running VM
 
@@ -379,9 +493,12 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/
 
 # 6. Test Nova API is responding
 curl -s http://localhost:8080/api/overview | python3 -c "import sys,json; d=json.load(sys.stdin); print('OK —', d.get('instances',{}).get('total'), 'instances')"
+
+# 7. Test Monitoring API is responding
+curl -s http://localhost:8080/api/metrics/summary | python3 -c "import sys,json; d=json.load(sys.stdin); print('OK — vCPUs:', d.get('vcpus_total'), '| RAM:', d.get('ram_total_mb'), 'MB')"
 ```
 
-If all 6 pass — you are ready to present.
+If all 7 pass — you are ready to present.
 
 ---
 
@@ -424,6 +541,17 @@ python3 app.py
 | Delete a volume | Volumes → Delete button (only if not attached) |
 | Allocate a floating IP | Floating IPs → Allocate IP button |
 | Release a floating IP | Floating IPs → Release button (only if unattached) |
+| View resource utilization | Monitoring → Hypervisor Resource Utilization panel |
+| View instance metrics | Monitoring → Instance Metrics table (ACTIVE instances only) |
+| Check raw metrics API | `curl -s http://localhost:8080/api/metrics/summary` |
+| Check per-instance metrics | `curl -s http://localhost:8080/api/instances/<id>/metrics` |
+| Create an IAM user | IAM → Users tab → Create User |
+| Create an IAM group | IAM → Groups tab → Create Group |
+| Add user to group | IAM → Groups tab → Members button |
+| Create an IAM role | IAM → Roles tab → Create Role |
+| Create a custom policy | IAM → Policies tab → Create Policy |
+| Attach policy to user/group/role | IAM → Attach Policy button on any row |
+| View a policy's JSON document | IAM → Policies tab → View JSON |
 | Fix stuck Nova workers | `echo "2923" \| sudo -S systemctl restart devstack@n-api` |
 | Check all services | `systemctl list-units 'devstack@*' --all \| grep -v running` |
 | SSH into demo VM | `ssh -i configs/project-key.pem cirros@10.200.195.153` |

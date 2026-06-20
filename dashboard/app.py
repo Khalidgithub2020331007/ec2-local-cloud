@@ -1,8 +1,10 @@
 import os
 import json
 import time
+import uuid
 import subprocess
 import requests
+from datetime import datetime
 from threading import Lock
 from flask import Flask, jsonify, render_template, request
 
@@ -11,7 +13,102 @@ app = Flask(__name__)
 ADMIN_USER    = os.environ.get('OS_USERNAME', 'admin')
 ADMIN_PASS    = os.environ.get('OS_PASSWORD', 'Admin1234OpenStack')
 ASG_DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'asg_groups.json')
+IAM_DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'iam_data.json')
 _asg_lock     = Lock()
+_iam_lock     = Lock()
+
+IAM_ACCOUNT_ID = '123456789012'
+
+# Pre-seeded AWS-style managed policies — read-only, cannot be deleted
+_MANAGED_POLICIES = [
+    {
+        'id': 'ANPAAadministratoraccess1',
+        'name': 'AdministratorAccess',
+        'arn': 'arn:aws:iam::aws:policy/AdministratorAccess',
+        'description': 'Provides full access to all AWS services and resources',
+        'is_managed': True,
+        'created_at': '2015-02-06T18:39:46Z',
+        'document': {
+            'Version': '2012-10-17',
+            'Statement': [{'Sid': 'AllowAll', 'Effect': 'Allow', 'Action': '*', 'Resource': '*'}]
+        },
+    },
+    {
+        'id': 'ANPAApoweruseraccess00002',
+        'name': 'PowerUserAccess',
+        'arn': 'arn:aws:iam::aws:policy/PowerUserAccess',
+        'description': 'Full access except IAM and Organizations management',
+        'is_managed': True,
+        'created_at': '2015-02-06T18:39:46Z',
+        'document': {
+            'Version': '2012-10-17',
+            'Statement': [
+                {'Sid': 'AllowNonIAM', 'Effect': 'Allow', 'NotAction': ['iam:*', 'organizations:*'], 'Resource': '*'},
+                {'Sid': 'AllowIAMRead', 'Effect': 'Allow', 'Action': ['iam:Get*', 'iam:List*'], 'Resource': '*'},
+            ],
+        },
+    },
+    {
+        'id': 'ANPAAreadonlyaccess000003',
+        'name': 'ReadOnlyAccess',
+        'arn': 'arn:aws:iam::aws:policy/ReadOnlyAccess',
+        'description': 'Provides read-only access to all AWS services',
+        'is_managed': True,
+        'created_at': '2015-02-06T18:39:46Z',
+        'document': {
+            'Version': '2012-10-17',
+            'Statement': [{'Sid': 'ReadOnly', 'Effect': 'Allow', 'Action': ['ec2:Describe*', 'iam:Get*', 'iam:List*'], 'Resource': '*'}],
+        },
+    },
+    {
+        'id': 'ANPAAamazonec2fullaccess4',
+        'name': 'AmazonEC2FullAccess',
+        'arn': 'arn:aws:iam::aws:policy/AmazonEC2FullAccess',
+        'description': 'Provides full access to Amazon EC2 via the AWS Management Console',
+        'is_managed': True,
+        'created_at': '2015-02-06T18:39:46Z',
+        'document': {
+            'Version': '2012-10-17',
+            'Statement': [{'Sid': 'EC2Full', 'Effect': 'Allow', 'Action': 'ec2:*', 'Resource': '*'}],
+        },
+    },
+    {
+        'id': 'ANPAAamazonec2readonly005',
+        'name': 'AmazonEC2ReadOnlyAccess',
+        'arn': 'arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess',
+        'description': 'Provides read-only access to Amazon EC2',
+        'is_managed': True,
+        'created_at': '2015-02-06T18:39:46Z',
+        'document': {
+            'Version': '2012-10-17',
+            'Statement': [{'Sid': 'EC2ReadOnly', 'Effect': 'Allow', 'Action': 'ec2:Describe*', 'Resource': '*'}],
+        },
+    },
+    {
+        'id': 'ANPAAiamfullaccess000006',
+        'name': 'IAMFullAccess',
+        'arn': 'arn:aws:iam::aws:policy/IAMFullAccess',
+        'description': 'Provides full access to IAM via the AWS Management Console',
+        'is_managed': True,
+        'created_at': '2015-02-06T18:39:46Z',
+        'document': {
+            'Version': '2012-10-17',
+            'Statement': [{'Sid': 'IAMFull', 'Effect': 'Allow', 'Action': 'iam:*', 'Resource': '*'}],
+        },
+    },
+    {
+        'id': 'ANPAAiamreadonlyaccess07',
+        'name': 'IAMReadOnlyAccess',
+        'arn': 'arn:aws:iam::aws:policy/IAMReadOnlyAccess',
+        'description': 'Provides read-only access to IAM via the AWS Management Console',
+        'is_managed': True,
+        'created_at': '2015-02-06T18:39:46Z',
+        'document': {
+            'Version': '2012-10-17',
+            'Statement': [{'Sid': 'IAMReadOnly', 'Effect': 'Allow', 'Action': ['iam:Get*', 'iam:List*'], 'Resource': '*'}],
+        },
+    },
+]
 
 
 def read_asg_data():
@@ -27,6 +124,33 @@ def write_asg_data(data):
     with _asg_lock:
         with open(ASG_DATA_FILE, 'w') as f:
             json.dump(data, f, indent=2)
+
+
+def read_iam_data():
+    """Load IAM entities from disk. Seeds managed policies on first run."""
+    if not os.path.exists(IAM_DATA_FILE):
+        initial = {'users': [], 'groups': [], 'roles': [], 'policies': _MANAGED_POLICIES}
+        write_iam_data(initial)
+        return initial
+    with open(IAM_DATA_FILE) as f:
+        return json.load(f)
+
+
+def write_iam_data(data):
+    """Persist IAM data atomically under a lock to prevent concurrent writes."""
+    with _iam_lock:
+        with open(IAM_DATA_FILE, 'w') as f:
+            json.dump(data, f, indent=2)
+
+
+def _new_iam_id(prefix):
+    """Generate a random IAM-style entity ID."""
+    return prefix + uuid.uuid4().hex[:16].upper()
+
+
+def _iam_now():
+    """Return current UTC time in ISO 8601 format."""
+    return datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
 def detect_host_ip():
@@ -262,7 +386,7 @@ def create_keypair():
         _, body = os_post(
             eps['compute'] + '/os-keypairs',
             token,
-            {"keypair": {"name": name, "type": "ssh"}}
+            {"keypair": {"name": name}}
         )
         kp = body.get('keypair', {})
         return jsonify({
@@ -2159,6 +2283,69 @@ def get_console_output(server_id):
         return jsonify({'error': str(e)}), 500
 
 
+# ── CloudWatch equivalent: metrics via Nova diagnostics ───────────────────────
+
+@app.route('/api/instances/<server_id>/metrics')
+def get_instance_metrics(server_id):
+    # Nova diagnostics are only available for ACTIVE instances on a live hypervisor.
+    # Returns cumulative counters, not rates — call twice and diff for throughput.
+    try:
+        token, eps, _ = authenticate()
+        diag = os_get(eps['compute'] + f'/servers/{server_id}/diagnostics', token)
+
+        # Sum across all CPUs, disks, and NICs — keys follow vda_read, vnet0_rx patterns.
+        cpu_time_ns = sum(v for k, v in diag.items()
+                          if k.startswith('cpu') and k.endswith('_time') and isinstance(v, (int, float)))
+        disk_read   = sum(v for k, v in diag.items()
+                          if k.endswith('_read') and isinstance(v, (int, float)))
+        disk_write  = sum(v for k, v in diag.items()
+                          if k.endswith('_write') and isinstance(v, (int, float)))
+        net_rx      = sum(v for k, v in diag.items()
+                          if k.startswith('vnet') and k.endswith('_rx') and isinstance(v, (int, float)))
+        net_tx      = sum(v for k, v in diag.items()
+                          if k.startswith('vnet') and k.endswith('_tx') and isinstance(v, (int, float)))
+
+        return jsonify({
+            'cpu_time_ns':      cpu_time_ns,
+            'memory_kb':        diag.get('memory', 0),
+            'disk_read_bytes':  disk_read,
+            'disk_write_bytes': disk_write,
+            'net_rx_bytes':     net_rx,
+            'net_tx_bytes':     net_tx,
+            'raw':              diag,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/metrics/summary')
+def api_metrics_summary():
+    # Uses /os-hypervisors/statistics — the /detail endpoint returns empty on this DevStack build
+    # even though nova-compute is up and running (known Nova 2025.1 behavior).
+    try:
+        token, eps, _ = authenticate()
+        h       = os_get(eps['compute'] + '/os-hypervisors/statistics', token).get('hypervisor_statistics', {})
+        servers = os_get(eps['compute'] + '/servers/detail', token, {'all_tenants': 1}).get('servers', [])
+
+        status_counts = {}
+        for s in servers:
+            status = s['status']
+            status_counts[status] = status_counts.get(status, 0) + 1
+
+        return jsonify({
+            'vcpus_total':            h.get('vcpus', 0),
+            'vcpus_used':             h.get('vcpus_used', 0),
+            'ram_total_mb':           h.get('memory_mb', 0),
+            'ram_used_mb':            h.get('memory_mb_used', 0),
+            'disk_total_gb':          h.get('local_gb', 0),
+            'disk_used_gb':           h.get('local_gb_used', 0),
+            'running_vms':            h.get('running_vms', 0),
+            'instance_status_counts': status_counts,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ── Network Interfaces / Ports (ENI equivalent) ───────────────────────────────
 
 @app.route('/api/ports')
@@ -2347,6 +2534,416 @@ def update_quota(project_id):
         return jsonify({'status': 'updated', 'key': key, 'value': value})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ── IAM — Users ──────────────────────────────────────────────────────────────
+
+@app.route('/api/iam/users')
+def list_iam_users():
+    """List all IAM users with their attached policies and group memberships."""
+    data       = read_iam_data()
+    policy_map = {p['arn']: p['name'] for p in data['policies']}
+    group_map  = {g['id']: g['name'] for g in data['groups']}
+    return jsonify([{
+        'id':                u['id'],
+        'username':          u['username'],
+        'arn':               u['arn'],
+        'created_at':        u.get('created_at', ''),
+        'attached_policies': [{'arn': a, 'name': policy_map.get(a, a)} for a in u.get('attached_policies', [])],
+        'groups':            [{'id': g, 'name': group_map.get(g, g)} for g in u.get('groups', [])],
+    } for u in data['users']])
+
+
+@app.route('/api/iam/users', methods=['POST'])
+def create_iam_user():
+    """Create an IAM user. Body: {username}."""
+    data     = read_iam_data()
+    username = (request.json.get('username') or '').strip()
+    if not username:
+        return jsonify({'error': 'username is required'}), 400
+    if any(u['username'] == username for u in data['users']):
+        return jsonify({'error': f'User "{username}" already exists'}), 409
+
+    user = {
+        'id':                _new_iam_id('AIDA'),
+        'username':          username,
+        'arn':               f'arn:aws:iam::{IAM_ACCOUNT_ID}:user/{username}',
+        'created_at':        _iam_now(),
+        'attached_policies': [],
+        'groups':            [],
+    }
+    data['users'].append(user)
+    write_iam_data(data)
+    return jsonify(user), 201
+
+
+@app.route('/api/iam/users/<user_id>', methods=['DELETE'])
+def delete_iam_user(user_id):
+    """Delete an IAM user and remove them from all groups."""
+    data = read_iam_data()
+    user = next((u for u in data['users'] if u['id'] == user_id), None)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    # Remove this user from all groups before deleting
+    for g in data['groups']:
+        g['members'] = [m for m in g.get('members', []) if m != user_id]
+
+    data['users'] = [u for u in data['users'] if u['id'] != user_id]
+    write_iam_data(data)
+    return jsonify({'status': 'deleted'})
+
+
+@app.route('/api/iam/users/<user_id>/attach-policy', methods=['POST'])
+def attach_policy_to_user(user_id):
+    """Attach a policy to a user. Body: {policy_arn}."""
+    data       = read_iam_data()
+    user       = next((u for u in data['users'] if u['id'] == user_id), None)
+    policy_arn = (request.json.get('policy_arn') or '').strip()
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    if not policy_arn:
+        return jsonify({'error': 'policy_arn is required'}), 400
+    if not any(p['arn'] == policy_arn for p in data['policies']):
+        return jsonify({'error': 'Policy not found'}), 404
+    if policy_arn in user.get('attached_policies', []):
+        return jsonify({'error': 'Policy already attached'}), 409
+
+    user.setdefault('attached_policies', []).append(policy_arn)
+    write_iam_data(data)
+    return jsonify({'status': 'attached'})
+
+
+@app.route('/api/iam/users/<user_id>/detach-policy', methods=['POST'])
+def detach_policy_from_user(user_id):
+    """Detach a policy from a user. Body: {policy_arn}."""
+    data       = read_iam_data()
+    user       = next((u for u in data['users'] if u['id'] == user_id), None)
+    policy_arn = (request.json.get('policy_arn') or '').strip()
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    user['attached_policies'] = [a for a in user.get('attached_policies', []) if a != policy_arn]
+    write_iam_data(data)
+    return jsonify({'status': 'detached'})
+
+
+# ── IAM — Groups ─────────────────────────────────────────────────────────────
+
+@app.route('/api/iam/groups')
+def list_iam_groups():
+    """List all IAM groups with attached policies and member usernames."""
+    data       = read_iam_data()
+    policy_map = {p['arn']: p['name'] for p in data['policies']}
+    user_map   = {u['id']: u['username'] for u in data['users']}
+    return jsonify([{
+        'id':                g['id'],
+        'name':              g['name'],
+        'arn':               g['arn'],
+        'created_at':        g.get('created_at', ''),
+        'attached_policies': [{'arn': a, 'name': policy_map.get(a, a)} for a in g.get('attached_policies', [])],
+        'members':           [{'id': m, 'username': user_map.get(m, m)} for m in g.get('members', [])],
+    } for g in data['groups']])
+
+
+@app.route('/api/iam/groups', methods=['POST'])
+def create_iam_group():
+    """Create an IAM group. Body: {name}."""
+    data = read_iam_data()
+    name = (request.json.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'name is required'}), 400
+    if any(g['name'] == name for g in data['groups']):
+        return jsonify({'error': f'Group "{name}" already exists'}), 409
+
+    group = {
+        'id':                _new_iam_id('AGPA'),
+        'name':              name,
+        'arn':               f'arn:aws:iam::{IAM_ACCOUNT_ID}:group/{name}',
+        'created_at':        _iam_now(),
+        'attached_policies': [],
+        'members':           [],
+    }
+    data['groups'].append(group)
+    write_iam_data(data)
+    return jsonify(group), 201
+
+
+@app.route('/api/iam/groups/<group_id>', methods=['DELETE'])
+def delete_iam_group(group_id):
+    """Delete a group and remove group membership from all users."""
+    data  = read_iam_data()
+    group = next((g for g in data['groups'] if g['id'] == group_id), None)
+    if not group:
+        return jsonify({'error': 'Group not found'}), 404
+
+    # Remove this group from all user records before deleting
+    for u in data['users']:
+        u['groups'] = [g for g in u.get('groups', []) if g != group_id]
+
+    data['groups'] = [g for g in data['groups'] if g['id'] != group_id]
+    write_iam_data(data)
+    return jsonify({'status': 'deleted'})
+
+
+@app.route('/api/iam/groups/<group_id>/attach-policy', methods=['POST'])
+def attach_policy_to_group(group_id):
+    """Attach a policy to a group. Body: {policy_arn}."""
+    data       = read_iam_data()
+    group      = next((g for g in data['groups'] if g['id'] == group_id), None)
+    policy_arn = (request.json.get('policy_arn') or '').strip()
+
+    if not group:
+        return jsonify({'error': 'Group not found'}), 404
+    if not policy_arn:
+        return jsonify({'error': 'policy_arn is required'}), 400
+    if not any(p['arn'] == policy_arn for p in data['policies']):
+        return jsonify({'error': 'Policy not found'}), 404
+    if policy_arn in group.get('attached_policies', []):
+        return jsonify({'error': 'Policy already attached'}), 409
+
+    group.setdefault('attached_policies', []).append(policy_arn)
+    write_iam_data(data)
+    return jsonify({'status': 'attached'})
+
+
+@app.route('/api/iam/groups/<group_id>/detach-policy', methods=['POST'])
+def detach_policy_from_group(group_id):
+    """Detach a policy from a group. Body: {policy_arn}."""
+    data       = read_iam_data()
+    group      = next((g for g in data['groups'] if g['id'] == group_id), None)
+    policy_arn = (request.json.get('policy_arn') or '').strip()
+
+    if not group:
+        return jsonify({'error': 'Group not found'}), 404
+    group['attached_policies'] = [a for a in group.get('attached_policies', []) if a != policy_arn]
+    write_iam_data(data)
+    return jsonify({'status': 'detached'})
+
+
+@app.route('/api/iam/groups/<group_id>/add-user', methods=['POST'])
+def add_user_to_group(group_id):
+    """Add a user to a group. Body: {user_id}."""
+    data    = read_iam_data()
+    group   = next((g for g in data['groups'] if g['id'] == group_id), None)
+    user_id = (request.json.get('user_id') or '').strip()
+    user    = next((u for u in data['users'] if u['id'] == user_id), None)
+
+    if not group:
+        return jsonify({'error': 'Group not found'}), 404
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    if user_id in group.get('members', []):
+        return jsonify({'error': 'User already in group'}), 409
+
+    group.setdefault('members', []).append(user_id)
+    user.setdefault('groups', []).append(group_id)
+    write_iam_data(data)
+    return jsonify({'status': 'added'})
+
+
+@app.route('/api/iam/groups/<group_id>/remove-user', methods=['POST'])
+def remove_user_from_group(group_id):
+    """Remove a user from a group. Body: {user_id}."""
+    data    = read_iam_data()
+    group   = next((g for g in data['groups'] if g['id'] == group_id), None)
+    user_id = (request.json.get('user_id') or '').strip()
+    user    = next((u for u in data['users'] if u['id'] == user_id), None)
+
+    if not group:
+        return jsonify({'error': 'Group not found'}), 404
+
+    group['members'] = [m for m in group.get('members', []) if m != user_id]
+    if user:
+        user['groups'] = [g for g in user.get('groups', []) if g != group_id]
+
+    write_iam_data(data)
+    return jsonify({'status': 'removed'})
+
+
+# ── IAM — Roles ──────────────────────────────────────────────────────────────
+
+@app.route('/api/iam/roles')
+def list_iam_roles():
+    """List all IAM roles with their attached policies."""
+    data       = read_iam_data()
+    policy_map = {p['arn']: p['name'] for p in data['policies']}
+    return jsonify([{
+        'id':                r['id'],
+        'name':              r['name'],
+        'arn':               r['arn'],
+        'description':       r.get('description', ''),
+        'trusted_service':   r.get('trusted_service', ''),
+        'created_at':        r.get('created_at', ''),
+        'attached_policies': [{'arn': a, 'name': policy_map.get(a, a)} for a in r.get('attached_policies', [])],
+    } for r in data['roles']])
+
+
+@app.route('/api/iam/roles', methods=['POST'])
+def create_iam_role():
+    """Create an IAM role. Body: {name, description, trusted_service}."""
+    data            = read_iam_data()
+    d               = request.json
+    name            = (d.get('name') or '').strip()
+    description     = (d.get('description') or '').strip()
+    # trusted_service is the AWS service principal allowed to assume this role
+    trusted_service = (d.get('trusted_service') or 'ec2.amazonaws.com').strip()
+
+    if not name:
+        return jsonify({'error': 'name is required'}), 400
+    if any(r['name'] == name for r in data['roles']):
+        return jsonify({'error': f'Role "{name}" already exists'}), 409
+
+    role = {
+        'id':              _new_iam_id('AROA'),
+        'name':            name,
+        'arn':             f'arn:aws:iam::{IAM_ACCOUNT_ID}:role/{name}',
+        'description':     description,
+        'trusted_service': trusted_service,
+        'created_at':      _iam_now(),
+        'trust_policy': {
+            'Version': '2012-10-17',
+            'Statement': [{
+                'Effect': 'Allow',
+                'Principal': {'Service': trusted_service},
+                'Action': 'sts:AssumeRole',
+            }],
+        },
+        'attached_policies': [],
+    }
+    data['roles'].append(role)
+    write_iam_data(data)
+    return jsonify(role), 201
+
+
+@app.route('/api/iam/roles/<role_id>', methods=['DELETE'])
+def delete_iam_role(role_id):
+    """Delete an IAM role."""
+    data = read_iam_data()
+    role = next((r for r in data['roles'] if r['id'] == role_id), None)
+    if not role:
+        return jsonify({'error': 'Role not found'}), 404
+    data['roles'] = [r for r in data['roles'] if r['id'] != role_id]
+    write_iam_data(data)
+    return jsonify({'status': 'deleted'})
+
+
+@app.route('/api/iam/roles/<role_id>/attach-policy', methods=['POST'])
+def attach_policy_to_role(role_id):
+    """Attach a policy to a role. Body: {policy_arn}."""
+    data       = read_iam_data()
+    role       = next((r for r in data['roles'] if r['id'] == role_id), None)
+    policy_arn = (request.json.get('policy_arn') or '').strip()
+
+    if not role:
+        return jsonify({'error': 'Role not found'}), 404
+    if not policy_arn:
+        return jsonify({'error': 'policy_arn is required'}), 400
+    if not any(p['arn'] == policy_arn for p in data['policies']):
+        return jsonify({'error': 'Policy not found'}), 404
+    if policy_arn in role.get('attached_policies', []):
+        return jsonify({'error': 'Policy already attached'}), 409
+
+    role.setdefault('attached_policies', []).append(policy_arn)
+    write_iam_data(data)
+    return jsonify({'status': 'attached'})
+
+
+@app.route('/api/iam/roles/<role_id>/detach-policy', methods=['POST'])
+def detach_policy_from_role(role_id):
+    """Detach a policy from a role. Body: {policy_arn}."""
+    data       = read_iam_data()
+    role       = next((r for r in data['roles'] if r['id'] == role_id), None)
+    policy_arn = (request.json.get('policy_arn') or '').strip()
+
+    if not role:
+        return jsonify({'error': 'Role not found'}), 404
+    role['attached_policies'] = [a for a in role.get('attached_policies', []) if a != policy_arn]
+    write_iam_data(data)
+    return jsonify({'status': 'detached'})
+
+
+# ── IAM — Policies ────────────────────────────────────────────────────────────
+
+@app.route('/api/iam/policies')
+def list_iam_policies():
+    """List all IAM policies (AWS managed + customer-managed)."""
+    data = read_iam_data()
+    return jsonify([{
+        'id':          p['id'],
+        'name':        p['name'],
+        'arn':         p['arn'],
+        'description': p.get('description', ''),
+        'is_managed':  p.get('is_managed', False),
+        'created_at':  p.get('created_at', ''),
+    } for p in data['policies']])
+
+
+@app.route('/api/iam/policies/<policy_id>')
+def get_iam_policy(policy_id):
+    """Get full policy detail including the JSON document."""
+    data   = read_iam_data()
+    policy = next((p for p in data['policies'] if p['id'] == policy_id), None)
+    if not policy:
+        return jsonify({'error': 'Policy not found'}), 404
+    return jsonify(policy)
+
+
+@app.route('/api/iam/policies', methods=['POST'])
+def create_iam_policy():
+    """Create a customer-managed policy. Body: {name, description, document}."""
+    data        = read_iam_data()
+    d           = request.json
+    name        = (d.get('name') or '').strip()
+    description = (d.get('description') or '').strip()
+    document    = d.get('document')
+
+    if not name:
+        return jsonify({'error': 'name is required'}), 400
+    if document is None:
+        return jsonify({'error': 'document is required'}), 400
+    if not isinstance(document, dict) or 'Statement' not in document:
+        return jsonify({'error': 'document must be a JSON object with a Statement array'}), 400
+    if any(p['name'] == name for p in data['policies']):
+        return jsonify({'error': f'Policy "{name}" already exists'}), 409
+
+    policy = {
+        'id':          _new_iam_id('ANPA'),
+        'name':        name,
+        'arn':         f'arn:aws:iam::{IAM_ACCOUNT_ID}:policy/{name}',
+        'description': description,
+        'is_managed':  False,
+        'created_at':  _iam_now(),
+        'document':    document,
+    }
+    data['policies'].append(policy)
+    write_iam_data(data)
+    return jsonify(policy), 201
+
+
+@app.route('/api/iam/policies/<policy_id>', methods=['DELETE'])
+def delete_iam_policy(policy_id):
+    """Delete a customer-managed policy; auto-detaches it from all entities first."""
+    data   = read_iam_data()
+    policy = next((p for p in data['policies'] if p['id'] == policy_id), None)
+    if not policy:
+        return jsonify({'error': 'Policy not found'}), 404
+    if policy.get('is_managed'):
+        return jsonify({'error': 'AWS managed policies cannot be deleted'}), 403
+
+    arn = policy['arn']
+    # Auto-detach from all entities so no dangling references remain
+    for u in data['users']:
+        u['attached_policies'] = [a for a in u.get('attached_policies', []) if a != arn]
+    for g in data['groups']:
+        g['attached_policies'] = [a for a in g.get('attached_policies', []) if a != arn]
+    for r in data['roles']:
+        r['attached_policies'] = [a for a in r.get('attached_policies', []) if a != arn]
+
+    data['policies'] = [p for p in data['policies'] if p['id'] != policy_id]
+    write_iam_data(data)
+    return jsonify({'status': 'deleted'})
 
 
 if __name__ == '__main__':

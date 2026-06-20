@@ -118,6 +118,14 @@
     /* Loading / empty */
     .loading-td { text-align:center; padding:32px; color:#8892a0; }
     .empty-state { text-align:center; padding:40px; color:#8892a0; }
+
+    /* IAM sub-tabs */
+    .iam-tab { background:none; border:none; border-bottom:3px solid transparent; padding:8px 18px; font-size:14px; font-weight:600; color:#6b7785; cursor:pointer; margin-bottom:-1px; transition:all .15s; }
+    .iam-tab:hover { color:#16191f; }
+    .iam-tab.active { border-bottom-color:var(--aws-orange); color:var(--aws-orange); }
+    .iam-tab-bar { border-bottom:1px solid #e3e8ef; margin-bottom:20px; display:flex; gap:4px; }
+    .policy-type-managed  { background:#e8f0fe; color:#1a56cc; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; }
+    .policy-type-customer { background:#fef3e2; color:#92400e; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; }
     .empty-state i { font-size:36px; display:block; margin-bottom:8px; }
     .spinner { display:inline-block; width:18px; height:18px; border:2px solid #e3e8ef; border-top-color:var(--aws-orange); border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:6px; }
     @keyframes spin { to { transform:rotate(360deg); } }
@@ -158,6 +166,9 @@
   <div class="nav-item" onclick="showSection('images')"         id="nav-images"><i class="bi bi-layers"></i> Images <span class="nav-badge" id="badge-images">—</span></div>
   <div class="nav-item" onclick="showSection('auto-scaling')"   id="nav-auto-scaling"><i class="bi bi-arrows-expand"></i> Auto Scaling</div>
 
+  <div class="nav-group">Monitoring</div>
+  <div class="nav-item" onclick="showSection('monitoring')" id="nav-monitoring"><i class="bi bi-graph-up"></i> Monitoring</div>
+
   <div class="nav-group">Storage</div>
   <div class="nav-item" onclick="showSection('volumes')"        id="nav-volumes"><i class="bi bi-device-hdd"></i> Volumes <span class="nav-badge" id="badge-volumes">—</span></div>
   <div class="nav-item" onclick="showSection('snapshots')"      id="nav-snapshots"><i class="bi bi-camera"></i> Snapshots</div>
@@ -173,6 +184,7 @@
 
   <div class="nav-group">Identity</div>
   <div class="nav-item" onclick="showSection('users')"          id="nav-users"><i class="bi bi-people"></i> Users &amp; Projects</div>
+  <div class="nav-item" onclick="showSection('iam')"            id="nav-iam"><i class="bi bi-shield-lock"></i> IAM</div>
   <div class="nav-item" onclick="showSection('quotas')"         id="nav-quotas"><i class="bi bi-speedometer2"></i> Quotas</div>
 
   <div class="nav-group">System</div>
@@ -186,6 +198,7 @@
   <section class="section active" id="section-overview">
     <div class="page-header"><div class="page-header-left"><h2>Overview</h2><p>Summary of all OpenStack resources</p></div></div>
     <div class="stat-grid" id="overview-cards"><div class="stat-card"><span class="spinner"></span> Loading…</div></div>
+    <div id="overview-resources"></div>
     <div class="card-box">
       <div class="card-box-header"><h5><i class="bi bi-pc-display me-2"></i>Running Instances</h5></div>
       <table class="data-table"><thead><tr><th>Name</th><th>Status</th><th>Private IP</th><th>Floating IP</th><th>Flavor</th><th>Project</th><th>Created</th></tr></thead>
@@ -410,6 +423,90 @@
     <div id="quotas-grid"></div>
   </section>
 
+  <!-- IAM -->
+  <section class="section" id="section-iam">
+    <div class="page-header">
+      <div class="page-header-left"><h2>Identity &amp; Access Management (IAM)</h2><p>AWS IAM equivalent — users, groups, roles, and JSON permission policies</p></div>
+      <button class="btn-secondary-act" onclick="refreshCurrent()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+    </div>
+
+    <div class="iam-tab-bar">
+      <button class="iam-tab active" id="iam-tab-users"    onclick="switchIamTab('users')"   >Users</button>
+      <button class="iam-tab"        id="iam-tab-groups"   onclick="switchIamTab('groups')"  >Groups</button>
+      <button class="iam-tab"        id="iam-tab-roles"    onclick="switchIamTab('roles')"   >Roles</button>
+      <button class="iam-tab"        id="iam-tab-policies" onclick="switchIamTab('policies')">Policies</button>
+    </div>
+
+    <!-- Users pane -->
+    <div id="iam-pane-users">
+      <div class="card-box">
+        <div class="card-box-header">
+          <h5>IAM Users</h5>
+          <div class="hdr-right">
+            <span id="iam-users-count" style="font-size:13px;color:#6b7785"></span>
+            <button class="btn-primary-act" onclick="openIamCreateUserModal()"><i class="bi bi-plus-lg me-1"></i>Create User</button>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>User ID</th><th>Username</th><th>ARN</th><th>Direct Policies</th><th>Groups</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody id="iam-users-body"><tr><td colspan="7" class="loading-td">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Groups pane -->
+    <div id="iam-pane-groups" style="display:none">
+      <div class="card-box">
+        <div class="card-box-header">
+          <h5>IAM Groups</h5>
+          <div class="hdr-right">
+            <span id="iam-groups-count" style="font-size:13px;color:#6b7785"></span>
+            <button class="btn-primary-act" onclick="openIamCreateGroupModal()"><i class="bi bi-plus-lg me-1"></i>Create Group</button>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Group ID</th><th>Name</th><th>ARN</th><th>Policies</th><th>Members</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody id="iam-groups-body"><tr><td colspan="7" class="loading-td">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Roles pane -->
+    <div id="iam-pane-roles" style="display:none">
+      <div class="card-box">
+        <div class="card-box-header">
+          <h5>IAM Roles</h5>
+          <div class="hdr-right">
+            <span id="iam-roles-count" style="font-size:13px;color:#6b7785"></span>
+            <button class="btn-primary-act" onclick="openIamCreateRoleModal()"><i class="bi bi-plus-lg me-1"></i>Create Role</button>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Role ID</th><th>Name</th><th>ARN</th><th>Trusted Service</th><th>Policies</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody id="iam-roles-body"><tr><td colspan="7" class="loading-td">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Policies pane -->
+    <div id="iam-pane-policies" style="display:none">
+      <div class="card-box">
+        <div class="card-box-header">
+          <h5>IAM Policies</h5>
+          <div class="hdr-right">
+            <span id="iam-policies-count" style="font-size:13px;color:#6b7785"></span>
+            <button class="btn-primary-act" onclick="openIamCreatePolicyModal()"><i class="bi bi-plus-lg me-1"></i>Create Policy</button>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Policy ID</th><th>Name</th><th>ARN</th><th>Type</th><th>Description</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody id="iam-policies-body"><tr><td colspan="7" class="loading-td">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+
   <!-- DevStack Monitor -->
   <section class="section" id="section-devstack">
     <div class="page-header">
@@ -466,6 +563,31 @@
       <div id="ds-log-container" style="background:#0d1117;border-radius:0 0 8px 8px;padding:16px 20px;overflow-y:auto;max-height:520px;font-family:monospace;font-size:12px;line-height:1.6;">
         <div style="color:#6b7785;text-align:center;padding:20px;">Loading log…</div>
       </div>
+    </div>
+  </section>
+
+  <!-- Monitoring (CloudWatch equivalent) -->
+  <section class="section" id="section-monitoring">
+    <div class="page-header">
+      <div class="page-header-left"><h2>Monitoring</h2><p>Hypervisor resource utilization and per-instance metrics — CloudWatch equivalent via Nova diagnostics</p></div>
+    </div>
+
+    <!-- Resource utilization cards -->
+    <div class="card-box" style="margin-bottom:20px">
+      <div class="card-box-header"><h5><i class="bi bi-speedometer2 me-2"></i>Hypervisor Resource Utilization</h5></div>
+      <div id="monitoring-utilization" style="padding:20px"><span class="spinner"></span> Loading…</div>
+    </div>
+
+    <!-- Per-instance metrics table -->
+    <div class="card-box">
+      <div class="card-box-header">
+        <h5><i class="bi bi-activity me-2"></i>Instance Metrics</h5>
+        <small style="color:#6b7785">Cumulative counters from Nova diagnostics · ACTIVE instances only</small>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Instance</th><th>Status</th><th>CPU Time</th><th>Memory Alloc</th><th>Disk Read</th><th>Disk Write</th><th>Net RX</th><th>Net TX</th></tr></thead>
+        <tbody id="monitoring-inst-body"><tr><td colspan="8" class="loading-td"><span class="spinner"></span>Loading…</td></tr></tbody>
+      </table>
     </div>
   </section>
 
@@ -1537,6 +1659,204 @@
   </div>
 </div>
 
+<!-- ── IAM Create User Modal ──────────────────────────────────────────────── -->
+<div class="modal fade" id="iamCreateUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Create IAM User</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Username <span class="text-danger">*</span></label>
+          <input type="text" id="iam-user-name" class="form-control" placeholder="e.g. alice">
+          <div class="form-text">Lowercase letters, numbers, hyphens, and underscores only.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitIamCreateUser()"><i class="bi bi-person-plus me-1"></i>Create User</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── IAM Create Group Modal ─────────────────────────────────────────────── -->
+<div class="modal fade" id="iamCreateGroupModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-people me-2"></i>Create IAM Group</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Group Name <span class="text-danger">*</span></label>
+          <input type="text" id="iam-group-name" class="form-control" placeholder="e.g. Developers">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitIamCreateGroup()"><i class="bi bi-people me-1"></i>Create Group</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── IAM Create Role Modal ──────────────────────────────────────────────── -->
+<div class="modal fade" id="iamCreateRoleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-person-badge me-2"></i>Create IAM Role</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Role Name <span class="text-danger">*</span></label>
+          <input type="text" id="iam-role-name" class="form-control" placeholder="e.g. EC2ServiceRole">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Description</label>
+          <input type="text" id="iam-role-description" class="form-control" placeholder="What this role allows">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Trusted Service (Principal)</label>
+          <select id="iam-role-trusted-service" class="form-select">
+            <option value="ec2.amazonaws.com">EC2 — ec2.amazonaws.com</option>
+            <option value="lambda.amazonaws.com">Lambda — lambda.amazonaws.com</option>
+            <option value="s3.amazonaws.com">S3 — s3.amazonaws.com</option>
+            <option value="ecs-tasks.amazonaws.com">ECS Tasks — ecs-tasks.amazonaws.com</option>
+            <option value="eks.amazonaws.com">EKS — eks.amazonaws.com</option>
+          </select>
+          <div class="form-text">The AWS service that can assume this role via sts:AssumeRole.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitIamCreateRole()"><i class="bi bi-person-badge me-1"></i>Create Role</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── IAM Create Policy Modal ────────────────────────────────────────────── -->
+<div class="modal fade" id="iamCreatePolicyModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-file-earmark-lock me-2"></i>Create IAM Policy</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row mb-3">
+          <div class="col-8">
+            <label class="form-label fw-bold">Policy Name <span class="text-danger">*</span></label>
+            <input type="text" id="iam-policy-name" class="form-control" placeholder="e.g. EC2StartStopOnly">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Description</label>
+          <input type="text" id="iam-policy-description" class="form-control" placeholder="What this policy allows or denies">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Policy Document (JSON) <span class="text-danger">*</span></label>
+          <textarea id="iam-policy-document" class="form-control font-monospace" rows="10" style="font-size:12px" placeholder='{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowStartStop",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:StartInstances",
+        "ec2:StopInstances"
+      ],
+      "Resource": "*"
+    }
+  ]
+}'></textarea>
+          <div class="form-text">Must be valid JSON with a <code>Statement</code> array containing <code>Effect</code>, <code>Action</code>, and <code>Resource</code>.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitIamCreatePolicy()"><i class="bi bi-file-earmark-lock me-1"></i>Create Policy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── IAM Attach Policy Modal ────────────────────────────────────────────── -->
+<div class="modal fade" id="iamAttachPolicyModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title" id="iam-attach-modal-title"><i class="bi bi-link-45deg me-2"></i>Attach Policy</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="iam-attach-entity-type">
+        <input type="hidden" id="iam-attach-entity-id">
+        <div class="mb-3">
+          <input type="text" id="iam-policy-search" class="form-control" placeholder="Filter policies…" oninput="filterIamPolicies()">
+        </div>
+        <div id="iam-policy-list" style="max-height:360px;overflow-y:auto;border:1px solid #dee2e6;border-radius:6px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── IAM View Policy Document Modal ────────────────────────────────────── -->
+<div class="modal fade" id="iamViewPolicyModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title" id="iam-view-policy-title"><i class="bi bi-file-earmark-code me-2"></i>Policy Document</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <pre id="iam-view-policy-doc" style="background:#0d1117;color:#c9d1d9;border-radius:6px;padding:16px;font-size:12px;line-height:1.6;max-height:500px;overflow-y:auto;margin:0"></pre>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── IAM Manage Group Members Modal ────────────────────────────────────── -->
+<div class="modal fade" id="iamManageMembersModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title" id="iam-members-modal-title"><i class="bi bi-person-lines-fill me-2"></i>Manage Group Members</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="iam-members-group-id">
+        <div class="row">
+          <div class="col-6">
+            <h6 style="font-size:13px;font-weight:700;color:#6b7785;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Current Members</h6>
+            <div id="iam-current-members" style="min-height:60px;border:1px solid #e3e8ef;border-radius:6px;padding:8px"></div>
+          </div>
+          <div class="col-6">
+            <h6 style="font-size:13px;font-weight:700;color:#6b7785;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Add User</h6>
+            <select id="iam-add-member-select" class="form-select form-select-sm" style="margin-bottom:8px"></select>
+            <button class="btn-primary-act" style="font-size:13px;padding:5px 14px" onclick="submitAddGroupMember()">Add to Group</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   let currentSection = 'overview';
@@ -1566,8 +1886,15 @@
   const createSnapshotModal  = new bootstrap.Modal(document.getElementById('createSnapshotModal'));
   const restoreSnapshotModal = new bootstrap.Modal(document.getElementById('restoreSnapshotModal'));
   const createPortModal      = new bootstrap.Modal(document.getElementById('createPortModal'));
-  const attachInterfaceModal = new bootstrap.Modal(document.getElementById('attachInterfaceModal'));
-  const consoleModal         = new bootstrap.Modal(document.getElementById('consoleModal'));
+  const attachInterfaceModal    = new bootstrap.Modal(document.getElementById('attachInterfaceModal'));
+  const consoleModal            = new bootstrap.Modal(document.getElementById('consoleModal'));
+  const iamCreateUserModal      = new bootstrap.Modal(document.getElementById('iamCreateUserModal'));
+  const iamCreateGroupModal     = new bootstrap.Modal(document.getElementById('iamCreateGroupModal'));
+  const iamCreateRoleModal      = new bootstrap.Modal(document.getElementById('iamCreateRoleModal'));
+  const iamCreatePolicyModal    = new bootstrap.Modal(document.getElementById('iamCreatePolicyModal'));
+  const iamAttachPolicyModal    = new bootstrap.Modal(document.getElementById('iamAttachPolicyModal'));
+  const iamViewPolicyModal      = new bootstrap.Modal(document.getElementById('iamViewPolicyModal'));
+  const iamManageMembersModal   = new bootstrap.Modal(document.getElementById('iamManageMembersModal'));
 
   // ── Navigation ────────────────────────────────────────────────────────────
   function showSection(name) {
@@ -1603,6 +1930,7 @@
       'devstack': loadDevstack, 'security-groups': fetchSecurityGroups,
       'key-pairs': fetchKeyPairs, 'users': fetchUsers,
       'snapshots': fetchSnapshots, 'ports': fetchPorts, 'quotas': fetchQuotas,
+      'iam': fetchIam, 'monitoring': fetchMonitoring,
     };
     (map[name] || (() => Promise.resolve()))().finally(() => {
       btn.disabled = false;
@@ -1656,9 +1984,10 @@
 
   // ── Overview ──────────────────────────────────────────────────────────────
   async function fetchOverview() {
-    const [ov, inst] = await Promise.all([
+    const [ov, inst, metrics] = await Promise.all([
       fetch('/api/overview').then(r => r.json()),
       fetch('/api/instances').then(r => r.json()),
+      fetch('/api/metrics/summary').then(r => r.json()).catch(() => null),
     ]);
     if (ov.error) { document.getElementById('overview-cards').innerHTML = `<div style="color:#dc3545">${ov.error}</div>`; return; }
 
@@ -1674,6 +2003,21 @@
       <div class="stat-card" onclick="showSection('floating-ips')"><div class="label">Floating IPs</div><div class="number">${ov.floating_ips.total}</div><div class="sub">${ov.floating_ips.attached} attached</div></div>
       <div class="stat-card" onclick="showSection('users')"><div class="label">Users</div><div class="number">${ov.users}</div><div class="sub">${ov.projects} projects</div></div>
       <div class="stat-card" onclick="showSection('networks')"><div class="label">Networks</div><div class="number">3</div><div class="sub">private · public · mgmt</div></div>`;
+
+    if (metrics && !metrics.error) {
+      document.getElementById('overview-resources').innerHTML = `
+        <div class="card-box" style="margin-bottom:20px">
+          <div class="card-box-header">
+            <h5><i class="bi bi-speedometer2 me-2"></i>Resource Utilization</h5>
+            <small style="color:#6b7785;cursor:pointer" onclick="showSection('monitoring')">View full metrics →</small>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;padding:20px">
+            ${buildUtilCard('vCPU', metrics.vcpus_used, metrics.vcpus_total, 'cores')}
+            ${buildUtilCard('RAM', (metrics.ram_used_mb/1024).toFixed(1), (metrics.ram_total_mb/1024).toFixed(1), 'GB')}
+            ${buildUtilCard('Disk', metrics.disk_used_gb, metrics.disk_total_gb, 'GB')}
+          </div>
+        </div>`;
+    }
 
     if (inst.error) { document.getElementById('overview-inst-body').innerHTML = errRow(inst.error, 7); return; }
     document.getElementById('overview-inst-body').innerHTML = inst.length === 0
@@ -3748,6 +4092,518 @@
         </div>` : '<div style="font-size:11px;color:#198754">Unlimited</div>'}
       </div>`;
     }).join('');
+  }
+
+  // ── IAM ───────────────────────────────────────────────────────────────────
+
+  let _iamCurrentTab = 'users';
+  // Cached policy list used by the attach-policy modal
+  let _iamAllPolicies = [];
+
+  function switchIamTab(tab) {
+    _iamCurrentTab = tab;
+    ['users', 'groups', 'roles', 'policies'].forEach(t => {
+      document.getElementById(`iam-tab-${t}`).classList.toggle('active', t === tab);
+      document.getElementById(`iam-pane-${t}`).style.display = t === tab ? '' : 'none';
+    });
+  }
+
+  async function fetchIam() {
+    const [users, groups, roles, policies] = await Promise.all([
+      fetch('/api/iam/users').then(r => r.json()),
+      fetch('/api/iam/groups').then(r => r.json()),
+      fetch('/api/iam/roles').then(r => r.json()),
+      fetch('/api/iam/policies').then(r => r.json()),
+    ]);
+    _iamAllPolicies = Array.isArray(policies) ? policies : [];
+    renderIamUsers(users);
+    renderIamGroups(groups);
+    renderIamRoles(roles);
+    renderIamPolicies(policies);
+  }
+
+  function renderIamUsers(users) {
+    const body = document.getElementById('iam-users-body');
+    const cnt  = document.getElementById('iam-users-count');
+    if (!Array.isArray(users)) { body.innerHTML = errRow(users.error || 'Failed to load', 7); return; }
+    cnt.textContent = `${users.length} user${users.length !== 1 ? 's' : ''}`;
+    if (!users.length) {
+      body.innerHTML = '<tr><td colspan="7" class="empty-state">No IAM users — click "Create User" to add one</td></tr>';
+      return;
+    }
+    body.innerHTML = users.map(u => `
+      <tr>
+        <td class="id-col">${u.id.substring(0, 14)}…</td>
+        <td><strong>${u.username}</strong></td>
+        <td class="id-col" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${u.arn}">${u.arn}</td>
+        <td>${u.attached_policies.length ? u.attached_policies.map(p => `<span class="rule-pill">${p.name}</span>`).join('') : '<span style="color:#aaa">—</span>'}</td>
+        <td>${u.groups.length ? u.groups.map(g => `<span class="project-chip">${g.name}</span>`).join('') : '<span style="color:#aaa">—</span>'}</td>
+        <td>${u.created_at ? u.created_at.substring(0, 10) : '—'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-act btn-modify" onclick="openIamAttachPolicyModal('user','${u.id}','${u.username}',${JSON.stringify(u.attached_policies)})">Attach Policy</button>
+          <button class="btn-act btn-delete" onclick="deleteIamUser('${u.id}','${u.username}')">Delete</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  function renderIamGroups(groups) {
+    const body = document.getElementById('iam-groups-body');
+    const cnt  = document.getElementById('iam-groups-count');
+    if (!Array.isArray(groups)) { body.innerHTML = errRow(groups.error || 'Failed to load', 7); return; }
+    cnt.textContent = `${groups.length} group${groups.length !== 1 ? 's' : ''}`;
+    if (!groups.length) {
+      body.innerHTML = '<tr><td colspan="7" class="empty-state">No IAM groups — click "Create Group" to add one</td></tr>';
+      return;
+    }
+    body.innerHTML = groups.map(g => `
+      <tr>
+        <td class="id-col">${g.id.substring(0, 14)}…</td>
+        <td><strong>${g.name}</strong></td>
+        <td class="id-col" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${g.arn}">${g.arn}</td>
+        <td>${g.attached_policies.length ? g.attached_policies.map(p => `<span class="rule-pill">${p.name}</span>`).join('') : '<span style="color:#aaa">—</span>'}</td>
+        <td>${g.members.length ? `<span style="font-weight:600">${g.members.length}</span> <span style="color:#aaa;font-size:12px">(${g.members.map(m => m.username).join(', ')})</span>` : '<span style="color:#aaa">—</span>'}</td>
+        <td>${g.created_at ? g.created_at.substring(0, 10) : '—'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-act btn-modify" onclick="openIamAttachPolicyModal('group','${g.id}','${g.name}',${JSON.stringify(g.attached_policies)})">Attach Policy</button>
+          <button class="btn-act btn-reboot" onclick="openIamManageMembersModal('${g.id}','${g.name}',${JSON.stringify(g.members)})">Members</button>
+          <button class="btn-act btn-delete" onclick="deleteIamGroup('${g.id}','${g.name}')">Delete</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  function renderIamRoles(roles) {
+    const body = document.getElementById('iam-roles-body');
+    const cnt  = document.getElementById('iam-roles-count');
+    if (!Array.isArray(roles)) { body.innerHTML = errRow(roles.error || 'Failed to load', 7); return; }
+    cnt.textContent = `${roles.length} role${roles.length !== 1 ? 's' : ''}`;
+    if (!roles.length) {
+      body.innerHTML = '<tr><td colspan="7" class="empty-state">No IAM roles — click "Create Role" to add one</td></tr>';
+      return;
+    }
+    body.innerHTML = roles.map(r => `
+      <tr>
+        <td class="id-col">${r.id.substring(0, 14)}…</td>
+        <td><strong>${r.name}</strong>${r.description ? `<br><small style="color:#6b7785;font-weight:400">${r.description}</small>` : ''}</td>
+        <td class="id-col" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.arn}">${r.arn}</td>
+        <td><span class="rule-pill">${r.trusted_service || '—'}</span></td>
+        <td>${r.attached_policies.length ? r.attached_policies.map(p => `<span class="rule-pill">${p.name}</span>`).join('') : '<span style="color:#aaa">—</span>'}</td>
+        <td>${r.created_at ? r.created_at.substring(0, 10) : '—'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-act btn-modify" onclick="openIamAttachPolicyModal('role','${r.id}','${r.name}',${JSON.stringify(r.attached_policies)})">Attach Policy</button>
+          <button class="btn-act btn-delete" onclick="deleteIamRole('${r.id}','${r.name}')">Delete</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  function renderIamPolicies(policies) {
+    const body = document.getElementById('iam-policies-body');
+    const cnt  = document.getElementById('iam-policies-count');
+    if (!Array.isArray(policies)) { body.innerHTML = errRow(policies.error || 'Failed to load', 7); return; }
+    cnt.textContent = `${policies.length} polic${policies.length !== 1 ? 'ies' : 'y'}`;
+    if (!policies.length) {
+      body.innerHTML = '<tr><td colspan="7" class="empty-state">No policies found</td></tr>';
+      return;
+    }
+    body.innerHTML = policies.map(p => `
+      <tr>
+        <td class="id-col">${p.id.substring(0, 14)}…</td>
+        <td><strong>${p.name}</strong></td>
+        <td class="id-col" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.arn}">${p.arn}</td>
+        <td><span class="${p.is_managed ? 'policy-type-managed' : 'policy-type-customer'}">${p.is_managed ? 'AWS Managed' : 'Customer'}</span></td>
+        <td style="color:#6b7785;font-size:12px">${p.description || '—'}</td>
+        <td>${p.created_at ? p.created_at.substring(0, 10) : '—'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-act btn-modify" onclick="viewIamPolicyDocument('${p.id}','${p.name}')">View JSON</button>
+          ${!p.is_managed ? `<button class="btn-act btn-delete" onclick="deleteIamPolicy('${p.id}','${p.name}')">Delete</button>` : ''}
+        </td>
+      </tr>`).join('');
+  }
+
+  // ── IAM Create helpers ────────────────────────────────────────────────────
+
+  function openIamCreateUserModal()   { document.getElementById('iam-user-name').value = ''; iamCreateUserModal.show(); }
+  function openIamCreateGroupModal()  { document.getElementById('iam-group-name').value = ''; iamCreateGroupModal.show(); }
+  function openIamCreateRoleModal()   { document.getElementById('iam-role-name').value = ''; document.getElementById('iam-role-description').value = ''; iamCreateRoleModal.show(); }
+  function openIamCreatePolicyModal() { document.getElementById('iam-policy-name').value = ''; document.getElementById('iam-policy-description').value = ''; document.getElementById('iam-policy-document').value = ''; iamCreatePolicyModal.show(); }
+
+  async function submitIamCreateUser() {
+    const username = document.getElementById('iam-user-name').value.trim();
+    if (!username) { toast('error', 'Validation', 'Username is required'); return; }
+    const r = await fetch('/api/iam/users', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ username }),
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Create failed', r.error); return; }
+    toast('success', 'User created', `"${username}" created successfully`);
+    iamCreateUserModal.hide();
+    refreshCurrent();
+  }
+
+  async function submitIamCreateGroup() {
+    const name = document.getElementById('iam-group-name').value.trim();
+    if (!name) { toast('error', 'Validation', 'Group name is required'); return; }
+    const r = await fetch('/api/iam/groups', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name }),
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Create failed', r.error); return; }
+    toast('success', 'Group created', `"${name}" created successfully`);
+    iamCreateGroupModal.hide();
+    refreshCurrent();
+  }
+
+  async function submitIamCreateRole() {
+    const name            = document.getElementById('iam-role-name').value.trim();
+    const description     = document.getElementById('iam-role-description').value.trim();
+    const trusted_service = document.getElementById('iam-role-trusted-service').value;
+    if (!name) { toast('error', 'Validation', 'Role name is required'); return; }
+    const r = await fetch('/api/iam/roles', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, description, trusted_service }),
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Create failed', r.error); return; }
+    toast('success', 'Role created', `"${name}" created successfully`);
+    iamCreateRoleModal.hide();
+    refreshCurrent();
+  }
+
+  async function submitIamCreatePolicy() {
+    const name        = document.getElementById('iam-policy-name').value.trim();
+    const description = document.getElementById('iam-policy-description').value.trim();
+    const docText     = document.getElementById('iam-policy-document').value.trim();
+    if (!name) { toast('error', 'Validation', 'Policy name is required'); return; }
+    if (!docText) { toast('error', 'Validation', 'Policy document is required'); return; }
+    let document_obj;
+    try { document_obj = JSON.parse(docText); }
+    catch (e) { toast('error', 'Invalid JSON', 'Policy document is not valid JSON: ' + e.message); return; }
+    const r = await fetch('/api/iam/policies', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, description, document: document_obj }),
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Create failed', r.error); return; }
+    toast('success', 'Policy created', `"${name}" created successfully`);
+    iamCreatePolicyModal.hide();
+    refreshCurrent();
+  }
+
+  // ── IAM Delete helpers ────────────────────────────────────────────────────
+
+  function deleteIamUser(userId, username) {
+    confirm(`Delete IAM user "${username}"? This removes them from all groups.`, async () => {
+      confirmModal.hide();
+      const r = await fetch(`/api/iam/users/${userId}`, { method: 'DELETE' }).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'User deleted', `"${username}" has been deleted`);
+      refreshCurrent();
+    });
+  }
+
+  function deleteIamGroup(groupId, name) {
+    confirm(`Delete IAM group "${name}"?`, async () => {
+      confirmModal.hide();
+      const r = await fetch(`/api/iam/groups/${groupId}`, { method: 'DELETE' }).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'Group deleted', `"${name}" has been deleted`);
+      refreshCurrent();
+    });
+  }
+
+  function deleteIamRole(roleId, name) {
+    confirm(`Delete IAM role "${name}"?`, async () => {
+      confirmModal.hide();
+      const r = await fetch(`/api/iam/roles/${roleId}`, { method: 'DELETE' }).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'Role deleted', `"${name}" has been deleted`);
+      refreshCurrent();
+    });
+  }
+
+  function deleteIamPolicy(policyId, name) {
+    confirm(`Delete policy "${name}"? It will be detached from all users, groups, and roles.`, async () => {
+      confirmModal.hide();
+      const r = await fetch(`/api/iam/policies/${policyId}`, { method: 'DELETE' }).then(r => r.json());
+      if (r.error) { toast('error', 'Delete failed', r.error); return; }
+      toast('success', 'Policy deleted', `"${name}" has been deleted`);
+      refreshCurrent();
+    });
+  }
+
+  // ── IAM Attach Policy modal ───────────────────────────────────────────────
+
+  function openIamAttachPolicyModal(entityType, entityId, entityName, attachedPolicies) {
+    document.getElementById('iam-attach-entity-type').value = entityType;
+    document.getElementById('iam-attach-entity-id').value   = entityId;
+    document.getElementById('iam-attach-modal-title').innerHTML =
+      `<i class="bi bi-link-45deg me-2"></i>Attach Policy to ${entityType}: <strong>${entityName}</strong>`;
+    document.getElementById('iam-policy-search').value = '';
+    renderAttachPolicyList(attachedPolicies);
+    iamAttachPolicyModal.show();
+  }
+
+  function filterIamPolicies() {
+    // Re-render list using current entity's attached policies from hidden fields
+    const entityType = document.getElementById('iam-attach-entity-type').value;
+    const entityId   = document.getElementById('iam-attach-entity-id').value;
+    // Get the currently attached policy ARNs from the rendered rows
+    const attached = Array.from(document.querySelectorAll('#iam-policy-list [data-attached="true"]'))
+      .map(el => el.dataset.arn);
+    renderAttachPolicyList(attached.map(arn => ({ arn })));
+  }
+
+  function renderAttachPolicyList(attachedPolicies) {
+    const search      = (document.getElementById('iam-policy-search').value || '').toLowerCase();
+    const attachedArns = new Set(attachedPolicies.map(p => p.arn));
+    const filtered    = _iamAllPolicies.filter(p =>
+      !search || p.name.toLowerCase().includes(search) || p.arn.toLowerCase().includes(search)
+    );
+    const container = document.getElementById('iam-policy-list');
+    if (!filtered.length) {
+      container.innerHTML = '<div class="empty-state" style="padding:20px">No policies match your filter</div>';
+      return;
+    }
+    container.innerHTML = filtered.map(p => {
+      const isAttached = attachedArns.has(p.arn);
+      return `<div data-arn="${p.arn}" data-attached="${isAttached}"
+        style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #f0f2f5;${isAttached ? 'background:#f8fff8' : ''}">
+        <div>
+          <div style="font-size:13px;font-weight:600">${p.name}
+            <span class="${p.is_managed ? 'policy-type-managed' : 'policy-type-customer'}" style="margin-left:6px">${p.is_managed ? 'AWS' : 'Customer'}</span>
+          </div>
+          <div style="font-size:11px;color:#6b7785;font-family:monospace">${p.arn}</div>
+          ${p.description ? `<div style="font-size:11px;color:#8892a0">${p.description}</div>` : ''}
+        </div>
+        ${isAttached
+          ? `<button class="btn-act btn-delete" style="white-space:nowrap" onclick="detachIamPolicy('${p.arn}','${p.name}')">Detach</button>`
+          : `<button class="btn-act btn-start" style="white-space:nowrap" onclick="attachIamPolicy('${p.arn}')">Attach</button>`
+        }
+      </div>`;
+    }).join('');
+  }
+
+  async function attachIamPolicy(policyArn) {
+    const entityType = document.getElementById('iam-attach-entity-type').value;
+    const entityId   = document.getElementById('iam-attach-entity-id').value;
+    const urlMap     = { user: `/api/iam/users/${entityId}/attach-policy`, group: `/api/iam/groups/${entityId}/attach-policy`, role: `/api/iam/roles/${entityId}/attach-policy` };
+    const r = await fetch(urlMap[entityType], {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ policy_arn: policyArn }),
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Attach failed', r.error); return; }
+    toast('success', 'Policy attached', '');
+    // Refresh the list and mark this policy as attached
+    const row = document.querySelector(`#iam-policy-list [data-arn="${policyArn}"]`);
+    if (row) row.dataset.attached = 'true';
+    // Re-fetch and re-render to pick up the new state
+    const resp = await fetch(`/api/iam/${entityType}s`).then(r => r.json());
+    const entity = Array.isArray(resp) ? resp.find(e => e.id === entityId) : null;
+    if (entity) renderAttachPolicyList(entity.attached_policies || []);
+    delete loaded['iam'];
+  }
+
+  async function detachIamPolicy(policyArn, policyName) {
+    const entityType = document.getElementById('iam-attach-entity-type').value;
+    const entityId   = document.getElementById('iam-attach-entity-id').value;
+    const urlMap     = { user: `/api/iam/users/${entityId}/detach-policy`, group: `/api/iam/groups/${entityId}/detach-policy`, role: `/api/iam/roles/${entityId}/detach-policy` };
+    const r = await fetch(urlMap[entityType], {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ policy_arn: policyArn }),
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Detach failed', r.error); return; }
+    toast('info', 'Policy detached', `"${policyName}" detached`);
+    const resp = await fetch(`/api/iam/${entityType}s`).then(r => r.json());
+    const entity = Array.isArray(resp) ? resp.find(e => e.id === entityId) : null;
+    if (entity) renderAttachPolicyList(entity.attached_policies || []);
+    delete loaded['iam'];
+  }
+
+  // ── IAM View Policy Document ──────────────────────────────────────────────
+
+  async function viewIamPolicyDocument(policyId, policyName) {
+    const r = await fetch(`/api/iam/policies/${policyId}`).then(r => r.json());
+    if (r.error) { toast('error', 'Load failed', r.error); return; }
+    document.getElementById('iam-view-policy-title').innerHTML =
+      `<i class="bi bi-file-earmark-code me-2"></i>Policy: <strong>${policyName}</strong>`;
+    document.getElementById('iam-view-policy-doc').textContent = JSON.stringify(r.document, null, 2);
+    iamViewPolicyModal.show();
+  }
+
+  // ── IAM Manage Group Members ──────────────────────────────────────────────
+
+  async function openIamManageMembersModal(groupId, groupName, currentMembers) {
+    document.getElementById('iam-members-group-id').value = groupId;
+    document.getElementById('iam-members-modal-title').innerHTML =
+      `<i class="bi bi-person-lines-fill me-2"></i>Group: <strong>${groupName}</strong> — Members`;
+    renderCurrentMembers(groupId, currentMembers);
+    // Populate the add-user dropdown with users not already in the group
+    const allUsers = await fetch('/api/iam/users').then(r => r.json());
+    const memberIds = new Set(currentMembers.map(m => m.id));
+    const sel = document.getElementById('iam-add-member-select');
+    const available = Array.isArray(allUsers) ? allUsers.filter(u => !memberIds.has(u.id)) : [];
+    sel.innerHTML = available.length
+      ? available.map(u => `<option value="${u.id}">${u.username}</option>`).join('')
+      : '<option value="">— no users available —</option>';
+    iamManageMembersModal.show();
+  }
+
+  function renderCurrentMembers(groupId, members) {
+    const el = document.getElementById('iam-current-members');
+    if (!members.length) { el.innerHTML = '<span style="color:#aaa;font-size:13px">No members yet</span>'; return; }
+    el.innerHTML = members.map(m =>
+      `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f2f5">
+        <span style="font-size:13px"><i class="bi bi-person me-1" style="color:#6b7785"></i>${m.username}</span>
+        <button class="btn-act btn-delete" style="padding:2px 8px;font-size:11px" onclick="removeMemberFromGroup('${groupId}','${m.id}','${m.username}')">Remove</button>
+      </div>`
+    ).join('');
+  }
+
+  async function submitAddGroupMember() {
+    const groupId = document.getElementById('iam-members-group-id').value;
+    const userId  = document.getElementById('iam-add-member-select').value;
+    if (!userId) return;
+    const r = await fetch(`/api/iam/groups/${groupId}/add-user`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ user_id: userId }),
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Add failed', r.error); return; }
+    toast('success', 'User added to group', '');
+    // Refresh group data and re-render the modal
+    const groups = await fetch('/api/iam/groups').then(r => r.json());
+    const group  = Array.isArray(groups) ? groups.find(g => g.id === groupId) : null;
+    if (group) {
+      renderCurrentMembers(groupId, group.members);
+      const memberIds = new Set(group.members.map(m => m.id));
+      const allUsers  = await fetch('/api/iam/users').then(r => r.json());
+      const sel = document.getElementById('iam-add-member-select');
+      const available = Array.isArray(allUsers) ? allUsers.filter(u => !memberIds.has(u.id)) : [];
+      sel.innerHTML = available.length
+        ? available.map(u => `<option value="${u.id}">${u.username}</option>`).join('')
+        : '<option value="">— no users available —</option>';
+    }
+    delete loaded['iam'];
+  }
+
+  async function removeMemberFromGroup(groupId, userId, username) {
+    const r = await fetch(`/api/iam/groups/${groupId}/remove-user`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ user_id: userId }),
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Remove failed', r.error); return; }
+    toast('info', 'User removed', `"${username}" removed from group`);
+    const groups = await fetch('/api/iam/groups').then(r => r.json());
+    const group  = Array.isArray(groups) ? groups.find(g => g.id === groupId) : null;
+    if (group) {
+      renderCurrentMembers(groupId, group.members);
+      const memberIds = new Set(group.members.map(m => m.id));
+      const allUsers  = await fetch('/api/iam/users').then(r => r.json());
+      const sel = document.getElementById('iam-add-member-select');
+      const available = Array.isArray(allUsers) ? allUsers.filter(u => !memberIds.has(u.id)) : [];
+      sel.innerHTML = available.length
+        ? available.map(u => `<option value="${u.id}">${u.username}</option>`).join('')
+        : '<option value="">— no users available —</option>';
+    }
+    delete loaded['iam'];
+  }
+
+  // ── Monitoring ────────────────────────────────────────────────────────────
+
+  // Builds a utilization card with a colored progress bar.
+  // Color shifts orange >60% and red >80% to match CloudWatch alarm thresholds visually.
+  function buildUtilCard(label, used, total, unit) {
+    const pct   = total > 0 ? Math.min(100, Math.round(used / total * 100)) : 0;
+    const color = pct > 80 ? '#dc3545' : pct > 60 ? '#fd7e14' : '#28a745';
+    return `<div style="padding:16px;border:1px solid #e3e8ef;border-radius:8px;background:#fff">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7785;margin-bottom:6px">${label}</div>
+      <div style="font-size:20px;font-weight:800;color:#16191f">${used}
+        <span style="font-size:12px;font-weight:400;color:#6b7785">/ ${total} ${unit}</span>
+      </div>
+      <div style="background:#e9ecef;border-radius:4px;height:6px;margin-top:10px;overflow:hidden">
+        <div style="background:${color};height:100%;width:${pct}%;border-radius:4px;transition:width .4s"></div>
+      </div>
+      <div style="font-size:11px;color:${color};margin-top:4px;font-weight:600">${pct}% used</div>
+    </div>`;
+  }
+
+  function fmtCpuTime(ns) {
+    if (!ns) return '—';
+    const s = ns / 1e9;
+    if (s < 60) return s.toFixed(1) + 's';
+    return Math.floor(s / 60) + 'm ' + (s % 60).toFixed(0) + 's';
+  }
+
+  function fmtBytes(bytes) {
+    if (!bytes) return '—';
+    if (bytes < 1024)       return bytes + ' B';
+    if (bytes < 1024 ** 2)  return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 ** 3)  return (bytes / 1024 ** 2).toFixed(1) + ' MB';
+    return (bytes / 1024 ** 3).toFixed(2) + ' GB';
+  }
+
+  async function fetchMonitoring() {
+    const [summary, instances] = await Promise.all([
+      fetch('/api/metrics/summary').then(r => r.json()),
+      fetch('/api/instances').then(r => r.json()),
+    ]);
+
+    if (summary.error) {
+      document.getElementById('monitoring-utilization').innerHTML = `<div style="color:#dc3545">${summary.error}</div>`;
+    } else {
+      const statusLine = Object.entries(summary.instance_status_counts || {})
+        .map(([s, c]) => `${badge(s)} <strong>${c}</strong>`)
+        .join('&nbsp;·&nbsp;');
+
+      document.getElementById('monitoring-utilization').innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:16px">
+          ${buildUtilCard('vCPU', summary.vcpus_used, summary.vcpus_total, 'cores')}
+          ${buildUtilCard('RAM', (summary.ram_used_mb/1024).toFixed(1), (summary.ram_total_mb/1024).toFixed(1), 'GB')}
+          ${buildUtilCard('Disk', summary.disk_used_gb, summary.disk_total_gb, 'GB')}
+        </div>
+        <div style="background:#f8f9fa;border-radius:6px;padding:10px 14px;font-size:13px;color:#6b7785">
+          Running VMs: <strong style="color:#16191f">${summary.running_vms}</strong>
+          ${statusLine ? '&nbsp;·&nbsp;' + statusLine : ''}
+        </div>`;
+    }
+
+    if (instances.error || !Array.isArray(instances)) {
+      document.getElementById('monitoring-inst-body').innerHTML = errRow(instances.error || 'Failed to load instances', 8);
+      return;
+    }
+    if (!instances.length) {
+      document.getElementById('monitoring-inst-body').innerHTML = '<tr><td colspan="8" class="empty-state"><i class="bi bi-inbox"></i>No instances — launch one to see metrics</td></tr>';
+      return;
+    }
+
+    // Fetch diagnostics for each ACTIVE instance; non-active instances show a placeholder row.
+    const activeInstances = instances.filter(i => i.status === 'ACTIVE');
+    const diagResults = await Promise.all(
+      activeInstances.map(i =>
+        fetch(`/api/instances/${i.id}/metrics`).then(r => r.json()).catch(() => ({ error: 'unavailable' }))
+      )
+    );
+
+    const activeRows = activeInstances.map((inst, idx) => {
+      const m = diagResults[idx];
+      if (m.error) return `<tr>
+        <td><strong>${inst.name}</strong></td><td>${badge(inst.status)}</td>
+        <td colspan="6" style="color:#aaa;font-style:italic;font-size:12px">Diagnostics unavailable (instance may still be booting)</td></tr>`;
+      return `<tr>
+        <td><strong>${inst.name}</strong></td>
+        <td>${badge(inst.status)}</td>
+        <td style="font-family:monospace;font-size:12px">${fmtCpuTime(m.cpu_time_ns)}</td>
+        <td style="font-family:monospace;font-size:12px">${fmtBytes(m.memory_kb * 1024)}</td>
+        <td style="font-family:monospace;font-size:12px">${fmtBytes(m.disk_read_bytes)}</td>
+        <td style="font-family:monospace;font-size:12px">${fmtBytes(m.disk_write_bytes)}</td>
+        <td style="font-family:monospace;font-size:12px">${fmtBytes(m.net_rx_bytes)}</td>
+        <td style="font-family:monospace;font-size:12px">${fmtBytes(m.net_tx_bytes)}</td></tr>`;
+    });
+
+    const otherRows = instances.filter(i => i.status !== 'ACTIVE').map(inst => `<tr>
+      <td><strong>${inst.name}</strong></td>
+      <td>${badge(inst.status)}</td>
+      <td colspan="6" style="color:#aaa;font-style:italic;font-size:12px">Diagnostics only available for ACTIVE instances</td></tr>`);
+
+    document.getElementById('monitoring-inst-body').innerHTML =
+      [...activeRows, ...otherRows].join('') ||
+      '<tr><td colspan="8" class="empty-state">No instances</td></tr>';
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
