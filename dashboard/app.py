@@ -798,6 +798,60 @@ def resize_volume(volume_id):
 
 # ── Write endpoints — Images (AMI) ───────────────────────────────────────────
 
+@app.route('/api/images', methods=['POST'])
+def upload_image():
+    """Register a new image by streaming data from a public URL into Glance.
+    Body: {name, url, disk_format, container_format, visibility, min_disk, min_ram}."""
+    try:
+        token, eps, _ = authenticate()
+        data             = request.json
+        name             = (data.get('name') or '').strip()
+        url              = (data.get('url') or '').strip()
+        disk_format      = (data.get('disk_format') or 'qcow2').strip()
+        container_format = (data.get('container_format') or 'bare').strip()
+        visibility       = (data.get('visibility') or 'private').strip()
+        min_disk         = int(data.get('min_disk') or 0)
+        min_ram          = int(data.get('min_ram') or 0)
+
+        if not name:
+            return jsonify({'error': 'name is required'}), 400
+        if not url:
+            return jsonify({'error': 'url is required'}), 400
+
+        # Create the image record — status will be "queued" until data is uploaded
+        create_r = requests.post(
+            eps['image'] + '/v2/images',
+            headers={'X-Auth-Token': token, 'Content-Type': 'application/json'},
+            json={
+                'name':             name,
+                'disk_format':      disk_format,
+                'container_format': container_format,
+                'visibility':       visibility,
+                'min_disk':         min_disk,
+                'min_ram':          min_ram,
+            },
+            timeout=20
+        )
+        create_r.raise_for_status()
+        new_image_id = create_r.json()['id']
+
+        # Stream image data from the external URL directly into the Glance image record
+        src_stream = requests.get(url, stream=True, timeout=30)
+        src_stream.raise_for_status()
+
+        upload_r = requests.put(
+            eps['image'] + f'/v2/images/{new_image_id}/file',
+            headers={'X-Auth-Token': token, 'Content-Type': 'application/octet-stream'},
+            data=src_stream.iter_content(chunk_size=1024 * 1024),
+            timeout=600
+        )
+        upload_r.raise_for_status()
+
+        return jsonify({'id': new_image_id, 'name': name, 'status': 'active'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/images/<image_id>', methods=['DELETE'])
 def delete_image(image_id):
     try:
