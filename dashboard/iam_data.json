@@ -1,0 +1,159 @@
+{
+  "users": [],
+  "groups": [],
+  "roles": [],
+  "policies": [
+    {
+      "id": "ANPAAadministratoraccess1",
+      "name": "AdministratorAccess",
+      "arn": "arn:aws:iam::aws:policy/AdministratorAccess",
+      "description": "Provides full access to all AWS services and resources",
+      "is_managed": true,
+      "created_at": "2015-02-06T18:39:46Z",
+      "document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AllowAll",
+            "Effect": "Allow",
+            "Action": "*",
+            "Resource": "*"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ANPAApoweruseraccess00002",
+      "name": "PowerUserAccess",
+      "arn": "arn:aws:iam::aws:policy/PowerUserAccess",
+      "description": "Full access except IAM and Organizations management",
+      "is_managed": true,
+      "created_at": "2015-02-06T18:39:46Z",
+      "document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AllowNonIAM",
+            "Effect": "Allow",
+            "NotAction": [
+              "iam:*",
+              "organizations:*"
+            ],
+            "Resource": "*"
+          },
+          {
+            "Sid": "AllowIAMRead",
+            "Effect": "Allow",
+            "Action": [
+              "iam:Get*",
+              "iam:List*"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ANPAAreadonlyaccess000003",
+      "name": "ReadOnlyAccess",
+      "arn": "arn:aws:iam::aws:policy/ReadOnlyAccess",
+      "description": "Provides read-only access to all AWS services",
+      "is_managed": true,
+      "created_at": "2015-02-06T18:39:46Z",
+      "document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "ReadOnly",
+            "Effect": "Allow",
+            "Action": [
+              "ec2:Describe*",
+              "iam:Get*",
+              "iam:List*"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ANPAAamazonec2fullaccess4",
+      "name": "AmazonEC2FullAccess",
+      "arn": "arn:aws:iam::aws:policy/AmazonEC2FullAccess",
+      "description": "Provides full access to Amazon EC2 via the AWS Management Console",
+      "is_managed": true,
+      "created_at": "2015-02-06T18:39:46Z",
+      "document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "EC2Full",
+            "Effect": "Allow",
+            "Action": "ec2:*",
+            "Resource": "*"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ANPAAamazonec2readonly005",
+      "name": "AmazonEC2ReadOnlyAccess",
+      "arn": "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess",
+      "description": "Provides read-only access to Amazon EC2",
+      "is_managed": true,
+      "created_at": "2015-02-06T18:39:46Z",
+      "document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "EC2ReadOnly",
+            "Effect": "Allow",
+            "Action": "ec2:Describe*",
+            "Resource": "*"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ANPAAiamfullaccess000006",
+      "name": "IAMFullAccess",
+      "arn": "arn:aws:iam::aws:policy/IAMFullAccess",
+      "description": "Provides full access to IAM via the AWS Management Console",
+      "is_managed": true,
+      "created_at": "2015-02-06T18:39:46Z",
+      "document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "IAMFull",
+            "Effect": "Allow",
+            "Action": "iam:*",
+            "Resource": "*"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ANPAAiamreadonlyaccess07",
+      "name": "IAMReadOnlyAccess",
+      "arn": "arn:aws:iam::aws:policy/IAMReadOnlyAccess",
+      "description": "Provides read-only access to IAM via the AWS Management Console",
+      "is_managed": true,
+      "created_at": "2015-02-06T18:39:46Z",
+      "document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "IAMReadOnly",
+            "Effect": "Allow",
+            "Action": [
+              "iam:Get*",
+              "iam:List*"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+    }
+  ]
+}
