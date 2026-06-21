@@ -229,7 +229,10 @@
 
   <!-- Images -->
   <section class="section" id="section-images">
-    <div class="page-header"><div class="page-header-left"><h2>Images</h2><p>OS templates used to boot instances — AMI equivalent</p></div></div>
+    <div class="page-header">
+      <div class="page-header-left"><h2>Images</h2><p>OS templates used to boot instances — AMI equivalent</p></div>
+      <button class="btn-primary-act" onclick="openRegisterImageModal()"><i class="bi bi-plus-lg me-1"></i>Register Image</button>
+    </div>
     <div class="card-box">
       <div class="card-box-header"><h5>Available Images</h5><span id="images-count" style="font-size:13px;color:#6b7785"></span></div>
       <table class="data-table">
@@ -878,6 +881,65 @@
       <div class="modal-footer">
         <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
         <button class="btn-primary-act" onclick="submitCopyAmi()"><i class="bi bi-copy me-1"></i>Copy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Register Image Modal ────────────────────────────────────────────────── -->
+<div class="modal fade" id="registerImageModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#232f3e;color:white;">
+        <h5 class="modal-title"><i class="bi bi-cloud-upload me-2"></i>Register Image</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Image Name <span class="text-danger">*</span></label>
+          <input type="text" id="reg-img-name" class="form-control" placeholder="e.g. ubuntu-22.04">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Image URL <span class="text-danger">*</span></label>
+          <input type="url" id="reg-img-url" class="form-control" placeholder="https://...">
+        </div>
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label fw-bold">Disk Format</label>
+            <select id="reg-img-disk-format" class="form-select">
+              <option value="qcow2">qcow2</option>
+              <option value="raw">raw</option>
+              <option value="vmdk">vmdk</option>
+              <option value="iso">iso</option>
+            </select>
+          </div>
+          <div class="col">
+            <label class="form-label fw-bold">Visibility</label>
+            <select id="reg-img-visibility" class="form-select">
+              <option value="private">private</option>
+              <option value="public">public</option>
+              <option value="shared">shared</option>
+            </select>
+          </div>
+        </div>
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label fw-bold">Min Disk (GB)</label>
+            <input type="number" id="reg-img-min-disk" class="form-control" value="0" min="0">
+          </div>
+          <div class="col">
+            <label class="form-label fw-bold">Min RAM (MB)</label>
+            <input type="number" id="reg-img-min-ram" class="form-control" value="0" min="0">
+          </div>
+        </div>
+        <div class="alert alert-warning" style="font-size:13px;padding:8px 12px;margin-bottom:0">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          Image data is streamed from the URL into Glance. Large images may take several minutes.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-act" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-primary-act" onclick="submitRegisterImage()"><i class="bi bi-cloud-upload me-1"></i>Register</button>
       </div>
     </div>
   </div>
@@ -1874,7 +1936,8 @@
   const detachVolumeModal  = new bootstrap.Modal(document.getElementById('detachVolumeModal'));
   const resizeVolumeModal  = new bootstrap.Modal(document.getElementById('resizeVolumeModal'));
   const createAmiModal     = new bootstrap.Modal(document.getElementById('createAmiModal'));
-  const copyAmiModal   = new bootstrap.Modal(document.getElementById('copyAmiModal'));
+  const copyAmiModal          = new bootstrap.Modal(document.getElementById('copyAmiModal'));
+  const registerImageModal    = new bootstrap.Modal(document.getElementById('registerImageModal'));
   const confirmModal   = new bootstrap.Modal(document.getElementById('confirmModal'));
   const createSgModal       = new bootstrap.Modal(document.getElementById('createSgModal'));
   const addRuleModal        = new bootstrap.Modal(document.getElementById('addRuleModal'));
@@ -2287,6 +2350,39 @@
     if (r.error) { toast('error', 'Copy failed', r.error); return; }
     toast('success', 'AMI copied', `"${name}" is now available in Images`);
     scheduleRefresh('images', 3000);
+  }
+
+  function openRegisterImageModal() {
+    document.getElementById('reg-img-name').value      = '';
+    document.getElementById('reg-img-url').value       = '';
+    document.getElementById('reg-img-disk-format').value = 'qcow2';
+    document.getElementById('reg-img-visibility').value  = 'private';
+    document.getElementById('reg-img-min-disk').value  = '0';
+    document.getElementById('reg-img-min-ram').value   = '0';
+    registerImageModal.show();
+  }
+
+  async function submitRegisterImage() {
+    const name       = document.getElementById('reg-img-name').value.trim();
+    const url        = document.getElementById('reg-img-url').value.trim();
+    const diskFormat = document.getElementById('reg-img-disk-format').value;
+    const visibility = document.getElementById('reg-img-visibility').value;
+    const minDisk    = parseInt(document.getElementById('reg-img-min-disk').value) || 0;
+    const minRam     = parseInt(document.getElementById('reg-img-min-ram').value) || 0;
+
+    if (!name) { toast('error', 'Validation', 'Image name is required'); return; }
+    if (!url)  { toast('error', 'Validation', 'Image URL is required'); return; }
+
+    registerImageModal.hide();
+    // Upload streams from a remote URL — warn user it may take time for large images.
+    toast('info', 'Registering image…', 'Streaming data into Glance — large images take several minutes');
+    const r = await fetch('/api/images', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, url, disk_format: diskFormat, container_format: 'bare', visibility, min_disk: minDisk, min_ram: minRam })
+    }).then(r => r.json());
+    if (r.error) { toast('error', 'Registration failed', r.error); return; }
+    toast('success', 'Image registered', `"${name}" is now available in Images`);
+    scheduleRefresh('images', 2000);
   }
 
   function deleteImage(imageId, imageName) {
