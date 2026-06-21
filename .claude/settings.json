@@ -128,10 +128,23 @@
       "Bash(sudo systemctl status apache2)",
       "Bash(python3 -c \"import sys,json; eps=json.load\\(sys.stdin\\)['endpoints']; [print\\(e['interface'], e['url']\\) for e in eps if e['interface']=='public']\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(len\\(d.get\\('users',[]\\)\\),'users'\\)\")",
-      "Bash(curl -s --max-time 20 http://localhost:5000/api/overview)"
+      "Bash(curl -s --max-time 20 http://localhost:5000/api/overview)",
+      "Bash(curl -s --max-time 25 http://localhost:8080/api/overview)",
+      "Bash(pkill -f \"python3 app.py\")",
+      "Bash(nohup python3 app.py)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(curl -s --max-time 15 http://localhost:8080/api/overview)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('OK — host_ip:', d.get\\('host_ip'\\), '| instances:', d['instances']['total']\\)\")",
+      "Bash(sudo -u stack bash -c \"source /opt/stack/devstack/openrc admin admin 2>/dev/null && env | grep OS_\")",
+      "Bash(env)",
+      "Bash(curl -s http://127.0.0.1/identity/)",
+      "Bash(sed -i 's/10\\\\.200\\\\.193\\\\.64/10.100.164.234/g' /opt/stack/devstack/.stackenv && grep \"10\\\\.\" /opt/stack/devstack/.stackenv)",
+      "Bash(sudo sed -i 's/10\\\\.200\\\\.193\\\\.64/10.100.164.234/g' /opt/stack/devstack/.stackenv)",
+      "Bash(mysql -u root -pAdmin1234OpenStack keystone -e \"SELECT id, url FROM endpoint WHERE url LIKE '%10.200.193.64%';\")"
     ],
     "additionalDirectories": [
-      "/home/khalid/ec2-local-cloud/dashboard"
+      "/home/khalid/ec2-local-cloud/dashboard",
+      "/opt/stack/devstack"
     ]
   }
 }

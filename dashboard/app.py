@@ -173,27 +173,30 @@ def detect_host_ip():
 def authenticate():
     """Get Keystone token and build service endpoint map from catalog."""
     host_ip = detect_host_ip()
-    resp = requests.post(
-        f'http://{host_ip}/identity/v3/auth/tokens',
-        json={
-            "auth": {
-                "identity": {
-                    "methods": ["password"],
-                    "password": {
-                        "user": {
-                            "name": ADMIN_USER,
-                            "password": ADMIN_PASS,
-                            "domain": {"name": "Default"}
+    try:
+        resp = requests.post(
+            f'http://{host_ip}/identity/v3/auth/tokens',
+            json={
+                "auth": {
+                    "identity": {
+                        "methods": ["password"],
+                        "password": {
+                            "user": {
+                                "name": ADMIN_USER,
+                                "password": ADMIN_PASS,
+                                "domain": {"name": "Default"}
+                            }
                         }
+                    },
+                    "scope": {
+                        "project": {"name": "admin", "domain": {"name": "Default"}}
                     }
-                },
-                "scope": {
-                    "project": {"name": "admin", "domain": {"name": "Default"}}
                 }
-            }
-        },
-        timeout=10
-    )
+            },
+            timeout=20
+        )
+    except requests.exceptions.Timeout:
+        raise RuntimeError(f'OpenStack Keystone did not respond within 20 s — is it running at {host_ip}?')
     resp.raise_for_status()
     token = resp.headers['X-Subject-Token']
     endpoints = {}
@@ -206,7 +209,10 @@ def authenticate():
 
 def os_get(url, token, params=None):
     """Authenticated GET to OpenStack API."""
-    r = requests.get(url, headers={'X-Auth-Token': token}, params=params, timeout=15)
+    try:
+        r = requests.get(url, headers={'X-Auth-Token': token}, params=params, timeout=30)
+    except requests.exceptions.Timeout:
+        raise RuntimeError(f'OpenStack API did not respond within 30 s: GET {url}')
     r.raise_for_status()
     return r.json()
 
@@ -239,7 +245,10 @@ def os_post(url, token, body):
 
 def os_delete(url, token):
     """Authenticated DELETE to OpenStack API."""
-    r = requests.delete(url, headers={'X-Auth-Token': token}, timeout=15)
+    try:
+        r = requests.delete(url, headers={'X-Auth-Token': token}, timeout=30)
+    except requests.exceptions.Timeout:
+        raise RuntimeError(f'OpenStack API did not respond within 30 s: DELETE {url}')
     r.raise_for_status()
     return r.status_code
 
@@ -2599,7 +2608,7 @@ def update_quota(project_id):
             url,
             headers={'X-Auth-Token': token, 'Content-Type': 'application/json'},
             json={"quota_set": {key: value}},
-            timeout=15
+            timeout=30
         )
         r.raise_for_status()
         return jsonify({'status': 'updated', 'key': key, 'value': value})
