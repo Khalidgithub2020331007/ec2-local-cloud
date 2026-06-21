@@ -1,5 +1,37 @@
 {
-  "users": [],
+  "users": [
+    {
+      "id": "AIDA299F6B92FCD54EAD",
+      "username": "test-user",
+      "arn": "arn:aws:iam::123456789012:user/test-user",
+      "created_at": "2026-06-21T00:17:36Z",
+      "attached_policies": [
+        "arn:aws:iam::aws:policy/ReadOnlyAccess",
+        "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+      ],
+      "groups": []
+    },
+    {
+      "id": "AIDA6054F5AA82CA4741",
+      "username": "test2",
+      "arn": "arn:aws:iam::123456789012:user/test2",
+      "created_at": "2026-06-21T00:18:04Z",
+      "attached_policies": [
+        "arn:aws:iam::aws:policy/IAMFullAccess",
+        "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess",
+        "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+      ],
+      "groups": []
+    },
+    {
+      "id": "AIDAAD1B92B1106C4562",
+      "username": "test3",
+      "arn": "arn:aws:iam::123456789012:user/test3",
+      "created_at": "2026-06-21T06:31:52Z",
+      "attached_policies": [],
+      "groups": []
+    }
+  ],
   "groups": [],
   "roles": [],
   "policies": [

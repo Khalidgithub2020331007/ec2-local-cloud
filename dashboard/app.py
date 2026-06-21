@@ -212,14 +212,28 @@ def os_get(url, token, params=None):
 
 
 def os_post(url, token, body):
-    """Authenticated POST to OpenStack API. Returns (status_code, response_dict)."""
+    """Authenticated POST to OpenStack API. Returns (status_code, response_dict).
+    Raises HTTPError with Octavia/Nova fault detail included in the message."""
     r = requests.post(
         url,
         headers={'X-Auth-Token': token, 'Content-Type': 'application/json'},
         json=body,
         timeout=20
     )
-    r.raise_for_status()
+    if not r.ok:
+        # Extract the API's own error message before discarding the response body.
+        detail = ''
+        try:
+            err_body = r.json()
+            detail = (err_body.get('faultstring') or
+                      err_body.get('description') or
+                      err_body.get('message') or
+                      str(err_body))
+        except Exception:
+            detail = r.text[:300]
+        raise requests.HTTPError(
+            f'{r.status_code} {r.reason} — {detail}', response=r
+        )
     return r.status_code, (r.json() if r.content else {})
 
 
@@ -1918,13 +1932,16 @@ def create_load_balancer():
         if not name or not subnet_id:
             return jsonify({'error': 'name and subnet_id are required'}), 400
 
+        lb_payload = {
+            'name':          name,
+            'vip_subnet_id': subnet_id,
+            'provider':      'ovn',
+        }
+        if description:
+            lb_payload['description'] = description
+
         _, lb_body = os_post(lb_ep + '/v2/lbaas/loadbalancers', token, {
-            'loadbalancer': {
-                'name':          name,
-                'description':   description,
-                'vip_subnet_id': subnet_id,
-                'provider':      'ovn',
-            }
+            'loadbalancer': lb_payload,
         })
         lb    = lb_body.get('loadbalancer', {})
         lb_id = lb.get('id', '')

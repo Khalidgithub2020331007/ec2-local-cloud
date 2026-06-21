@@ -1,0 +1,21 @@
+{
+  "groups": [
+    {
+      "name": "abc",
+      "image_id": "6281294e-8df2-45ac-8b48-427477773e72",
+      "image_name": "cirros-0.6.3",
+      "flavor_id": "901a7d1e-6295-4bc6-b822-0a5864ca8049",
+      "flavor_name": "medium",
+      "network_id": "1779a260-3cb2-4648-b797-e68aa998717d",
+      "security_groups": [
+        "ssh-only"
+      ],
+      "key_name": "demo-key",
+      "min_size": 1,
+      "max_size": 3,
+      "desired_capacity": 1,
+      "created_at": "2026-06-20",
+      "policies": []
+    }
+  ]
+}

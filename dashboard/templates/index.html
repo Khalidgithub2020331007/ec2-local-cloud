@@ -130,6 +130,12 @@
     .spinner { display:inline-block; width:18px; height:18px; border:2px solid #e3e8ef; border-top-color:var(--aws-orange); border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:6px; }
     @keyframes spin { to { transform:rotate(360deg); } }
 
+    /* Quota summary cards */
+    .quota-summary-card { background:white; border:1px solid #e3e8ef; border-radius:8px; padding:16px 20px; display:flex; align-items:center; gap:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .quota-summary-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+    .quota-summary-num  { font-size:28px; font-weight:800; line-height:1; }
+    .quota-summary-label{ font-size:12px; color:#6b7785; margin-top:3px; font-weight:500; }
+
     /* Toast */
     #toast-container { position:fixed; bottom:24px; right:24px; z-index:9999; display:flex; flex-direction:column; gap:10px; }
     .toast-msg { background:white; border-radius:8px; padding:14px 18px; box-shadow:0 4px 16px rgba(0,0,0,.15); border-left:4px solid; min-width:260px; max-width:380px; display:flex; align-items:flex-start; gap:10px; animation:slide-in .25s ease; }
@@ -1896,6 +1902,18 @@
   const iamViewPolicyModal      = new bootstrap.Modal(document.getElementById('iamViewPolicyModal'));
   const iamManageMembersModal   = new bootstrap.Modal(document.getElementById('iamManageMembersModal'));
 
+  // Wraps fetch with JSON parsing; returns {error} on network or HTTP failures.
+  async function apiFetch(url, options = {}) {
+    try {
+      const res = await fetch(url, options);
+      const body = await res.json();
+      if (!res.ok) return { error: body.message || body.error || `HTTP ${res.status}` };
+      return body;
+    } catch (e) {
+      return { error: e.message || 'Network error' };
+    }
+  }
+
   // ── Navigation ────────────────────────────────────────────────────────────
   function showSection(name) {
     // Stop devstack auto-refresh when leaving that section
@@ -2058,7 +2076,7 @@
             <td><code style="font-size:12px">${s.flavor}</code></td>
             <td><span class="project-chip">${s.project}</span></td>
             <td style="color:#8892a0;font-size:12px">${s.created}</td>
-            <td style="white-space:nowrap">${actions || '<span style="color:#aaa;font-size:12px">…</span>'}</td></tr>`;
+            <td><div style="display:flex;flex-wrap:wrap;gap:4px">${actions || '<span style="color:#aaa;font-size:12px">…</span>'}</div></td></tr>`;
         }).join('');
   }
 
@@ -3854,7 +3872,7 @@
     const vols = await apiFetch('/api/volumes');
     sel.innerHTML = vols.error
       ? '<option value="">Failed to load volumes</option>'
-      : vols.map(v => `<option value="${v.id}">${v.name || v.id.slice(0,8)} (${v.size} GB)</option>`).join('');
+      : vols.map(v => `<option value="${v.id}">${v.name || v.id.slice(0,8)} (${v.size_gb} GB)</option>`).join('');
   }
 
   async function submitCreateSnapshot() {
@@ -4039,59 +4057,166 @@
   }
 
   // ── Resource Quotas ────────────────────────────────────────────────────────
+
+  // Collect all quota items from a project for cross-project warning counts.
+  function _allQuotaItems(p) {
+    return [
+      { used: p.instances?.in_use,   limit: p.instances?.limit },
+      { used: p.vcpus?.in_use,       limit: p.vcpus?.limit },
+      { used: p.ram_mb?.in_use != null ? Math.round(p.ram_mb.in_use/1024) : null, limit: p.ram_mb?.limit != null ? Math.round(p.ram_mb.limit/1024) : null },
+      { used: p.key_pairs?.in_use,   limit: p.key_pairs?.limit },
+      { used: p.volumes?.in_use,     limit: p.volumes?.limit },
+      { used: p.gigabytes?.in_use,   limit: p.gigabytes?.limit },
+      { used: p.networks?.used,      limit: p.networks?.limit },
+      { used: p.floating_ips?.used,  limit: p.floating_ips?.limit },
+      { used: p.security_groups?.used, limit: p.security_groups?.limit },
+      { used: p.ports?.used,         limit: p.ports?.limit },
+    ];
+  }
+
   async function fetchQuotas() {
     const grid = document.getElementById('quotas-grid');
-    grid.innerHTML = '<div style="text-align:center;padding:32px"><span class="spinner-border"></span></div>';
+    grid.innerHTML = '<div style="text-align:center;padding:40px"><span class="spinner"></span> Loading quotas…</div>';
     const data = await apiFetch('/api/quotas');
     if (data.error) { grid.innerHTML = `<div class="empty-state text-danger">${data.error}</div>`; return; }
     if (!data.length) { grid.innerHTML = '<div class="empty-state">No quota data available</div>'; return; }
-    grid.innerHTML = data.map(project => `
-      <div class="card-box" style="margin-bottom:20px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-          <h5 style="margin:0;font-size:16px;font-weight:600">${project.project_name}</h5>
-          <small class="text-muted id-col">${shortId(project.project_id)}</small>
+
+    // Tally warnings/criticals across all projects for the summary row.
+    let totalWarning = 0, totalCritical = 0;
+    data.forEach(p => _allQuotaItems(p).forEach(({used, limit}) => {
+      if (limit == null || limit === -1 || used == null) return;
+      const pct = (used / limit) * 100;
+      if (pct >= 90) totalCritical++; else if (pct >= 70) totalWarning++;
+    }));
+
+    grid.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px">
+        <div class="quota-summary-card">
+          <div class="quota-summary-icon" style="background:#e8eaf6;color:#3949ab"><i class="bi bi-building"></i></div>
+          <div><div class="quota-summary-num">${data.length}</div><div class="quota-summary-label">Projects monitored</div></div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
-          ${quotaSection('Compute', [
-            { label: 'Instances',    used: project.instances?.in_use,    limit: project.instances?.limit    },
-            { label: 'vCPUs',        used: project.vcpus?.in_use,        limit: project.vcpus?.limit        },
-            { label: 'RAM (GB)',     used: project.ram_mb?.in_use != null ? Math.round(project.ram_mb.in_use/1024) : null, limit: project.ram_mb?.limit != null ? Math.round(project.ram_mb.limit/1024) : null },
-            { label: 'Key Pairs',    used: project.key_pairs?.in_use,    limit: project.key_pairs?.limit    },
-          ])}
-          ${quotaSection('Storage', [
-            { label: 'Volumes',      used: project.volumes?.in_use,      limit: project.volumes?.limit      },
-            { label: 'Snapshots',    used: project.snapshots?.in_use,    limit: project.snapshots?.limit    },
-            { label: 'Storage (GB)', used: project.gigabytes?.in_use,    limit: project.gigabytes?.limit    },
-          ])}
-          ${quotaSection('Network', [
-            { label: 'Networks',     used: project.networks?.used,       limit: project.networks?.limit     },
-            { label: 'Subnets',      used: project.subnets?.used,        limit: project.subnets?.limit      },
-            { label: 'Routers',      used: project.routers?.used,        limit: project.routers?.limit      },
-            { label: 'Floating IPs', used: project.floating_ips?.used,   limit: project.floating_ips?.limit },
-            { label: 'Security Grps',used: project.security_groups?.used,limit: project.security_groups?.limit },
-            { label: 'Ports',        used: project.ports?.used,          limit: project.ports?.limit        },
-          ])}
+        <div class="quota-summary-card">
+          <div class="quota-summary-icon" style="background:#fff3e0;color:#e65100"><i class="bi bi-exclamation-triangle"></i></div>
+          <div>
+            <div class="quota-summary-num" style="color:${totalWarning ? '#e65100' : '#16191f'}">${totalWarning}</div>
+            <div class="quota-summary-label">Quotas above 70%</div>
+          </div>
         </div>
-      </div>`).join('');
+        <div class="quota-summary-card">
+          <div class="quota-summary-icon" style="background:#fde8e8;color:#b91c1c"><i class="bi bi-exclamation-circle"></i></div>
+          <div>
+            <div class="quota-summary-num" style="color:${totalCritical ? '#b91c1c' : '#16191f'}">${totalCritical}</div>
+            <div class="quota-summary-label">Critical (above 90%)</div>
+          </div>
+        </div>
+      </div>
+      ${data.map(_renderProjectQuotaCard).join('')}`;
   }
 
-  // Renders individual quota progress bars; color-codes by utilization.
-  function quotaSection(groupTitle, rows) {
-    return rows.filter(r => r.used != null).map(r => {
-      const limit   = r.limit === -1 ? null : r.limit;
-      const pct     = limit ? Math.min(100, Math.round((r.used / limit) * 100)) : 0;
-      const color   = pct >= 90 ? '#dc3545' : pct >= 70 ? '#fd7e14' : '#198754';
-      const barText = limit ? `${r.used} / ${limit}` : `${r.used} / ∞`;
-      return `<div style="background:#f8f9fa;border-radius:6px;padding:10px 12px">
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
-          <span style="color:#495057;font-weight:600">${r.label}</span>
-          <span style="color:#6c757d">${barText}</span>
+  function _renderProjectQuotaCard(project) {
+    // Count at-risk items for the card header badge.
+    let warn = 0, crit = 0;
+    _allQuotaItems(project).forEach(({used, limit}) => {
+      if (limit == null || limit === -1 || used == null) return;
+      const pct = (used / limit) * 100;
+      if (pct >= 90) crit++; else if (pct >= 70) warn++;
+    });
+
+    const alertBadge = crit
+      ? `<span style="background:#fde8e8;color:#b91c1c;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px"><i class="bi bi-exclamation-circle-fill"></i>${crit} critical</span>`
+      : warn
+      ? `<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px"><i class="bi bi-exclamation-triangle-fill"></i>${warn} warning</span>`
+      : `<span style="background:#f0fdf4;color:#15803d;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;display:inline-flex;align-items:center;gap:5px"><i class="bi bi-check-circle-fill"></i>Healthy</span>`;
+
+    return `
+      <div class="card-box" style="margin-bottom:20px">
+        <div class="card-box-header">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:34px;height:34px;border-radius:8px;background:#e8eaf6;display:flex;align-items:center;justify-content:center;color:#3949ab;flex-shrink:0">
+              <i class="bi bi-building" style="font-size:16px"></i>
+            </div>
+            <div>
+              <div style="font-size:15px;font-weight:700;line-height:1.2">${project.project_name}</div>
+              <div class="id-col" style="font-size:11px;margin-top:1px">${shortId(project.project_id)}</div>
+            </div>
+          </div>
+          ${alertBadge}
         </div>
-        ${limit ? `<div style="background:#e9ecef;border-radius:3px;height:6px">
-          <div style="background:${color};width:${pct}%;height:6px;border-radius:3px;transition:width .3s"></div>
-        </div>` : '<div style="font-size:11px;color:#198754">Unlimited</div>'}
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr">
+          ${_quotaCategoryCol('Compute', 'bi-cpu', [
+            { label: 'Instances',   used: project.instances?.in_use,  limit: project.instances?.limit },
+            { label: 'vCPUs',       used: project.vcpus?.in_use,      limit: project.vcpus?.limit },
+            { label: 'RAM (GB)',    used: project.ram_mb?.in_use != null ? Math.round(project.ram_mb.in_use/1024) : null, limit: project.ram_mb?.limit != null ? Math.round(project.ram_mb.limit/1024) : null },
+            { label: 'Key Pairs',   used: project.key_pairs?.in_use,  limit: project.key_pairs?.limit },
+          ])}
+          ${_quotaCategoryCol('Storage', 'bi-device-hdd', [
+            { label: 'Volumes',     used: project.volumes?.in_use,    limit: project.volumes?.limit },
+            { label: 'Snapshots',   used: project.snapshots?.in_use,  limit: project.snapshots?.limit },
+            { label: 'Storage (GB)',used: project.gigabytes?.in_use,  limit: project.gigabytes?.limit },
+          ], true)}
+          ${_quotaCategoryCol('Network', 'bi-diagram-3', [
+            { label: 'Networks',        used: project.networks?.used,       limit: project.networks?.limit },
+            { label: 'Subnets',         used: project.subnets?.used,        limit: project.subnets?.limit },
+            { label: 'Routers',         used: project.routers?.used,        limit: project.routers?.limit },
+            { label: 'Floating IPs',    used: project.floating_ips?.used,   limit: project.floating_ips?.limit },
+            { label: 'Security Groups', used: project.security_groups?.used,limit: project.security_groups?.limit },
+            { label: 'Ports',           used: project.ports?.used,          limit: project.ports?.limit },
+          ], true)}
+        </div>
       </div>`;
-    }).join('');
+  }
+
+  // Renders one category column (Compute / Storage / Network) inside a project card.
+  function _quotaCategoryCol(title, icon, rows, borderLeft = false) {
+    const validRows = rows.filter(r => r.used != null);
+    const borderStyle = borderLeft ? 'border-left:1px solid #f0f2f5;' : '';
+    const header = `
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:16px">
+        <i class="bi ${icon}" style="font-size:14px;color:#3949ab"></i>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#6b7785">${title}</span>
+      </div>`;
+
+    if (!validRows.length) return `
+      <div style="padding:20px;${borderStyle}">
+        ${header}
+        <div style="color:#aab4be;font-size:12px;text-align:center;padding:12px 0">No data</div>
+      </div>`;
+
+    return `
+      <div style="padding:20px;${borderStyle}">
+        ${header}
+        <div style="display:flex;flex-direction:column;gap:13px">
+          ${validRows.map(_quotaItem).join('')}
+        </div>
+      </div>`;
+  }
+
+  // Renders a single quota metric: label, percentage chip, progress bar, used/limit text.
+  function _quotaItem({label, used, limit}) {
+    const isUnlimited = limit === -1 || limit == null;
+    const pct = isUnlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
+    const barColor = pct >= 90 ? '#dc2626' : pct >= 70 ? '#ea580c' : '#16a34a';
+    const chipStyle = pct >= 90
+      ? 'background:#fde8e8;color:#b91c1c'
+      : pct >= 70
+      ? 'background:#fff3e0;color:#c2410c'
+      : 'background:#f0fdf4;color:#15803d';
+
+    return `
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <span style="font-size:13px;color:#374151;font-weight:500">${label}</span>
+          ${isUnlimited
+            ? `<span style="font-size:11px;font-weight:600;padding:1px 8px;border-radius:10px;background:#f0fdf4;color:#15803d">∞ Unlimited</span>`
+            : `<span style="font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px;${chipStyle}">${pct}%</span>`}
+        </div>
+        ${isUnlimited
+          ? `<div style="font-size:11px;color:#6b7785">${used} in use</div>`
+          : `<div style="background:#e9ecef;border-radius:4px;height:7px;overflow:hidden">
+               <div style="background:${barColor};width:${pct}%;height:7px;border-radius:4px;transition:width .4s ease"></div>
+             </div>
+             <div style="font-size:11px;color:#6b7785;margin-top:3px">${used} used of ${limit}</div>`}
+      </div>`;
   }
 
   // ── IAM ───────────────────────────────────────────────────────────────────
@@ -4140,7 +4265,7 @@
         <td>${u.groups.length ? u.groups.map(g => `<span class="project-chip">${g.name}</span>`).join('') : '<span style="color:#aaa">—</span>'}</td>
         <td>${u.created_at ? u.created_at.substring(0, 10) : '—'}</td>
         <td style="white-space:nowrap">
-          <button class="btn-act btn-modify" onclick="openIamAttachPolicyModal('user','${u.id}','${u.username}',${JSON.stringify(u.attached_policies)})">Attach Policy</button>
+          <button class="btn-act btn-modify" onclick="openIamAttachPolicyModal('user','${u.id}','${u.username}',${JSON.stringify(u.attached_policies).replace(/"/g,'&quot;')})">Attach Policy</button>
           <button class="btn-act btn-delete" onclick="deleteIamUser('${u.id}','${u.username}')">Delete</button>
         </td>
       </tr>`).join('');
@@ -4164,8 +4289,8 @@
         <td>${g.members.length ? `<span style="font-weight:600">${g.members.length}</span> <span style="color:#aaa;font-size:12px">(${g.members.map(m => m.username).join(', ')})</span>` : '<span style="color:#aaa">—</span>'}</td>
         <td>${g.created_at ? g.created_at.substring(0, 10) : '—'}</td>
         <td style="white-space:nowrap">
-          <button class="btn-act btn-modify" onclick="openIamAttachPolicyModal('group','${g.id}','${g.name}',${JSON.stringify(g.attached_policies)})">Attach Policy</button>
-          <button class="btn-act btn-reboot" onclick="openIamManageMembersModal('${g.id}','${g.name}',${JSON.stringify(g.members)})">Members</button>
+          <button class="btn-act btn-modify" onclick="openIamAttachPolicyModal('group','${g.id}','${g.name}',${JSON.stringify(g.attached_policies).replace(/"/g,'&quot;')})">Attach Policy</button>
+          <button class="btn-act btn-reboot" onclick="openIamManageMembersModal('${g.id}','${g.name}',${JSON.stringify(g.members).replace(/"/g,'&quot;')})">Members</button>
           <button class="btn-act btn-delete" onclick="deleteIamGroup('${g.id}','${g.name}')">Delete</button>
         </td>
       </tr>`).join('');
@@ -4189,7 +4314,7 @@
         <td>${r.attached_policies.length ? r.attached_policies.map(p => `<span class="rule-pill">${p.name}</span>`).join('') : '<span style="color:#aaa">—</span>'}</td>
         <td>${r.created_at ? r.created_at.substring(0, 10) : '—'}</td>
         <td style="white-space:nowrap">
-          <button class="btn-act btn-modify" onclick="openIamAttachPolicyModal('role','${r.id}','${r.name}',${JSON.stringify(r.attached_policies)})">Attach Policy</button>
+          <button class="btn-act btn-modify" onclick="openIamAttachPolicyModal('role','${r.id}','${r.name}',${JSON.stringify(r.attached_policies).replace(/"/g,'&quot;')})">Attach Policy</button>
           <button class="btn-act btn-delete" onclick="deleteIamRole('${r.id}','${r.name}')">Delete</button>
         </td>
       </tr>`).join('');
