@@ -192,9 +192,6 @@
   <div class="nav-item" onclick="showSection('users')"          id="nav-users"><i class="bi bi-people"></i> Users &amp; Projects</div>
   <div class="nav-item" onclick="showSection('iam')"            id="nav-iam"><i class="bi bi-shield-lock"></i> IAM</div>
   <div class="nav-item" onclick="showSection('quotas')"         id="nav-quotas"><i class="bi bi-speedometer2"></i> Quotas</div>
-
-  <div class="nav-group">System</div>
-  <div class="nav-item" onclick="showSection('devstack')" id="nav-devstack"><i class="bi bi-terminal"></i> DevStack Monitor</div>
 </aside>
 
 <!-- Main -->
@@ -519,7 +516,7 @@
   <!-- DevStack Monitor -->
   <section class="section" id="section-devstack">
     <div class="page-header">
-      <div class="page-header-left"><h2>DevStack Monitor</h2><p>Live stack.sh installation progress and service control</p></div>
+      <div class="page-header-left"><h2>Monitor</h2><p>Live stack.sh installation progress and service control</p></div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button class="btn-secondary-act" onclick="loadDevstack()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
         <button class="btn-act btn-delete" id="ds-stop-btn" onclick="stopDevstack()" style="padding:7px 14px;font-size:13px;font-weight:600;display:none"><i class="bi bi-stop-circle me-1"></i>Stop stack.sh</button>
