@@ -190,8 +190,8 @@
           <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 4 — Networking</strong><span>Networks, routers, DHCP</span></div></div>
           <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 5 — Floating IPs</strong><span>Assign public IPs to instances</span></div></div>
           <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 6 — Security Groups</strong><span>Firewall rules per instance</span></div></div>
-          <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 7 — SSH Key Pairs</strong><span>Inject SSH keys at boot</span></div></div>
-          <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 8 — Block Storage</strong><span>Volumes, snapshots, attach/detach</span></div></div>
+          <div class="step done"><div class="step-dot"></div><div class="step-body"><strong>Step 7 — SSH Key Pairs</strong><span>Generate/import RSA keypairs, inject via cloud-init ISO at boot</span></div></div>
+          <div class="step done"><div class="step-dot"></div><div class="step-body"><strong>Step 8 — Block Storage</strong><span>LVM volumes, LVM snapshots, libvirt hotplug attach/detach</span></div></div>
           <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 9 — Monitoring</strong><span>CPU, RAM, disk usage per instance</span></div></div>
           <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 10 — Load Balancers + Auto Scaling</strong><span>Traffic distribution, scale groups</span></div></div>
         </div>
@@ -232,6 +232,13 @@
                 <option value="">Blank disk (no OS)</option>
               </select>
               <span class="form-hint">Select an uploaded image, or leave as blank disk</span>
+            </div>
+            <div class="form-group">
+              <label>Key Pair <span class="optional-tag">optional</span></label>
+              <select id="inst-keypair-select">
+                <option value="">No key pair (password login only)</option>
+              </select>
+              <span class="form-hint">SSH key injected via cloud-init — cloud images only</span>
             </div>
           </div>
           <div class="modal-footer">
@@ -340,14 +347,121 @@
 
     <!-- Volumes -->
     <section id="section-volumes" class="console-section" style="display:none;">
-      <div class="section-header"><div><h2>Volumes</h2><p>Block storage — attach to instances like EBS</p></div><button class="btn btn-primary btn-sm" disabled>Create Volume</button></div>
-      <div class="coming-soon-card"><div class="cs-icon">💾</div><div class="cs-title">Block Storage — Coming in Step 8</div><p>Create LVM logical volumes, attach/detach to running VMs, persistent data storage.</p></div>
+      <div class="section-header">
+        <div><h2>Volumes</h2><p>LVM block storage — attach to instances like AWS EBS</p></div>
+        <button class="btn btn-primary btn-sm" id="vol-create-btn">+ Create Volume</button>
+      </div>
+
+      <!-- Create Volume Modal -->
+      <div id="vol-create-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Create Volume</h3>
+            <button class="modal-close" id="vol-create-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Name</label>
+              <input id="vol-create-name" type="text" placeholder="e.g. data-disk-1">
+            </div>
+            <div class="form-group">
+              <label>Size (GB)</label>
+              <input id="vol-create-size" type="number" value="10" min="1" max="1000">
+            </div>
+            <div id="vol-create-error" class="alert alert-error" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="vol-create-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="vol-create-submit">Create</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attach Modal -->
+      <div id="vol-attach-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Attach Volume to Instance</h3>
+            <button class="modal-close" id="vol-attach-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Instance</label>
+              <select id="vol-attach-instance-select"><option value="">Loading...</option></select>
+            </div>
+            <div id="vol-attach-error" class="alert alert-error" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="vol-attach-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="vol-attach-submit">Attach</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Snapshot Modal -->
+      <div id="vol-snap-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Create Snapshot</h3>
+            <button class="modal-close" id="vol-snap-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Snapshot Name</label>
+              <input id="vol-snap-name" type="text" placeholder="e.g. backup-2024-06-21">
+            </div>
+            <div id="vol-snap-error" class="alert alert-error" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="vol-snap-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="vol-snap-submit">Create Snapshot</button>
+          </div>
+        </div>
+      </div>
+
+      <p id="vol-empty" class="empty-state" style="display:none;">No volumes yet. Create one to get started.</p>
+      <table class="data-table" id="vol-table" style="display:none;">
+        <thead>
+          <tr><th>Name</th><th>Size</th><th>Status</th><th>Attached To</th><th>Created</th><th></th></tr>
+        </thead>
+        <tbody id="vol-tbody"></tbody>
+      </table>
     </section>
 
     <!-- Snapshots -->
     <section id="section-snapshots" class="console-section" style="display:none;">
-      <div class="section-header"><div><h2>Snapshots</h2><p>Point-in-time copy of a volume</p></div><button class="btn btn-primary btn-sm" disabled>Create Snapshot</button></div>
-      <div class="coming-soon-card"><div class="cs-icon">📸</div><div class="cs-title">Snapshots — Coming in Step 8</div><p>Create, restore, and delete volume snapshots using LVM snapshot commands.</p></div>
+      <div class="section-header">
+        <div><h2>Snapshots</h2><p>Point-in-time LVM copies — restore to a new volume any time</p></div>
+      </div>
+
+      <!-- Restore Modal -->
+      <div id="snap-restore-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Restore Snapshot to New Volume</h3>
+            <button class="modal-close" id="snap-restore-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>New Volume Name</label>
+              <input id="snap-restore-name" type="text" placeholder="e.g. restored-from-backup">
+            </div>
+            <div id="snap-restore-error" class="alert alert-error" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="snap-restore-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="snap-restore-submit">Restore</button>
+          </div>
+        </div>
+      </div>
+
+      <p id="snap-empty" class="empty-state" style="display:none;">No snapshots yet. Click <strong>Snapshot</strong> on any volume to create one.</p>
+      <table class="data-table" id="snap-table" style="display:none;">
+        <thead>
+          <tr><th>Name</th><th>Size</th><th>Source Volume</th><th>Created</th><th></th></tr>
+        </thead>
+        <tbody id="snap-tbody"></tbody>
+      </table>
     </section>
 
     <!-- Networks -->
@@ -488,8 +602,105 @@
 
     <!-- Security Groups -->
     <section id="section-security-groups" class="console-section" style="display:none;">
-      <div class="section-header"><div><h2>Security Groups</h2><p>Firewall rules per instance (like AWS SG)</p></div><button class="btn btn-primary btn-sm" disabled>Create Group</button></div>
-      <div class="coming-soon-card"><div class="cs-icon">🛡️</div><div class="cs-title">Security Groups — Coming in Step 6</div><p>iptables rules per instance — allow/deny ports, protocols, CIDR ranges.</p></div>
+      <div class="section-header">
+        <div><h2>Security Groups</h2><p>Firewall rules per instance (like AWS SG)</p></div>
+        <button class="btn btn-primary btn-sm" id="sg-create-btn">+ Create Group</button>
+      </div>
+
+      <!-- Create Group Modal -->
+      <div id="sg-create-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Create Security Group</h3>
+            <button class="modal-close" id="sg-create-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Name</label>
+              <input id="sg-name" type="text" placeholder="e.g. web-servers">
+            </div>
+            <div class="form-group">
+              <label>Description (optional)</label>
+              <input id="sg-desc" type="text" placeholder="e.g. Allow HTTP and SSH">
+            </div>
+            <div id="sg-create-error" class="alert alert-error" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="sg-create-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="sg-create-submit">Create</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Manage Rules Modal -->
+      <div id="sg-manage-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box" style="max-width:680px;width:92%;">
+          <div class="modal-header">
+            <h3 id="sg-manage-title">Rules</h3>
+            <button class="modal-close" id="sg-manage-close">&times;</button>
+          </div>
+          <div class="modal-body">
+
+            <!-- Add Rule -->
+            <p style="font-size:11px;font-weight:600;color:var(--gray-400);letter-spacing:.06em;margin-bottom:10px;">ADD RULE</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:4px;">
+              <div>
+                <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Direction</label>
+                <select id="sg-rule-dir"><option value="inbound">Inbound</option><option value="outbound">Outbound</option></select>
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Protocol</label>
+                <select id="sg-rule-proto"><option value="tcp">TCP</option><option value="udp">UDP</option><option value="icmp">ICMP</option><option value="all">All</option></select>
+              </div>
+              <div id="sg-port-min-wrap">
+                <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Port Min</label>
+                <input id="sg-rule-port-min" type="number" placeholder="22" min="1" max="65535" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;">
+              </div>
+              <div id="sg-port-max-wrap">
+                <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Port Max</label>
+                <input id="sg-rule-port-max" type="number" placeholder="22" min="1" max="65535" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;">
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Source CIDR</label>
+                <input id="sg-rule-cidr" type="text" value="0.0.0.0/0" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;">
+              </div>
+              <button class="btn btn-primary btn-sm" id="sg-rule-add-btn">Add</button>
+            </div>
+            <div id="sg-rule-error" class="alert alert-error" style="display:none;margin-bottom:8px;"></div>
+
+            <!-- Rules List -->
+            <p style="font-size:11px;font-weight:600;color:var(--gray-400);letter-spacing:.06em;margin:18px 0 10px;">CURRENT RULES</p>
+            <p id="sg-rules-empty" class="empty-state" style="display:none;padding:16px 0;font-size:12px;">No rules — all inbound traffic is blocked by default.</p>
+            <div id="sg-rules-table-wrap" style="display:none;">
+              <table class="data-table">
+                <thead><tr><th>Direction</th><th>Protocol</th><th>Ports</th><th>CIDR</th><th></th></tr></thead>
+                <tbody id="sg-rules-tbody"></tbody>
+              </table>
+            </div>
+
+            <!-- Attach / Detach VM -->
+            <p style="font-size:11px;font-weight:600;color:var(--gray-400);letter-spacing:.06em;margin:18px 0 10px;">ATTACH / DETACH VM</p>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select id="sg-vm-select" style="max-width:280px;flex:1;"></select>
+              <button class="btn btn-primary btn-xs" id="sg-attach-btn">Attach</button>
+              <button class="btn btn-danger btn-xs" id="sg-detach-btn">Detach</button>
+            </div>
+            <div id="sg-vm-error" class="alert alert-error" style="display:none;margin-top:8px;"></div>
+
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="sg-manage-done">Done</button>
+          </div>
+        </div>
+      </div>
+
+      <p id="sg-empty" class="empty-state" style="display:none;">No security groups yet. Click <strong>+ Create Group</strong> to get started.</p>
+      <div id="sg-table-wrap" style="display:none;">
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Description</th><th>Rules</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody id="sg-tbody"></tbody>
+        </table>
+      </div>
     </section>
 
     <!-- Load Balancers -->
@@ -500,8 +711,96 @@
 
     <!-- Key Pairs -->
     <section id="section-key-pairs" class="console-section" style="display:none;">
-      <div class="section-header"><div><h2>Key Pairs</h2><p>SSH keys injected into instances at boot</p></div><button class="btn btn-primary btn-sm" disabled>Import Key</button></div>
-      <div class="coming-soon-card"><div class="cs-icon">🔑</div><div class="cs-title">SSH Key Pairs — Coming in Step 7</div><p>Generate or import RSA/ED25519 keypairs, inject via cloud-init at instance launch.</p></div>
+      <div class="section-header">
+        <div><h2>Key Pairs</h2><p>SSH public keys injected into instances via cloud-init at boot</p></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost btn-sm" id="kp-upload-btn">Upload Public Key</button>
+          <button class="btn btn-primary btn-sm" id="kp-generate-btn">+ Generate Key Pair</button>
+        </div>
+      </div>
+
+      <!-- Generate Modal -->
+      <div id="kp-generate-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Generate Key Pair</h3>
+            <button class="modal-close" id="kp-gen-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div id="kp-gen-error" class="alert alert-error" style="display:none;"></div>
+            <div class="form-group">
+              <label>Key Pair Name</label>
+              <input type="text" id="kp-gen-name" placeholder="e.g. my-laptop" />
+              <span class="form-hint">Only the public key is stored. Private key shown once — save it immediately.</span>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="kp-gen-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="kp-gen-submit">Generate</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upload Modal -->
+      <div id="kp-upload-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Upload Public Key</h3>
+            <button class="modal-close" id="kp-upload-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div id="kp-upload-error" class="alert alert-error" style="display:none;"></div>
+            <div class="form-group">
+              <label>Key Pair Name</label>
+              <input type="text" id="kp-upload-name" placeholder="e.g. work-macbook" />
+            </div>
+            <div class="form-group">
+              <label>Public Key</label>
+              <textarea id="kp-upload-key" rows="4" placeholder="Paste your public key here (ssh-rsa AAAA... or ssh-ed25519 AAAA...)" style="width:100%;font-family:monospace;font-size:12px;resize:vertical;padding:8px;border:1px solid var(--border);border-radius:var(--radius);box-sizing:border-box;"></textarea>
+              <span class="form-hint">Run <code>cat ~/.ssh/id_rsa.pub</code> locally to get your public key</span>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="kp-upload-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="kp-upload-submit">Import</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Private Key Reveal Modal — shown once immediately after generation -->
+      <div id="kp-private-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box" style="max-width:580px;">
+          <div class="modal-header">
+            <h3>Save Your Private Key</h3>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-error" style="display:block;margin-bottom:16px;">
+              This private key is shown <strong>once only</strong> and is NOT stored on the server.
+              Copy or download it now — you cannot recover it later.
+            </div>
+            <div class="form-group">
+              <label>Key Pair: <strong id="kp-private-name"></strong></label>
+              <label style="color:var(--gray-400);font-size:12px;">Fingerprint: <code id="kp-private-fingerprint"></code></label>
+            </div>
+            <div class="form-group">
+              <textarea id="kp-private-key-text" rows="14" readonly
+                style="width:100%;font-family:monospace;font-size:11px;resize:none;padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--gray-50);box-sizing:border-box;white-space:pre;"></textarea>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-ghost btn-sm" id="kp-copy-key">Copy</button>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary btn-sm" id="kp-private-saved">I have saved the private key</button>
+          </div>
+        </div>
+      </div>
+
+      <p id="kp-empty" class="empty-state" style="display:none;">No key pairs yet. Generate one or upload your existing public key.</p>
+      <table class="data-table" id="kp-table" style="display:none;">
+        <thead><tr><th>Name</th><th>Fingerprint (MD5)</th><th>Created</th><th></th></tr></thead>
+        <tbody id="kp-tbody"></tbody>
+      </table>
     </section>
 
     <!-- IAM -->
@@ -558,5 +857,8 @@
 <script src="/static/js/instances.js"></script>
 <script src="/static/js/images.js"></script>
 <script src="/static/js/network.js"></script>
+<script src="/static/js/security-groups.js"></script>
+<script src="/static/js/keypairs.js"></script>
+<script src="/static/js/volumes.js"></script>
 <script src="/static/js/dashboard.js"></script>
 {% endblock %}

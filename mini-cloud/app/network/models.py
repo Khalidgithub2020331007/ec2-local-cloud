@@ -243,3 +243,182 @@ def get_next_floating_ip():
         return None  # Pool exhausted (30-IP max)
     finally:
         conn.close()
+
+
+# ── Security Groups ────────────────────────────────────────────────────────────
+
+def create_security_group(user_id, name, description=''):
+    group_id   = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+    conn = get_connection()
+    try:
+        conn.execute(
+            '''INSERT INTO security_groups (id, user_id, name, description, created_at)
+               VALUES (?, ?, ?, ?, ?)''',
+            (group_id, user_id, name, description, created_at),
+        )
+        conn.commit()
+        return group_id
+    finally:
+        conn.close()
+
+
+def get_security_group(group_id, user_id=None):
+    conn = get_connection()
+    try:
+        if user_id:
+            row = conn.execute(
+                'SELECT * FROM security_groups WHERE id=? AND user_id=?',
+                (group_id, user_id),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                'SELECT * FROM security_groups WHERE id=?', (group_id,)
+            ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def list_security_groups(user_id):
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM security_groups WHERE user_id=? ORDER BY created_at DESC',
+            (user_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def delete_security_group(group_id):
+    conn = get_connection()
+    try:
+        # ON DELETE CASCADE removes all rules and vm_security_groups rows automatically
+        conn.execute('DELETE FROM security_groups WHERE id=?', (group_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# ── Security Group Rules ───────────────────────────────────────────────────────
+
+def add_sg_rule_db(group_id, direction, protocol, port_min, port_max, cidr):
+    rule_id    = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+    conn = get_connection()
+    try:
+        conn.execute(
+            '''INSERT INTO security_group_rules
+               (id, group_id, direction, protocol, port_min, port_max, cidr, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+            (rule_id, group_id, direction, protocol, port_min, port_max, cidr, created_at),
+        )
+        conn.commit()
+        return rule_id
+    finally:
+        conn.close()
+
+
+def get_sg_rule(rule_id):
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            'SELECT * FROM security_group_rules WHERE id=?', (rule_id,)
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def list_sg_rules(group_id):
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            'SELECT * FROM security_group_rules WHERE group_id=? ORDER BY created_at',
+            (group_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def delete_sg_rule(rule_id):
+    conn = get_connection()
+    try:
+        conn.execute('DELETE FROM security_group_rules WHERE id=?', (rule_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# ── VM ↔ Security Group mapping ────────────────────────────────────────────────
+
+def attach_vm_to_sg(vm_id, group_id):
+    conn = get_connection()
+    try:
+        # INSERT OR IGNORE — attaching the same group twice is a no-op, not an error
+        conn.execute(
+            'INSERT OR IGNORE INTO vm_security_groups (vm_id, group_id) VALUES (?, ?)',
+            (vm_id, group_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def detach_vm_from_sg(vm_id, group_id):
+    conn = get_connection()
+    try:
+        conn.execute(
+            'DELETE FROM vm_security_groups WHERE vm_id=? AND group_id=?',
+            (vm_id, group_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_vm_security_groups(vm_id):
+    # Returns all security groups currently attached to a VM
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            '''SELECT sg.* FROM security_groups sg
+               JOIN vm_security_groups vsg ON sg.id = vsg.group_id
+               WHERE vsg.vm_id=?''',
+            (vm_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_all_vm_sg_rules(vm_id):
+    # Union of all rules from every security group attached to the VM.
+    # Used when rebuilding the VM's iptables chain from scratch.
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            '''SELECT sgr.* FROM security_group_rules sgr
+               JOIN vm_security_groups vsg ON sgr.group_id = vsg.group_id
+               WHERE vsg.vm_id=?
+               ORDER BY sgr.created_at''',
+            (vm_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_all_vms_with_security_groups():
+    # Returns every VM ID that has at least one security group — used on startup restore
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            'SELECT DISTINCT vm_id FROM vm_security_groups'
+        ).fetchall()
+        return [r['vm_id'] for r in rows]
+    finally:
+        conn.close()

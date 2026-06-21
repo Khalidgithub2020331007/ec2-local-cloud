@@ -24,6 +24,9 @@
   setupRouters();
   setupFloatingIps();
   setupNetworkInterfaces();
+  setupSecurityGroups();
+  setupKeyPairs();
+  setupVolumes();
 })();
 
 
@@ -63,6 +66,10 @@ function switchSection(sectionId) {
   if (sectionId === 'routers')             loadRouters();
   if (sectionId === 'floating-ips')        loadFloatingIps();
   if (sectionId === 'network-interfaces')  loadNetworkInterfaces();
+  if (sectionId === 'security-groups')     loadSecurityGroups();
+  if (sectionId === 'key-pairs')           loadKeyPairs();
+  if (sectionId === 'volumes')             loadVolumes();
+  if (sectionId === 'snapshots')           loadSnapshots();
 }
 
 

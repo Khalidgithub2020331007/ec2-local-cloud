@@ -1,5 +1,7 @@
 import os
+import shutil
 import subprocess
+import tempfile
 import libvirt
 from xml.etree import ElementTree as ET
 
@@ -19,8 +21,23 @@ def _connect():
     return conn
 
 
-def _build_domain_xml(libvirt_name, vcpus, ram_mb, disk_path):
+def _build_domain_xml(libvirt_name, vcpus, ram_mb, disk_path, instance_id, seed_iso_path=None):
     # KVM VM এর XML definition — Nova এর বদলে এটাই সরাসরি libvirt কে পাঠানো হয়
+    # Linux interface names are capped at 15 chars; we use the first 8 hex chars of the UUID.
+    tap_name = f'tap-{instance_id[:8]}'
+
+    # cloud-init reads the CDROM labeled 'cidata' on first boot to inject SSH keys.
+    # SATA bus is used because virtio-blk device names (vdb) can conflict with the main disk ordering.
+    cdrom_xml = ''
+    if seed_iso_path:
+        cdrom_xml = f"""
+    <disk type='file' device='cdrom'>
+      <driver name='qemu' type='raw'/>
+      <source file='{seed_iso_path}'/>
+      <target dev='sda' bus='sata'/>
+      <readonly/>
+    </disk>"""
+
     return f"""<domain type='kvm'>
   <name>{libvirt_name}</name>
   <memory unit='MiB'>{ram_mb}</memory>
@@ -46,9 +63,10 @@ def _build_domain_xml(libvirt_name, vcpus, ram_mb, disk_path):
       <driver name='qemu' type='qcow2' cache='none'/>
       <source file='{disk_path}'/>
       <target dev='vda' bus='virtio'/>
-    </disk>
+    </disk>{cdrom_xml}
     <interface type='network'>
       <source network='default'/>
+      <target dev='{tap_name}'/>
       <model type='virtio'/>
     </interface>
     <serial type='pty'>
@@ -99,11 +117,54 @@ def create_instance_disk(instance_id, disk_gb, base_image_path=None):
     return disk_path
 
 
-def launch_vm(libvirt_name, vcpus, ram_mb, disk_path):
+def build_cloud_init_iso(instance_id, hostname, public_key):
+    """Create a NoCloud datasource ISO containing the SSH public key.
+
+    cloud-init's NoCloud datasource triggers on a drive labeled 'cidata' — no network
+    metadata server needed. It reads meta-data (instance ID + hostname) and user-data
+    (#cloud-config YAML), then writes ssh_authorized_keys into the VM's default user account.
+    """
+    instance_dir = os.path.join(STORAGE_BASE, instance_id)
+    os.makedirs(instance_dir, exist_ok=True)
+
+    iso_path = os.path.join(instance_dir, 'seed.iso')
+    staging_dir = tempfile.mkdtemp(prefix='cloud-init-')
+
+    try:
+        meta_data = f"instance-id: {instance_id}\nlocal-hostname: {hostname}\n"
+        # #cloud-config header is mandatory — cloud-init ignores user-data without it
+        user_data = f"#cloud-config\nssh_authorized_keys:\n  - {public_key.strip()}\n"
+
+        with open(os.path.join(staging_dir, 'meta-data'), 'w') as f:
+            f.write(meta_data)
+        with open(os.path.join(staging_dir, 'user-data'), 'w') as f:
+            f.write(user_data)
+
+        result = subprocess.run(
+            [
+                'genisoimage', '-output', iso_path,
+                '-volid', 'cidata',   # 'cidata' label is the NoCloud datasource trigger
+                '-joliet', '-rock',   # joliet + rock ridge: filenames readable on both Linux and legacy BIOS
+                os.path.join(staging_dir, 'meta-data'),
+                os.path.join(staging_dir, 'user-data'),
+            ],
+            capture_output=True, text=True,
+        )
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+
+    if result.returncode != 0:
+        raise RuntimeError(f'genisoimage failed: {result.stderr}')
+
+    _set_qemu_acl(iso_path)
+    return iso_path
+
+
+def launch_vm(libvirt_name, vcpus, ram_mb, disk_path, instance_id, seed_iso_path=None):
     # Domain define করে তারপর start করে — define করলে persistent হয়
     conn = _connect()
     try:
-        xml = _build_domain_xml(libvirt_name, vcpus, ram_mb, disk_path)
+        xml = _build_domain_xml(libvirt_name, vcpus, ram_mb, disk_path, instance_id, seed_iso_path)
         domain = conn.defineXML(xml)
         domain.create()  # start the defined domain
         return True

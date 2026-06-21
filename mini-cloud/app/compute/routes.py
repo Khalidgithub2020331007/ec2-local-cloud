@@ -7,8 +7,8 @@ from app.compute.models import (
     get_instance, list_instances, mark_terminated,
 )
 from app.compute.libvirt_manager import (
-    create_instance_disk, launch_vm, stop_vm, start_vm,
-    reboot_vm, terminate_vm, get_vm_status, get_vm_vnc_port,
+    create_instance_disk, launch_vm, build_cloud_init_iso,
+    stop_vm, start_vm, reboot_vm, terminate_vm, get_vm_status, get_vm_vnc_port,
 )
 
 compute_bp = Blueprint('compute', __name__, url_prefix='/api/v1/compute')
@@ -44,6 +44,7 @@ def launch():
     flavor_name = data.get('flavor', '').strip()
     image_id    = data.get('image_id', '').strip() or None
     image_path  = data.get('image_path', '').strip() or None
+    keypair_id  = data.get('keypair_id', '').strip() or None
 
     # image_id takes precedence — look up its file path from the images table
     if image_id:
@@ -61,6 +62,14 @@ def launch():
     flavor = get_flavor(flavor_name)
     if not flavor:
         return jsonify({'error': 'VALIDATION_ERROR', 'message': f'Unknown flavor. Valid: {[f["name"] for f in list_flavors()]}', 'statusCode': 400}), 400
+
+    # Validate keypair belongs to this user before doing any expensive work
+    keypair = None
+    if keypair_id:
+        from app.keypairs.models import get_keypair
+        keypair = get_keypair(keypair_id, g.current_user['id'])
+        if not keypair:
+            return jsonify({'error': 'NOT_FOUND', 'message': 'Key pair not found', 'statusCode': 404}), 404
 
     # libvirt domain name: mc-<user>-<instance-name> — globally unique in KVM
     libvirt_name = f"mc-{g.current_user['username']}-{name}"
@@ -83,19 +92,35 @@ def launch():
         disk_path = create_instance_disk(instance_id, flavor['disk_gb'], image_path)
         update_instance_status(instance_id, 'pending')
 
-        # Update disk_path in DB
+        # Update disk_path and keypair_id in DB
         from app.database import get_connection
         conn = get_connection()
-        conn.execute('UPDATE instances SET disk_path=? WHERE id=?', (disk_path, instance_id))
+        conn.execute('UPDATE instances SET disk_path=?, keypair_id=? WHERE id=?',
+                     (disk_path, keypair_id, instance_id))
         conn.commit()
         conn.close()
 
-        # Step 3: libvirt এ VM launch করো
-        launch_vm(libvirt_name, flavor['vcpus'], flavor['ram_mb'], disk_path)
+        # Step 3: Build cloud-init seed ISO if a keypair was selected.
+        # The ISO is attached as a virtual CDROM; cloud-init reads it on first boot
+        # and writes the public key to /home/<user>/.ssh/authorized_keys inside the VM.
+        seed_iso_path = None
+        if keypair:
+            seed_iso_path = build_cloud_init_iso(instance_id, name, keypair['public_key'])
 
-        # Step 4: VNC port পড়ো এবং status update করো
+        # Step 4: libvirt এ VM launch করো
+        launch_vm(libvirt_name, flavor['vcpus'], flavor['ram_mb'], disk_path, instance_id, seed_iso_path)
+
+        # Step 5: VNC port পড়ো এবং status update করো
         vnc_port = get_vm_vnc_port(libvirt_name)
         update_instance_status(instance_id, 'running', vnc_port=vnc_port)
+
+        # Step 6: Create the default-deny iptables chain for this VM.
+        # The chain enforces security group rules on the VM's tap device.
+        from app.network.sg_manager import create_vm_sg_chain
+        try:
+            create_vm_sg_chain(instance_id)
+        except RuntimeError:
+            pass  # Non-fatal — user can still attach security groups later
 
         instance = get_instance(instance_id)
         return jsonify({'message': 'Instance launched', 'instance': instance}), 201
@@ -156,6 +181,12 @@ def action(instance_id):
             return jsonify({'message': 'Instance rebooting'}), 200
 
         elif act == 'terminate':
+            # Clean up iptables chain before destroying the VM
+            from app.network.sg_manager import delete_vm_sg_chain
+            try:
+                delete_vm_sg_chain(instance_id)
+            except RuntimeError:
+                pass
             terminate_vm(lname, instance_id)
             mark_terminated(instance_id)
             return jsonify({'message': 'Instance terminated'}), 200

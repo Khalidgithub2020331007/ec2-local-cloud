@@ -6,11 +6,12 @@ async function setupInstances() {
   document.getElementById('launch-btn').addEventListener('click', async () => {
     document.getElementById('launch-modal').style.display = 'flex';
     document.getElementById('launch-error').style.display = 'none';
-    document.getElementById('inst-name').value         = '';
-    document.getElementById('inst-image-select').value = '';
-    document.getElementById('inst-flavor').value       = '';
-    // Refresh image list each time modal opens so newly uploaded images appear
-    await loadImagesForLaunch();
+    document.getElementById('inst-name').value            = '';
+    document.getElementById('inst-image-select').value    = '';
+    document.getElementById('inst-flavor').value          = '';
+    document.getElementById('inst-keypair-select').value  = '';
+    // Refresh image and keypair lists each time modal opens so new items appear
+    await Promise.all([loadImagesForLaunch(), loadKeyPairsForLaunch()]);
   });
 
   ['modal-close', 'modal-cancel'].forEach(id => {
@@ -135,13 +136,14 @@ function actionButtons(inst) {
 
 
 async function launchInstance() {
-  const name    = document.getElementById('inst-name').value.trim().toLowerCase();
-  const flavor  = document.getElementById('inst-flavor').value;
-  const imageId = document.getElementById('inst-image-select').value;
-  const errorDiv = document.getElementById('launch-error');
-  const btnText  = document.getElementById('modal-btn-text');
-  const spinner  = document.getElementById('modal-spinner');
-  const btn      = document.getElementById('modal-launch-btn');
+  const name      = document.getElementById('inst-name').value.trim().toLowerCase();
+  const flavor    = document.getElementById('inst-flavor').value;
+  const imageId   = document.getElementById('inst-image-select').value;
+  const keypairId = document.getElementById('inst-keypair-select').value;
+  const errorDiv  = document.getElementById('launch-error');
+  const btnText   = document.getElementById('modal-btn-text');
+  const spinner   = document.getElementById('modal-spinner');
+  const btn       = document.getElementById('modal-launch-btn');
 
   errorDiv.style.display = 'none';
 
@@ -151,7 +153,8 @@ async function launchInstance() {
   btn.disabled = true; btnText.style.display = 'none'; spinner.style.display = 'inline-block';
 
   const body = { name, flavor };
-  if (imageId) body.image_id = imageId;
+  if (imageId)   body.image_id   = imageId;
+  if (keypairId) body.keypair_id = keypairId;
 
   const { ok, data } = await apiCall('POST', '/api/v1/compute/instances', body);
 

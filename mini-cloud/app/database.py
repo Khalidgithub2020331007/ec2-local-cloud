@@ -132,5 +132,96 @@ def init_db():
         )
     ''')
 
+    # Security Groups — named rule sets that can be attached to VMs (like AWS SGs)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS security_groups (
+            id          TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL,
+            name        TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            created_at  TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Security Group Rules — each row is one ACCEPT rule in the iptables chain
+    # port_min/port_max are NULL for icmp and all protocols (no port concept)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS security_group_rules (
+            id        TEXT PRIMARY KEY,
+            group_id  TEXT NOT NULL,
+            direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+            protocol  TEXT NOT NULL CHECK (protocol IN ('tcp', 'udp', 'icmp', 'all')),
+            port_min  INTEGER,
+            port_max  INTEGER,
+            cidr      TEXT NOT NULL DEFAULT '0.0.0.0/0',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (group_id) REFERENCES security_groups(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # VM ↔ Security Group mapping — one VM can have many groups; one group many VMs
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS vm_security_groups (
+            vm_id    TEXT NOT NULL,
+            group_id TEXT NOT NULL,
+            PRIMARY KEY (vm_id, group_id),
+            FOREIGN KEY (vm_id)    REFERENCES instances(id)        ON DELETE CASCADE,
+            FOREIGN KEY (group_id) REFERENCES security_groups(id)  ON DELETE CASCADE
+        )
+    ''')
+
+    # SSH Key Pairs — only public key is stored; private key is shown once at generation and never persisted.
+    # Storing the private key server-side would mean a DB breach equals full VM access — unacceptable.
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS keypairs (
+            id          TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL,
+            name        TEXT NOT NULL,
+            public_key  TEXT NOT NULL,
+            fingerprint TEXT NOT NULL,
+            created_at  TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # keypair_id added in Step 7 — nullable so existing instances are unaffected.
+    # ALTER TABLE is safe to re-run; the except swallows the "duplicate column" error.
+    try:
+        cursor.execute('ALTER TABLE instances ADD COLUMN keypair_id TEXT')
+    except Exception:
+        pass  # Column already exists from a previous run
+
+    # Volumes — LVM logical volumes, like AWS EBS.
+    # source_snapshot_id is set when the volume was cloned from a snapshot (restore).
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS volumes (
+            id                 TEXT PRIMARY KEY,
+            user_id            TEXT NOT NULL,
+            name               TEXT NOT NULL,
+            size_gb            INTEGER NOT NULL,
+            status             TEXT NOT NULL DEFAULT 'available',
+            vm_id              TEXT,
+            device_name        TEXT,
+            source_snapshot_id TEXT,
+            created_at         TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Snapshots — COW point-in-time copies of volumes via LVM snapshot.
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS snapshots (
+            id         TEXT PRIMARY KEY,
+            user_id    TEXT NOT NULL,
+            name       TEXT NOT NULL,
+            volume_id  TEXT NOT NULL,
+            size_gb    INTEGER NOT NULL,
+            status     TEXT NOT NULL DEFAULT 'available',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
     conn.commit()
     conn.close()
