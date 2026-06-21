@@ -1,0 +1,562 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Mini Cloud{% endblock %}
+
+{% block content %}
+<div class="console-layout">
+
+  <!-- ── Sidebar ──────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <svg width="26" height="26" viewBox="0 0 40 40" fill="none">
+        <rect width="40" height="40" rx="8" fill="#2563eb"/>
+        <path d="M10 26c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="20" cy="16" r="3" fill="#fff"/>
+      </svg>
+      <span>MiniCloud EC2</span>
+    </div>
+
+    <nav class="sidebar-nav">
+
+      <!-- Overview -->
+      <a href="#" class="nav-item active" data-section="overview">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Overview
+      </a>
+
+      <!-- Compute -->
+      <div class="nav-group-label">Compute</div>
+      <a href="#" class="nav-item" data-section="instances">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Instances
+      </a>
+      <a href="#" class="nav-item" data-section="images">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        Images (AMI)
+      </a>
+      <a href="#" class="nav-item" data-section="autoscaling">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Auto Scaling
+      </a>
+      <a href="#" class="nav-item" data-section="monitoring">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Monitoring
+      </a>
+
+      <!-- Storage -->
+      <div class="nav-group-label">Storage</div>
+      <a href="#" class="nav-item" data-section="volumes">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        Volumes
+      </a>
+      <a href="#" class="nav-item" data-section="snapshots">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Snapshots
+      </a>
+
+      <!-- Networking -->
+      <div class="nav-group-label">Networking</div>
+      <a href="#" class="nav-item" data-section="networks">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="6"/><rect x="9" y="16" width="6" height="6"/><rect x="2" y="9" width="6" height="6"/><rect x="16" y="9" width="6" height="6"/><path d="M9 5h-3a1 1 0 0 0-1 1v3M15 5h3a1 1 0 0 1 1 1v3M9 19h-3a1 1 0 0 1-1-1v-3M15 19h3a1 1 0 0 0 1-1v-3"/></svg>
+        Networks
+      </a>
+      <a href="#" class="nav-item" data-section="routers">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Routers
+      </a>
+      <a href="#" class="nav-item" data-section="floating-ips">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        Floating IPs
+      </a>
+      <a href="#" class="nav-item" data-section="network-interfaces">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12H19M12 5l7 7-7 7"/></svg>
+        Network Interfaces
+      </a>
+      <a href="#" class="nav-item" data-section="security-groups">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Security Groups
+      </a>
+      <a href="#" class="nav-item" data-section="load-balancers">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><path d="M5 12l7-7 7 7"/><line x1="5" y1="19" x2="19" y2="19"/></svg>
+        Load Balancers
+      </a>
+      <a href="#" class="nav-item" data-section="key-pairs">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        Key Pairs
+      </a>
+
+      <!-- Account -->
+      <div class="nav-group-label">Account</div>
+      <a href="#" class="nav-item" data-section="iam">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        IAM
+      </a>
+      <a href="#" class="nav-item" data-section="users-projects">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Users &amp; Projects
+      </a>
+      <a href="#" class="nav-item" data-section="quotas">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Quotas
+      </a>
+      <a href="#" class="nav-item" data-section="api-keys">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        API Keys
+      </a>
+
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <span id="user-name">Loading...</span>
+      </div>
+      <button class="btn-logout" id="logout-btn" title="Sign out">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ────────────────────────────────────── -->
+  <main class="console-main">
+
+    <!-- Overview -->
+    <section id="section-overview" class="console-section">
+      <div class="section-header">
+        <div><h2>Overview</h2><p>Your Mini Cloud at a glance</p></div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card" data-goto="instances">
+          <div class="stat-icon compute">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </div>
+          <div class="stat-label">Instances</div>
+          <div class="stat-value" id="stat-instances">—</div>
+          <div class="stat-hint">Step 2</div>
+        </div>
+        <div class="stat-card" data-goto="images">
+          <div class="stat-icon storage">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          </div>
+          <div class="stat-label">Images (AMI)</div>
+          <div class="stat-value" id="stat-images">—</div>
+          <div class="stat-hint">Step 3</div>
+        </div>
+        <div class="stat-card" data-goto="networks">
+          <div class="stat-icon network">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="6"/><rect x="9" y="16" width="6" height="6"/><rect x="2" y="9" width="6" height="6"/><rect x="16" y="9" width="6" height="6"/></svg>
+          </div>
+          <div class="stat-label">Networks</div>
+          <div class="stat-value" id="stat-networks">—</div>
+          <div class="stat-hint">Step 4</div>
+        </div>
+        <div class="stat-card" data-goto="floating-ips">
+          <div class="stat-icon network">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4"/></svg>
+          </div>
+          <div class="stat-label">Floating IPs</div>
+          <div class="stat-value" id="stat-fips">—</div>
+          <div class="stat-hint">Step 5</div>
+        </div>
+        <div class="stat-card" data-goto="volumes">
+          <div class="stat-icon storage">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          </div>
+          <div class="stat-label">Volumes</div>
+          <div class="stat-value" id="stat-volumes">—</div>
+          <div class="stat-hint">Step 8</div>
+        </div>
+        <div class="stat-card" data-goto="security-groups">
+          <div class="stat-icon account">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="stat-label">Security Groups</div>
+          <div class="stat-value" id="stat-sg">—</div>
+          <div class="stat-hint">Step 6</div>
+        </div>
+      </div>
+
+      <div class="progress-card">
+        <div class="progress-title">Build Progress</div>
+        <div class="progress-steps">
+          <div class="step done">
+            <div class="step-dot"></div>
+            <div class="step-body">
+              <strong>Step 1 — Auth System</strong>
+              <span>JWT login, API Keys, user accounts</span>
+            </div>
+          </div>
+          <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 2 — VM Management</strong><span>Launch, stop, start, reboot, terminate instances</span></div></div>
+          <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 3 — Image Store</strong><span>Upload, list, delete OS images (AMI)</span></div></div>
+          <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 4 — Networking</strong><span>Networks, routers, DHCP</span></div></div>
+          <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 5 — Floating IPs</strong><span>Assign public IPs to instances</span></div></div>
+          <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 6 — Security Groups</strong><span>Firewall rules per instance</span></div></div>
+          <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 7 — SSH Key Pairs</strong><span>Inject SSH keys at boot</span></div></div>
+          <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 8 — Block Storage</strong><span>Volumes, snapshots, attach/detach</span></div></div>
+          <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 9 — Monitoring</strong><span>CPU, RAM, disk usage per instance</span></div></div>
+          <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 10 — Load Balancers + Auto Scaling</strong><span>Traffic distribution, scale groups</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Instances -->
+    <section id="section-instances" class="console-section" style="display:none;">
+      <div class="section-header">
+        <div><h2>Instances</h2><p>Virtual machines running on KVM via libvirt</p></div>
+        <button class="btn btn-primary btn-sm" id="launch-btn">+ Launch Instance</button>
+      </div>
+
+      <!-- Launch Modal -->
+      <div id="launch-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Launch Instance</h3>
+            <button class="modal-close" id="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div id="launch-error" class="alert alert-error" style="display:none;"></div>
+            <div class="form-group">
+              <label>Instance Name</label>
+              <input type="text" id="inst-name" placeholder="my-server (lowercase, hyphens ok)" />
+              <span class="form-hint">Lowercase letters, numbers, hyphens. E.g. web-server-01</span>
+            </div>
+            <div class="form-group">
+              <label>Flavor (Instance Type)</label>
+              <select id="inst-flavor">
+                <option value="">Select a flavor...</option>
+              </select>
+              <span class="form-hint" id="flavor-hint"></span>
+            </div>
+            <div class="form-group">
+              <label>Image <span class="optional-tag">optional</span></label>
+              <select id="inst-image-select">
+                <option value="">Blank disk (no OS)</option>
+              </select>
+              <span class="form-hint">Select an uploaded image, or leave as blank disk</span>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="modal-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="modal-launch-btn">
+              <span id="modal-btn-text">Launch</span>
+              <span id="modal-spinner" class="spinner" style="display:none;"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Instance table -->
+      <p id="instances-empty" class="empty-state" style="display:none;">No instances yet. Click <strong>Launch Instance</strong> to create your first VM.</p>
+      <div id="instances-table-wrap" style="display:none;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Instance ID</th>
+              <th>Flavor</th>
+              <th>vCPU / RAM</th>
+              <th>Status</th>
+              <th>VNC Port</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="instances-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Images -->
+    <section id="section-images" class="console-section" style="display:none;">
+      <div class="section-header">
+        <div><h2>Images (AMI)</h2><p>OS images available for launching instances</p></div>
+        <button class="btn btn-primary btn-sm" id="upload-img-btn">+ Upload Image</button>
+      </div>
+
+      <!-- Upload Modal -->
+      <div id="img-upload-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Upload Image</h3>
+            <button class="modal-close" id="img-modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div id="img-upload-error" class="alert alert-error" style="display:none;"></div>
+            <div class="form-group">
+              <label>Image Name</label>
+              <input type="text" id="img-name" placeholder="e.g. Ubuntu 22.04 Server" />
+            </div>
+            <div class="form-group">
+              <label>Description <span class="optional-tag">optional</span></label>
+              <input type="text" id="img-desc" placeholder="Short description of this image" />
+            </div>
+            <div class="form-group">
+              <label>File <span class="form-hint" style="display:inline;">.qcow2 / .img / .iso</span></label>
+              <input type="file" id="img-file" accept=".qcow2,.img,.iso" style="padding:6px 0;" />
+            </div>
+            <div id="img-progress-wrap" class="upload-progress-wrap" style="display:none;">
+              <div class="upload-progress-track">
+                <div class="upload-progress-bar" id="img-progress-bar"></div>
+              </div>
+              <span class="upload-progress-text" id="img-progress-text"></span>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="img-modal-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="img-upload-submit">Upload</button>
+          </div>
+        </div>
+      </div>
+
+      <p id="images-empty" class="empty-state" style="display:none;">No images yet. Upload a .qcow2 or .iso file to get started.</p>
+      <div id="images-table-wrap" style="display:none;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Format</th>
+              <th>Size</th>
+              <th>Owner</th>
+              <th>Visibility</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="images-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Auto Scaling -->
+    <section id="section-autoscaling" class="console-section" style="display:none;">
+      <div class="section-header"><div><h2>Auto Scaling</h2><p>Automatically scale instance count based on load</p></div><button class="btn btn-primary btn-sm" disabled>Create Group</button></div>
+      <div class="coming-soon-card"><div class="cs-icon">📈</div><div class="cs-title">Auto Scaling — Coming in Step 10</div><p>Define min/max instances, scale-up/scale-down policies based on CPU or custom metrics.</p></div>
+    </section>
+
+    <!-- Monitoring -->
+    <section id="section-monitoring" class="console-section" style="display:none;">
+      <div class="section-header"><div><h2>Monitoring</h2><p>Real-time resource usage per instance</p></div></div>
+      <div class="coming-soon-card"><div class="cs-icon">📊</div><div class="cs-title">Monitoring — Coming in Step 9</div><p>CPU %, RAM usage, disk I/O, network traffic — pulled from libvirt stats and /proc.</p></div>
+    </section>
+
+    <!-- Volumes -->
+    <section id="section-volumes" class="console-section" style="display:none;">
+      <div class="section-header"><div><h2>Volumes</h2><p>Block storage — attach to instances like EBS</p></div><button class="btn btn-primary btn-sm" disabled>Create Volume</button></div>
+      <div class="coming-soon-card"><div class="cs-icon">💾</div><div class="cs-title">Block Storage — Coming in Step 8</div><p>Create LVM logical volumes, attach/detach to running VMs, persistent data storage.</p></div>
+    </section>
+
+    <!-- Snapshots -->
+    <section id="section-snapshots" class="console-section" style="display:none;">
+      <div class="section-header"><div><h2>Snapshots</h2><p>Point-in-time copy of a volume</p></div><button class="btn btn-primary btn-sm" disabled>Create Snapshot</button></div>
+      <div class="coming-soon-card"><div class="cs-icon">📸</div><div class="cs-title">Snapshots — Coming in Step 8</div><p>Create, restore, and delete volume snapshots using LVM snapshot commands.</p></div>
+    </section>
+
+    <!-- Networks -->
+    <section id="section-networks" class="console-section" style="display:none;">
+      <div class="section-header">
+        <div><h2>Networks</h2><p>Linux bridge networks with DHCP (like VPC)</p></div>
+        <button class="btn btn-primary btn-sm" id="net-create-btn">+ Create Network</button>
+      </div>
+
+      <!-- Create Network Modal -->
+      <div id="net-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Create Network</h3>
+            <button class="modal-close" id="net-modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div id="net-modal-error" class="alert alert-error" style="display:none;"></div>
+            <div class="form-group">
+              <label>Network Name</label>
+              <input type="text" id="net-name" placeholder="e.g. my-network" />
+            </div>
+            <div class="form-group">
+              <label>CIDR</label>
+              <input type="text" id="net-cidr" placeholder="e.g. 192.168.200.0/24" />
+              <span class="form-hint">Gateway will be the first host; DHCP starts at +9</span>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="net-modal-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="net-modal-submit">Create</button>
+          </div>
+        </div>
+      </div>
+
+      <p id="networks-empty" class="empty-state" style="display:none;">No networks yet. Click <strong>Create Network</strong> to add one.</p>
+      <div id="networks-table-wrap" style="display:none;">
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Bridge</th><th>CIDR</th><th>Gateway</th><th>Status</th><th>Created</th><th></th></tr></thead>
+          <tbody id="networks-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Routers -->
+    <section id="section-routers" class="console-section" style="display:none;">
+      <div class="section-header">
+        <div><h2>Routers</h2><p>NAT gateway — lets VMs reach the internet via iptables MASQUERADE</p></div>
+        <button class="btn btn-primary btn-sm" id="router-create-btn">+ Create Router</button>
+      </div>
+
+      <!-- Create Router Modal -->
+      <div id="router-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Create Router</h3>
+            <button class="modal-close" id="router-modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div id="router-modal-error" class="alert alert-error" style="display:none;"></div>
+            <div class="form-group">
+              <label>Router Name</label>
+              <input type="text" id="router-name" placeholder="e.g. main-router" />
+            </div>
+            <div class="form-group">
+              <label>Network</label>
+              <select id="router-network-select"><option value="">Loading...</option></select>
+              <span class="form-hint">External interface is auto-detected from the host default route</span>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="router-modal-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="router-modal-submit">Create</button>
+          </div>
+        </div>
+      </div>
+
+      <p id="routers-empty" class="empty-state" style="display:none;">No routers yet. Create a network first, then add a router to enable NAT.</p>
+      <div id="routers-table-wrap" style="display:none;">
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Network</th><th>Ext. Interface</th><th>Status</th><th>Created</th><th></th></tr></thead>
+          <tbody id="routers-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Floating IPs -->
+    <section id="section-floating-ips" class="console-section" style="display:none;">
+      <div class="section-header">
+        <div><h2>Floating IPs</h2><p>Host-side IPs mapped to VMs via iptables DNAT (like Elastic IP)</p></div>
+        <button class="btn btn-primary btn-sm" id="fip-allocate-btn">+ Allocate IP</button>
+      </div>
+
+      <!-- Associate Modal -->
+      <div id="fip-associate-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Associate Floating IP</h3>
+            <button class="modal-close" id="fip-modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Running Instance</label>
+              <select id="fip-instance-select"><option value="">Loading...</option></select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="fip-modal-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="fip-modal-submit">Associate</button>
+          </div>
+        </div>
+      </div>
+
+      <p id="fips-empty" class="empty-state" style="display:none;">No floating IPs yet. Click <strong>Allocate IP</strong> to reserve one from the 172.16.0.0/24 pool.</p>
+      <div id="fips-table-wrap" style="display:none;">
+        <table class="data-table">
+          <thead><tr><th>Floating IP</th><th>Instance</th><th>Private IP</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="fips-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Network Interfaces -->
+    <section id="section-network-interfaces" class="console-section" style="display:none;">
+      <div class="section-header">
+        <div><h2>Network Interfaces</h2><p>vNICs attached to running instances (read from libvirt)</p></div>
+        <button class="btn btn-ghost btn-sm" id="nics-refresh-btn">Refresh</button>
+      </div>
+
+      <p id="nics-empty" class="empty-state" style="display:none;">No running instances have network interfaces.</p>
+      <div id="nics-table-wrap" style="display:none;">
+        <table class="data-table">
+          <thead><tr><th>Instance</th><th>MAC Address</th><th>Network / Bridge</th><th>IP Address</th></tr></thead>
+          <tbody id="nics-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Security Groups -->
+    <section id="section-security-groups" class="console-section" style="display:none;">
+      <div class="section-header"><div><h2>Security Groups</h2><p>Firewall rules per instance (like AWS SG)</p></div><button class="btn btn-primary btn-sm" disabled>Create Group</button></div>
+      <div class="coming-soon-card"><div class="cs-icon">🛡️</div><div class="cs-title">Security Groups — Coming in Step 6</div><p>iptables rules per instance — allow/deny ports, protocols, CIDR ranges.</p></div>
+    </section>
+
+    <!-- Load Balancers -->
+    <section id="section-load-balancers" class="console-section" style="display:none;">
+      <div class="section-header"><div><h2>Load Balancers</h2><p>Distribute traffic across instances</p></div><button class="btn btn-primary btn-sm" disabled>Create LB</button></div>
+      <div class="coming-soon-card"><div class="cs-icon">⚖️</div><div class="cs-title">Load Balancers — Coming in Step 10</div><p>HAProxy or iptables-based round-robin traffic distribution to backend instances.</p></div>
+    </section>
+
+    <!-- Key Pairs -->
+    <section id="section-key-pairs" class="console-section" style="display:none;">
+      <div class="section-header"><div><h2>Key Pairs</h2><p>SSH keys injected into instances at boot</p></div><button class="btn btn-primary btn-sm" disabled>Import Key</button></div>
+      <div class="coming-soon-card"><div class="cs-icon">🔑</div><div class="cs-title">SSH Key Pairs — Coming in Step 7</div><p>Generate or import RSA/ED25519 keypairs, inject via cloud-init at instance launch.</p></div>
+    </section>
+
+    <!-- IAM -->
+    <section id="section-iam" class="console-section" style="display:none;">
+      <div class="section-header"><div><h2>IAM</h2><p>Identity and Access Management</p></div></div>
+      <div class="coming-soon-card"><div class="cs-icon">👤</div><div class="cs-title">IAM — Available Now (Step 1)</div><p>User accounts, roles (admin/user), and API Keys are already working. Advanced IAM policies coming later.</p><a href="#" class="btn btn-primary btn-sm" style="margin-top:16px;display:inline-flex;" data-section-link="api-keys">Manage API Keys</a></div>
+    </section>
+
+    <!-- Users & Projects -->
+    <section id="section-users-projects" class="console-section" style="display:none;">
+      <div class="section-header"><div><h2>Users &amp; Projects</h2><p>Manage accounts and project isolation</p></div></div>
+      <div class="coming-soon-card"><div class="cs-icon">👥</div><div class="cs-title">Users &amp; Projects — Coming Soon</div><p>Multi-user accounts, project-level resource isolation (like OpenStack projects / AWS Organizations).</p></div>
+    </section>
+
+    <!-- Quotas -->
+    <section id="section-quotas" class="console-section" style="display:none;">
+      <div class="section-header"><div><h2>Quotas</h2><p>Resource limits per user/project</p></div></div>
+      <div class="coming-soon-card"><div class="cs-icon">📋</div><div class="cs-title">Quotas — Coming Soon</div><p>Set max instances, max volumes, max floating IPs per user to prevent resource exhaustion.</p></div>
+    </section>
+
+    <!-- API Keys -->
+    <section id="section-api-keys" class="console-section" style="display:none;">
+      <div class="section-header">
+        <div><h2>API Keys</h2><p>Programmatic access credentials (like AWS Access Key)</p></div>
+        <button class="btn btn-primary btn-sm" id="create-key-btn">+ Create Key</button>
+      </div>
+
+      <div id="key-create-form" class="inline-form" style="display:none;">
+        <input type="text" id="key-name" placeholder="Key name (e.g. my-laptop)" />
+        <button class="btn btn-primary btn-sm" id="key-save-btn">Create</button>
+        <button class="btn btn-ghost btn-sm" id="key-cancel-btn">Cancel</button>
+      </div>
+
+      <div id="key-secret-box" class="secret-box" style="display:none;">
+        <strong>⚠ Save your Secret Key now — it will NOT be shown again</strong>
+        <div class="secret-row"><span class="label">Access Key:</span><code id="disp-access-key"></code></div>
+        <div class="secret-row"><span class="label">Secret Key:</span><code id="disp-secret-key"></code></div>
+        <button class="btn btn-ghost btn-sm" id="key-secret-close" style="margin-top:8px;">I have saved it</button>
+      </div>
+
+      <p id="keys-empty" class="empty-state" style="display:none;">No API keys yet. Create one to get programmatic access.</p>
+      <table class="data-table" id="keys-table" style="display:none;">
+        <thead><tr><th>Name</th><th>Access Key</th><th>Created</th><th>Status</th><th></th></tr></thead>
+        <tbody id="keys-tbody"></tbody>
+      </table>
+    </section>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/auth.js"></script>
+<script src="/static/js/instances.js"></script>
+<script src="/static/js/images.js"></script>
+<script src="/static/js/network.js"></script>
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}

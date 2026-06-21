@@ -1,0 +1,19 @@
+[Unit]
+Description=Mini Cloud — Floating IP restore on boot
+# Run after the network stack is up so iptables rules land on real interfaces.
+After=network.target
+# Must finish before the Flask app starts (if you run it as a service too).
+Before=mini-cloud.service
+
+[Service]
+Type=oneshot
+# Adjust the path if you move the project.
+ExecStart=/usr/bin/python3 /home/khalid/ec2-local-cloud/mini-cloud/scripts/restore_fip.py
+# Keep the unit in "active" state after the script exits so other units
+# can depend on it and systemctl status shows it as succeeded.
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

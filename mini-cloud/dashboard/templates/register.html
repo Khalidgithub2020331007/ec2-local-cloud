@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Create Account — Mini Cloud{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+        <rect width="40" height="40" rx="8" fill="#2563eb"/>
+        <path d="M10 26c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="20" cy="16" r="3" fill="#fff"/>
+      </svg>
+      <span class="auth-logo-text">MiniCloud</span>
+    </div>
+
+    <h1 class="auth-title">Create your account</h1>
+    <p class="auth-subtitle">Get started with your personal cloud console</p>
+
+    <div id="error-msg" class="alert alert-error" style="display:none;"></div>
+    <div id="success-msg" class="alert alert-success" style="display:none;"></div>
+
+    <form id="register-form" novalidate>
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" placeholder="khalid" minlength="3" maxlength="32" required />
+        <span class="form-hint">3–32 characters</span>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email address</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" required />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" minlength="8" required />
+        <span class="form-hint">At least 8 characters</span>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full" id="reg-btn">
+        <span id="btn-text">Create Account</span>
+        <span id="btn-spinner" class="spinner" style="display:none;"></span>
+      </button>
+    </form>
+
+    <p class="auth-footer">
+      Already have an account? <a href="/">Sign in</a>
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/auth.js"></script>
+<script>
+  document.getElementById('register-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn     = document.getElementById('reg-btn');
+    const text    = document.getElementById('btn-text');
+    const spinner = document.getElementById('btn-spinner');
+    const errorDiv   = document.getElementById('error-msg');
+    const successDiv = document.getElementById('success-msg');
+
+    const username = document.getElementById('username').value.trim();
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+
+    if (username.length < 3) { showError(errorDiv, 'Username must be at least 3 characters.'); return; }
+    if (!email.includes('@')) { showError(errorDiv, 'Enter a valid email address.'); return; }
+    if (password.length < 8)  { showError(errorDiv, 'Password must be at least 8 characters.'); return; }
+
+    btn.disabled = true; text.style.display = 'none'; spinner.style.display = 'inline-block';
+
+    try {
+      const res = await fetch('/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        successDiv.textContent = 'Account created! Redirecting to login...';
+        successDiv.style.display = 'block';
+        setTimeout(() => window.location.href = '/', 1500);
+      } else {
+        showError(errorDiv, data.message || 'Registration failed.');
+      }
+    } catch (_) {
+      showError(errorDiv, 'Cannot connect to server.');
+    } finally {
+      btn.disabled = false; text.style.display = 'inline'; spinner.style.display = 'none';
+    }
+  });
+</script>
+{% endblock %}
