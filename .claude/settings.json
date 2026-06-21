@@ -124,7 +124,11 @@
       "Bash(sudo systemctl is-active devstack@o-api)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://10.200.193.64/load-balancer/v2/providers)",
       "Bash(kill -HUP 17358)",
-      "Bash(kill -TERM 17358)"
+      "Bash(kill -TERM 17358)",
+      "Bash(sudo systemctl status apache2)",
+      "Bash(python3 -c \"import sys,json; eps=json.load\\(sys.stdin\\)['endpoints']; [print\\(e['interface'], e['url']\\) for e in eps if e['interface']=='public']\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(len\\(d.get\\('users',[]\\)\\),'users'\\)\")",
+      "Bash(curl -s --max-time 20 http://localhost:5000/api/overview)"
     ],
     "additionalDirectories": [
       "/home/khalid/ec2-local-cloud/dashboard"
