@@ -57,6 +57,19 @@ def create_new_volume():
                         'message': f'size_gb must be between 1 and {MAX_VOLUME_SIZE_GB}',
                         'statusCode': 400}), 400
 
+    from app.quotas.models import check_quota
+    ok, limit, used = check_quota(g.current_user['id'], 'volumes')
+    if not ok:
+        return jsonify({'error': 'QUOTA_EXCEEDED',
+                        'message': f'Volume quota exceeded. Limit: {limit}, Current: {used}',
+                        'statusCode': 403}), 403
+
+    ok, limit, used = check_quota(g.current_user['id'], 'volume_gb', size_gb)
+    if not ok:
+        return jsonify({'error': 'QUOTA_EXCEEDED',
+                        'message': f'Volume storage quota exceeded. Limit: {limit} GB, Current: {used} GB, Requested: {size_gb} GB',
+                        'statusCode': 403}), 403
+
     volume_id = create_volume(g.current_user['id'], name, size_gb)
     try:
         create_lv(volume_id, size_gb)

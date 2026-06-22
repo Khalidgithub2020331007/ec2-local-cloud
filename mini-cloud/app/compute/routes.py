@@ -63,6 +63,26 @@ def launch():
     if not flavor:
         return jsonify({'error': 'VALIDATION_ERROR', 'message': f'Unknown flavor. Valid: {[f["name"] for f in list_flavors()]}', 'statusCode': 400}), 400
 
+    # Enforce quotas before doing any disk or libvirt work — fail fast and cheap
+    from app.quotas.models import check_quota
+    ok, limit, used = check_quota(g.current_user['id'], 'instances')
+    if not ok:
+        return jsonify({'error': 'QUOTA_EXCEEDED',
+                        'message': f'Instance quota exceeded. Limit: {limit}, Current: {used}',
+                        'statusCode': 403}), 403
+
+    ok, limit, used = check_quota(g.current_user['id'], 'vcpus', flavor['vcpus'])
+    if not ok:
+        return jsonify({'error': 'QUOTA_EXCEEDED',
+                        'message': f'vCPU quota exceeded. Limit: {limit}, Current: {used}, Requested: {flavor["vcpus"]}',
+                        'statusCode': 403}), 403
+
+    ok, limit, used = check_quota(g.current_user['id'], 'ram_mb', flavor['ram_mb'])
+    if not ok:
+        return jsonify({'error': 'QUOTA_EXCEEDED',
+                        'message': f'RAM quota exceeded. Limit: {limit} MB, Current: {used} MB, Requested: {flavor["ram_mb"]} MB',
+                        'statusCode': 403}), 403
+
     # Validate keypair belongs to this user before doing any expensive work
     keypair = None
     if keypair_id:
@@ -187,6 +207,9 @@ def action(instance_id):
                 delete_vm_sg_chain(instance_id)
             except RuntimeError:
                 pass
+            # Stop the websockify proxy so its port is freed immediately
+            from app.console.proxy import stop_console_proxy
+            stop_console_proxy(instance_id)
             terminate_vm(lname, instance_id)
             mark_terminated(instance_id)
             return jsonify({'message': 'Instance terminated'}), 200

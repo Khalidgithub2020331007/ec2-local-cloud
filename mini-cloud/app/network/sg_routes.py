@@ -49,6 +49,13 @@ def create_sg():
                         'message': 'name is required',
                         'statusCode': 400}), 400
 
+    from app.quotas.models import check_quota
+    ok, limit, used = check_quota(g.current_user['id'], 'security_groups')
+    if not ok:
+        return jsonify({'error': 'QUOTA_EXCEEDED',
+                        'message': f'Security group quota exceeded. Limit: {limit}, Current: {used}',
+                        'statusCode': 403}), 403
+
     group_id      = create_security_group(g.current_user['id'], name, description)
     group         = get_security_group(group_id)
     group['rules'] = []
@@ -136,6 +143,13 @@ def add_rule(group_id):
         return jsonify({'error': 'VALIDATION_ERROR',
                         'message': f'Invalid CIDR: {cidr}',
                         'statusCode': 400}), 400
+
+    from app.quotas.models import check_quota
+    ok, limit, used = check_quota(g.current_user['id'], 'security_group_rules')
+    if not ok:
+        return jsonify({'error': 'QUOTA_EXCEEDED',
+                        'message': f'Security group rules quota exceeded. Limit: {limit}, Current: {used}',
+                        'statusCode': 403}), 403
 
     rule_id = add_sg_rule_db(group_id, direction, protocol, port_min, port_max, cidr)
 

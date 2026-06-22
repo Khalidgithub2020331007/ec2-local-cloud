@@ -10,8 +10,8 @@ async function setupInstances() {
     document.getElementById('inst-image-select').value    = '';
     document.getElementById('inst-flavor').value          = '';
     document.getElementById('inst-keypair-select').value  = '';
-    // Refresh image and keypair lists each time modal opens so new items appear
-    await Promise.all([loadImagesForLaunch(), loadKeyPairsForLaunch()]);
+    // Refresh dropdowns each time modal opens so newly created resources appear
+    await Promise.all([loadImagesForLaunch(), loadKeyPairsForLaunch(), loadNetworksForLaunch(), loadSgsForLaunch()]);
   });
 
   ['modal-close', 'modal-cancel'].forEach(id => {
@@ -83,6 +83,9 @@ async function loadInstances() {
   if (!ok) return;
 
   const { instances } = data;
+  const statEl = document.getElementById('stat-instances');
+  if (statEl) statEl.textContent = instances.filter(i => i.status !== 'terminated').length;
+
   const empty     = document.getElementById('instances-empty');
   const wrap      = document.getElementById('instances-table-wrap');
   const tbody     = document.getElementById('instances-tbody');
@@ -129,9 +132,17 @@ function actionButtons(inst) {
     <div class="action-group">
       ${isRunning ? `<button class="btn btn-ghost btn-xs" onclick="doAction('${inst.id}','stop')">Stop</button>` : ''}
       ${isRunning ? `<button class="btn btn-ghost btn-xs" onclick="doAction('${inst.id}','reboot')">Reboot</button>` : ''}
+      ${isRunning ? `<button class="btn btn-ghost btn-xs" onclick="openConsole('${inst.id}')">Console</button>` : ''}
       ${isStopped ? `<button class="btn btn-ghost btn-xs" onclick="doAction('${inst.id}','start')">Start</button>` : ''}
       <button class="btn btn-danger btn-xs" onclick="doAction('${inst.id}','terminate')">Terminate</button>
     </div>`;
+}
+
+
+function openConsole(instanceId) {
+  // Open the noVNC console in a new tab — keeps the dashboard intact.
+  // The console page fetches its own WebSocket URL using the stored JWT token.
+  window.open(`/console/${instanceId}`, '_blank', 'noopener');
 }
 
 
@@ -140,6 +151,7 @@ async function launchInstance() {
   const flavor    = document.getElementById('inst-flavor').value;
   const imageId   = document.getElementById('inst-image-select').value;
   const keypairId = document.getElementById('inst-keypair-select').value;
+  const networkId = document.getElementById('inst-network-select') ? document.getElementById('inst-network-select').value : '';
   const errorDiv  = document.getElementById('launch-error');
   const btnText   = document.getElementById('modal-btn-text');
   const spinner   = document.getElementById('modal-spinner');
@@ -155,6 +167,13 @@ async function launchInstance() {
   const body = { name, flavor };
   if (imageId)   body.image_id   = imageId;
   if (keypairId) body.keypair_id = keypairId;
+  if (networkId) body.network_id = networkId;
+
+  // Collect multi-select security group IDs
+  const sgSelect = document.getElementById('inst-sg-select');
+  if (sgSelect) {
+    body.security_group_ids = Array.from(sgSelect.selectedOptions).map(o => o.value).filter(Boolean);
+  }
 
   const { ok, data } = await apiCall('POST', '/api/v1/compute/instances', body);
 
@@ -162,6 +181,7 @@ async function launchInstance() {
 
   if (ok) {
     document.getElementById('launch-modal').style.display = 'none';
+    showToast(`Instance "${name}" launched.`, 'success');
     await loadInstances();
   } else {
     showError(errorDiv, data.message || 'Launch failed.');
@@ -170,18 +190,19 @@ async function launchInstance() {
 
 
 async function doAction(instanceId, action) {
-  const confirmMsg = {
-    stop:      'Stop this instance?',
-    start:     'Start this instance?',
-    reboot:    'Reboot this instance?',
-    terminate: 'TERMINATE this instance? This will DELETE the VM and its disk permanently.',
-  };
-
-  if (!confirm(confirmMsg[action])) return;
+  // Only destructive actions need a confirmation modal — stop/start/reboot do not
+  if (action === 'terminate') {
+    const ok = await showConfirm(
+      'TERMINATE this instance?\n\nThis permanently deletes the VM and its disk. This cannot be undone.',
+      'Terminate'
+    );
+    if (!ok) return;
+  }
 
   const { ok, data } = await apiCall('POST', `/api/v1/compute/instances/${instanceId}/action`, { action });
-  if (!ok) { alert(data.message || `${action} failed.`); return; }
+  if (!ok) { showToast(data.message || `${action} failed.`, 'error'); return; }
 
-  // Action এর পরে table refresh করো
+  const labels = { stop: 'stopped', start: 'started', reboot: 'rebooting', terminate: 'terminated' };
+  showToast(`Instance ${labels[action] || action}.`, 'success');
   await loadInstances();
 }

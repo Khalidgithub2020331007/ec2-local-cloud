@@ -70,15 +70,17 @@ async function createNetwork() {
   }
 
   closeNetModal();
+  showToast(`Network "${name}" created.`, 'success');
   loadNetworks();
 }
 
 async function deleteNetwork(networkId) {
-  if (!confirm('Delete this network? The bridge and DHCP server will be removed.')) return;
+  if (!await showConfirm('Delete this network? The bridge and DHCP server will be removed.')) return;
   const { ok, data } = await apiCall('DELETE', '/api/v1/network/networks/' + networkId);
-  if (!ok) { alert(data.message || 'Failed to delete network.'); return; }
+  if (!ok) { showToast(data.message || 'Failed to delete network.', 'error'); return; }
+  showToast('Network deleted.', 'success');
   loadNetworks();
-  loadRouters(); // router list may change
+  loadRouters();
 }
 
 
@@ -150,13 +152,15 @@ async function createRouter() {
   }
 
   closeRouterModal();
+  showToast(`Router "${name}" created.`, 'success');
   loadRouters();
 }
 
 async function deleteRouter(routerId) {
-  if (!confirm('Delete this router? NAT rules will be removed.')) return;
+  if (!await showConfirm('Delete this router? NAT rules will be removed.')) return;
   const { ok, data } = await apiCall('DELETE', '/api/v1/network/routers/' + routerId);
-  if (!ok) { alert(data.message || 'Failed to delete router.'); return; }
+  if (!ok) { showToast(data.message || 'Failed to delete router.', 'error'); return; }
+  showToast('Router deleted.', 'success');
   loadRouters();
 }
 
@@ -206,7 +210,8 @@ async function loadFloatingIps() {
 
 async function allocateFloatingIp() {
   const { ok, data } = await apiCall('POST', '/api/v1/network/floating-ips', {});
-  if (!ok) { alert(data.message || 'Failed to allocate IP.'); return; }
+  if (!ok) { showToast(data.message || 'Failed to allocate IP.', 'error'); return; }
+  showToast('Floating IP allocated.', 'success');
   loadFloatingIps();
 }
 
@@ -233,30 +238,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function doAssociate() {
   const instanceId = document.getElementById('fip-instance-select').value;
-  if (!instanceId) { alert('Select an instance.'); return; }
+  if (!instanceId) { showToast('Select an instance.', 'error'); return; }
 
   const { ok, data } = await apiCall('POST',
     `/api/v1/network/floating-ips/${_pendingFipId}/associate`,
     { instance_id: instanceId });
 
-  if (!ok) { alert(data.message || 'Failed to associate.'); return; }
+  if (!ok) { showToast(data.message || 'Failed to associate.', 'error'); return; }
   document.getElementById('fip-associate-modal').style.display = 'none';
+  showToast('Floating IP associated.', 'success');
   loadFloatingIps();
 }
 
 async function disassociateFip(fipId) {
-  if (!confirm('Disassociate this floating IP?')) return;
+  if (!await showConfirm('Disassociate this floating IP?')) return;
   const { ok, data } = await apiCall('POST',
     `/api/v1/network/floating-ips/${fipId}/disassociate`, {});
-  if (!ok) { alert(data.message || 'Failed.'); return; }
+  if (!ok) { showToast(data.message || 'Failed.', 'error'); return; }
+  showToast('Floating IP disassociated.', 'success');
   loadFloatingIps();
 }
 
 async function releaseFip(fipId) {
-  if (!confirm('Release this floating IP? It will be returned to the pool.')) return;
+  if (!await showConfirm('Release this floating IP? It will be returned to the pool.')) return;
   const { ok, data } = await apiCall('DELETE',
     `/api/v1/network/floating-ips/${fipId}`);
-  if (!ok) { alert(data.message || 'Failed.'); return; }
+  if (!ok) { showToast(data.message || 'Failed.', 'error'); return; }
+  showToast('Floating IP released.', 'success');
   loadFloatingIps();
 }
 

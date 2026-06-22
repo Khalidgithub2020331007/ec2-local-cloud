@@ -132,15 +132,17 @@ function uploadImage() {
 
 
 async function deleteImage(imageId) {
-  if (!confirm('Delete this image? This cannot be undone.')) return;
+  if (!await showConfirm('Delete this image? This cannot be undone.')) return;
   const { ok, data } = await apiCall('DELETE', '/api/v1/images/' + imageId);
-  if (!ok) { alert(data.message || 'Delete failed.'); return; }
+  if (!ok) { showToast(data.message || 'Delete failed.', 'error'); return; }
+  showToast('Image deleted.', 'success');
   loadImages();
 }
 
 
 async function toggleImageVisibility(imageId, makePublic) {
   const { ok, data } = await apiCall('POST', `/api/v1/images/${imageId}/visibility`, { is_public: makePublic });
-  if (!ok) { alert(data.message || 'Could not update visibility.'); return; }
+  if (!ok) { showToast(data.message || 'Could not update visibility.', 'error'); return; }
+  showToast(`Image is now ${makePublic ? 'public' : 'private'}.`, 'success');
   loadImages();
 }

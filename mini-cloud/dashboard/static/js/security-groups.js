@@ -84,9 +84,10 @@ function showSgCreateError(msg) {
 }
 
 async function deleteSecurityGroup(groupId, groupName) {
-  if (!confirm(`Delete security group "${groupName}"? This cannot be undone.`)) return;
+  if (!await showConfirm(`Delete security group "${groupName}"? This cannot be undone.`)) return;
   const { ok, data } = await apiCall('DELETE', `/api/v1/security-groups/${groupId}`);
-  if (!ok) { alert(data.message || 'Failed to delete security group.'); return; }
+  if (!ok) { showToast(data.message || 'Failed to delete security group.', 'error'); return; }
+  showToast(`Security group "${groupName}" deleted.`, 'success');
   loadSecurityGroups();
 }
 
@@ -192,7 +193,7 @@ async function addSgRule() {
 async function deleteSgRule(ruleId) {
   if (!_activeSgId) return;
   const { ok, data } = await apiCall('DELETE', `/api/v1/security-groups/${_activeSgId}/rules/${ruleId}`);
-  if (!ok) { alert(data.message || 'Failed to remove rule.'); return; }
+  if (!ok) { showToast(data.message || 'Failed to remove rule.', 'error'); return; }
   loadSgRules();
 }
 
@@ -232,7 +233,7 @@ async function attachSgToVm() {
   if (!ok) { errEl.textContent = data.message || 'Failed to attach.'; errEl.style.display = 'block'; return; }
 
   errEl.style.display = 'none';
-  alert(`Security group attached to VM successfully.\niptables chain updated — rules are now enforced.`);
+  showToast('Security group attached — iptables rules are now enforced.', 'success');
 }
 
 async function detachSgFromVm() {
@@ -247,5 +248,5 @@ async function detachSgFromVm() {
   if (!ok) { errEl.textContent = data.message || 'Failed to detach.'; errEl.style.display = 'block'; return; }
 
   errEl.style.display = 'none';
-  alert('Security group detached. iptables chain rebuilt without these rules.');
+  showToast('Security group detached — iptables chain rebuilt.', 'success');
 }

@@ -27,6 +27,13 @@ def generate():
     if not name:
         return jsonify({'error': 'VALIDATION_ERROR', 'message': 'name is required', 'statusCode': 400}), 400
 
+    from app.quotas.models import check_quota
+    ok, limit, used = check_quota(g.current_user['id'], 'key_pairs')
+    if not ok:
+        return jsonify({'error': 'QUOTA_EXCEEDED',
+                        'message': f'Key pair quota exceeded. Limit: {limit}, Current: {used}',
+                        'statusCode': 403}), 403
+
     private_pem, public_openssh = generate_rsa_keypair()
     fingerprint = compute_fingerprint(public_openssh)
     keypair_id  = create_keypair(g.current_user['id'], name, public_openssh, fingerprint)
@@ -53,6 +60,14 @@ def upload():
         return jsonify({'error': 'VALIDATION_ERROR', 'message': 'name is required', 'statusCode': 400}), 400
     if not public_key:
         return jsonify({'error': 'VALIDATION_ERROR', 'message': 'public_key is required', 'statusCode': 400}), 400
+
+    from app.quotas.models import check_quota
+    ok, limit, used = check_quota(g.current_user['id'], 'key_pairs')
+    if not ok:
+        return jsonify({'error': 'QUOTA_EXCEEDED',
+                        'message': f'Key pair quota exceeded. Limit: {limit}, Current: {used}',
+                        'statusCode': 403}), 403
+
     if len(public_key.encode()) > _MAX_PUBLIC_KEY_BYTES:
         return jsonify({'error': 'VALIDATION_ERROR', 'message': 'public_key too large', 'statusCode': 400}), 400
 

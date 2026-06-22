@@ -59,6 +59,7 @@ async function createVolume() {
   if (!ok) { showError(errEl, data.message || 'Failed to create volume.'); return; }
 
   closeCreateVolumeModal();
+  showToast('Volume created.', 'success');
   loadVolumes();
 }
 
@@ -127,14 +128,15 @@ async function openAttachModal(volumeId) {
   select.innerHTML = '<option value="">Loading instances...</option>';
   document.getElementById('vol-attach-modal').style.display = 'flex';
 
-  const { ok, data } = await apiCall('GET', '/api/v1/instances');
+  // /api/v1/compute/instances is the correct path — /api/v1/instances doesn't exist
+  const { ok, data } = await apiCall('GET', '/api/v1/compute/instances');
   select.innerHTML = '';
-  if (!ok || data.instances.length === 0) {
+  if (!ok || !data.instances || data.instances.length === 0) {
     select.innerHTML = '<option value="">No instances available</option>';
     return;
   }
-  // Show all instances — attach to stopped VM is valid (volume appears on next boot).
-  data.instances.forEach(inst => {
+  // Show all instances — attaching to a stopped VM is valid (device appears on next boot).
+  data.instances.filter(i => i.status !== 'terminated').forEach(inst => {
     const opt = document.createElement('option');
     opt.value       = inst.id;
     opt.textContent = `${inst.name}  (${inst.status})`;
@@ -161,6 +163,7 @@ async function doAttach() {
   if (!ok) { showError(errEl, data.message || 'Attach failed.'); return; }
 
   closeAttachModal();
+  showToast('Volume attached.', 'success');
   loadVolumes();
 }
 
@@ -168,10 +171,11 @@ async function doAttach() {
 // ── Detach Volume ─────────────────────────────────────────────────────────────
 
 async function doDetach(volumeId) {
-  if (!confirm('Detach this volume? Make sure the guest OS has unmounted it first to avoid data corruption.')) return;
+  if (!await showConfirm('Detach this volume?\n\nMake sure the guest OS has unmounted it first to avoid data corruption.', 'Detach')) return;
 
   const { ok, data } = await apiCall('POST', `/api/v1/volumes/${volumeId}/detach`);
-  if (!ok) { alert(data.message || 'Detach failed.'); return; }
+  if (!ok) { showToast(data.message || 'Detach failed.', 'error'); return; }
+  showToast('Volume detached.', 'success');
   loadVolumes();
 }
 
@@ -179,10 +183,11 @@ async function doDetach(volumeId) {
 // ── Delete Volume ─────────────────────────────────────────────────────────────
 
 async function deleteVolume(volumeId, volumeName) {
-  if (!confirm(`Delete volume "${volumeName}"? This permanently destroys its LVM logical volume and all data.`)) return;
+  if (!await showConfirm(`Delete volume "${volumeName}"?\n\nThis permanently destroys the LVM logical volume and all data.`)) return;
 
   const { ok, data } = await apiCall('DELETE', `/api/v1/volumes/${volumeId}`);
-  if (!ok) { alert(data.message || 'Delete failed.'); return; }
+  if (!ok) { showToast(data.message || 'Delete failed.', 'error'); return; }
+  showToast('Volume deleted.', 'success');
   loadVolumes();
 }
 
@@ -216,7 +221,7 @@ async function doCreateSnapshot() {
   if (!ok) { showError(errEl, data.message || 'Snapshot failed.'); return; }
 
   closeSnapModal();
-  // Refresh both sections since the snapshot list may be visible.
+  showToast('Snapshot created.', 'success');
   loadVolumes();
   loadSnapshots();
 }
@@ -282,6 +287,7 @@ async function doRestoreSnapshot() {
   if (!ok) { showError(errEl, data.message || 'Restore failed.'); return; }
 
   closeRestoreModal();
+  showToast('Volume restored from snapshot.', 'success');
   loadVolumes();
   loadSnapshots();
 }
@@ -290,9 +296,10 @@ async function doRestoreSnapshot() {
 // ── Delete Snapshot ───────────────────────────────────────────────────────────
 
 async function deleteSnapshot(snapId, snapName) {
-  if (!confirm(`Delete snapshot "${snapName}"? This is permanent and cannot be undone.`)) return;
+  if (!await showConfirm(`Delete snapshot "${snapName}"? This is permanent and cannot be undone.`)) return;
 
   const { ok, data } = await apiCall('DELETE', `/api/v1/snapshots/${snapId}`);
-  if (!ok) { alert(data.message || 'Delete failed.'); return; }
+  if (!ok) { showToast(data.message || 'Delete failed.', 'error'); return; }
+  showToast('Snapshot deleted.', 'success');
   loadSnapshots();
 }

@@ -223,5 +223,261 @@ def init_db():
         )
     ''')
 
+    # Quota defaults — one row per resource type, system-wide baseline for all users.
+    # These are seeded once; admin can update them via PUT /api/v1/quotas/defaults.
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS quota_defaults (
+            resource_type TEXT PRIMARY KEY,
+            limit_value   INTEGER NOT NULL
+        )
+    ''')
+
+    # Per-user quota overrides — only present when admin grants a user a custom limit.
+    # Logic: check this table first; if no row, fall back to quota_defaults.
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS quota_user_overrides (
+            user_id       TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            limit_value   INTEGER NOT NULL,
+            PRIMARY KEY (user_id, resource_type),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Load Balancers — each row is one HAProxy frontend+backend pair.
+    # port is UNIQUE because two frontends cannot bind the same port on the host.
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS load_balancers (
+            id          TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL,
+            name        TEXT NOT NULL,
+            port        INTEGER NOT NULL UNIQUE,
+            algorithm   TEXT NOT NULL DEFAULT 'roundrobin',
+            status      TEXT NOT NULL DEFAULT 'active',
+            created_at  TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # LB Members — each row maps one VM into a load balancer's HAProxy backend.
+    # (lb_id, vm_id) is UNIQUE: a VM can be added to the same LB only once.
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS lb_members (
+            id            TEXT PRIMARY KEY,
+            lb_id         TEXT NOT NULL,
+            vm_id         TEXT NOT NULL,
+            vm_private_ip TEXT NOT NULL,
+            member_port   INTEGER NOT NULL,
+            status        TEXT NOT NULL DEFAULT 'active',
+            created_at    TEXT NOT NULL,
+            UNIQUE (lb_id, vm_id),
+            FOREIGN KEY (lb_id) REFERENCES load_balancers(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # source column — 'manual' for user-launched instances, 'autoscaling' for ASG-managed ones
+    try:
+        cursor.execute("ALTER TABLE instances ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
+    except Exception:
+        pass  # Column already exists
+
+    # Auto Scaling Groups — each row is one scaling policy + VM template
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS autoscaling_groups (
+            id                   TEXT PRIMARY KEY,
+            user_id              TEXT NOT NULL,
+            name                 TEXT NOT NULL,
+            image_id             TEXT,
+            flavor               TEXT NOT NULL,
+            network_id           TEXT,
+            keypair_id           TEXT,
+            security_group_id    TEXT,
+            min_instances        INTEGER NOT NULL DEFAULT 1,
+            max_instances        INTEGER NOT NULL DEFAULT 5,
+            scale_up_threshold   REAL NOT NULL DEFAULT 70.0,
+            scale_down_threshold REAL NOT NULL DEFAULT 30.0,
+            cooldown_seconds     INTEGER NOT NULL DEFAULT 120,
+            lb_id                TEXT,
+            lb_member_port       INTEGER,
+            last_action_at       TEXT,
+            status               TEXT NOT NULL DEFAULT 'active',
+            created_at           TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Instances currently managed by an ASG
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS asg_instances (
+            id          TEXT PRIMARY KEY,
+            asg_id      TEXT NOT NULL,
+            vm_id       TEXT NOT NULL,
+            launched_at TEXT NOT NULL,
+            FOREIGN KEY (asg_id) REFERENCES autoscaling_groups(id) ON DELETE CASCADE,
+            FOREIGN KEY (vm_id)  REFERENCES instances(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Audit log of every scale-up / scale-down / ensure_min action
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS asg_events (
+            id             TEXT PRIMARY KEY,
+            asg_id         TEXT NOT NULL,
+            action         TEXT NOT NULL,
+            instance_count INTEGER NOT NULL,
+            avg_cpu        REAL NOT NULL,
+            reason         TEXT NOT NULL,
+            created_at     TEXT NOT NULL,
+            FOREIGN KEY (asg_id) REFERENCES autoscaling_groups(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # ─── IAM tables ───────────────────────────────────────────────────────────
+
+    # IAM Users — distinct from login accounts; represent service identities
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS iam_users (
+            id         TEXT PRIMARY KEY,
+            username   TEXT UNIQUE NOT NULL,
+            arn        TEXT UNIQUE NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    ''')
+
+    # IAM Groups — collections of IAM users that share the same policies
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS iam_groups (
+            id         TEXT PRIMARY KEY,
+            name       TEXT UNIQUE NOT NULL,
+            arn        TEXT UNIQUE NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    ''')
+
+    # Many-to-many: which IAM users belong to which group
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS iam_group_members (
+            group_id TEXT NOT NULL,
+            user_id  TEXT NOT NULL,
+            PRIMARY KEY (group_id, user_id),
+            FOREIGN KEY (group_id) REFERENCES iam_groups(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id)  REFERENCES iam_users(id)  ON DELETE CASCADE
+        )
+    ''')
+
+    # IAM Roles — assumed by trusted services (e.g. EC2 assumes a role to access S3)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS iam_roles (
+            id                TEXT PRIMARY KEY,
+            name              TEXT UNIQUE NOT NULL,
+            arn               TEXT UNIQUE NOT NULL,
+            description       TEXT NOT NULL DEFAULT '',
+            trusted_service   TEXT NOT NULL,
+            trust_policy_json TEXT NOT NULL,
+            created_at        TEXT NOT NULL
+        )
+    ''')
+
+    # IAM Policies — JSON permission documents; type='managed' rows are seeded and protected
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS iam_policies (
+            id          TEXT PRIMARY KEY,
+            name        TEXT UNIQUE NOT NULL,
+            arn         TEXT UNIQUE NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            policy_json TEXT NOT NULL,
+            type        TEXT NOT NULL CHECK (type IN ('managed', 'customer')),
+            created_at  TEXT NOT NULL
+        )
+    ''')
+
+    # Policy attachments — one row per policy↔entity binding
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS iam_attachments (
+            id          TEXT PRIMARY KEY,
+            policy_id   TEXT NOT NULL,
+            entity_type TEXT NOT NULL CHECK (entity_type IN ('user', 'group', 'role')),
+            entity_id   TEXT NOT NULL,
+            created_at  TEXT NOT NULL,
+            UNIQUE (policy_id, entity_type, entity_id),
+            FOREIGN KEY (policy_id) REFERENCES iam_policies(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Seed the 7 AWS-managed policies once; skip if already present (idempotent)
+    existing_policies = cursor.execute(
+        "SELECT COUNT(*) FROM iam_policies WHERE type = 'managed'"
+    ).fetchone()[0]
+    if existing_policies == 0:
+        import json as _json
+        import uuid as _uuid
+
+        _ACCOUNT = '123456789012'
+
+        def _seed_policy(name, description, statement):
+            pid  = str(_uuid.uuid4())
+            arn  = f'arn:minicloud:iam::{_ACCOUNT}:policy/{name}'
+            doc  = _json.dumps({'Version': '2012-10-17', 'Statement': [statement]})
+            cursor.execute(
+                '''INSERT INTO iam_policies (id, name, arn, description, policy_json, type, created_at)
+                   VALUES (?, ?, ?, ?, ?, 'managed', datetime('now'))''',
+                (pid, name, arn, description, doc),
+            )
+
+        _seed_policy(
+            'AdministratorAccess',
+            'Provides full access to all services and resources.',
+            {'Effect': 'Allow', 'Action': '*', 'Resource': '*'},
+        )
+        _seed_policy(
+            'PowerUserAccess',
+            'Provides full access except IAM operations.',
+            {'Effect': 'Allow', 'NotAction': 'iam:*', 'Resource': '*'},
+        )
+        _seed_policy(
+            'ReadOnlyAccess',
+            'Provides read-only access to EC2 and IAM describe/list operations.',
+            {'Effect': 'Allow', 'Action': ['ec2:Describe*', 'iam:Get*', 'iam:List*'], 'Resource': '*'},
+        )
+        _seed_policy(
+            'AmazonEC2FullAccess',
+            'Provides full access to all EC2 operations.',
+            {'Effect': 'Allow', 'Action': 'ec2:*', 'Resource': '*'},
+        )
+        _seed_policy(
+            'AmazonEC2ReadOnlyAccess',
+            'Provides read-only access to EC2 Describe operations.',
+            {'Effect': 'Allow', 'Action': 'ec2:Describe*', 'Resource': '*'},
+        )
+        _seed_policy(
+            'IAMFullAccess',
+            'Provides full access to all IAM operations.',
+            {'Effect': 'Allow', 'Action': 'iam:*', 'Resource': '*'},
+        )
+        _seed_policy(
+            'IAMReadOnlyAccess',
+            'Provides read-only access to IAM Get and List operations.',
+            {'Effect': 'Allow', 'Action': ['iam:Get*', 'iam:List*'], 'Resource': '*'},
+        )
+
+    # Seed default limits only if the table is empty (idempotent on restart)
+    existing = cursor.execute('SELECT COUNT(*) FROM quota_defaults').fetchone()[0]
+    if existing == 0:
+        defaults = [
+            ('instances',            5),
+            ('vcpus',                10),
+            ('ram_mb',               10240),
+            ('volumes',              10),
+            ('volume_gb',            500),
+            ('floating_ips',         5),
+            ('security_groups',      10),
+            ('security_group_rules', 50),
+            ('key_pairs',            10),
+        ]
+        cursor.executemany(
+            'INSERT INTO quota_defaults (resource_type, limit_value) VALUES (?, ?)',
+            defaults,
+        )
+
     conn.commit()
     conn.close()

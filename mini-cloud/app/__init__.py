@@ -9,6 +9,11 @@ from app.network.sg_routes import sg_bp
 from app.keypairs.routes import keypairs_bp
 from app.storage.routes import storage_bp
 from app.monitoring.routes import monitoring_bp
+from app.quotas.routes import quotas_bp
+from app.load_balancers.routes import lb_bp
+from app.autoscaling.routes import asg_bp
+from app.iam.routes import iam_bp
+from app.console.routes import console_bp
 
 
 def restore_all_sg_chains():
@@ -48,6 +53,15 @@ def create_app():
     app.register_blueprint(keypairs_bp)
     app.register_blueprint(storage_bp)
     app.register_blueprint(monitoring_bp)
+    app.register_blueprint(quotas_bp)
+    app.register_blueprint(lb_bp)
+    app.register_blueprint(asg_bp)
+    app.register_blueprint(iam_bp)
+    app.register_blueprint(console_bp)
+
+    # Start the autoscaling monitor thread — runs every 30 s in the background
+    from app.autoscaling.monitor import start_monitor
+    start_monitor()
 
     # Dashboard page routes
     @app.route('/')

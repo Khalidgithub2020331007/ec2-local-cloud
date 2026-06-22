@@ -128,6 +128,8 @@ a:hover { text-decoration: underline; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
 .badge-green { background: var(--green-light); color: var(--green); }
 .badge-red   { background: var(--red-light); color: var(--red); }
+.badge-blue  { background: #dbeafe; color: #1d4ed8; }
+.badge-amber { background: #fef3c7; color: #92400e; }
 
 /* ─── Sidebar Nav Groups ────────────────────────────────────────── */
 .nav-group-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.25); padding: 14px 12px 4px; }
@@ -220,3 +222,57 @@ select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px r
 .mon-net-val  { font-size: 13px; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
 
 .mon-note { font-size: 12px; color: var(--gray-400); margin-top: 20px; padding: 10px 14px; background: var(--gray-100); border-radius: var(--radius); border-left: 3px solid var(--gray-200); }
+
+/* ─── Toast Notifications ────────────────────────────────────────── */
+#toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast { min-width: 280px; max-width: 380px; padding: 12px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,.15); display: flex; align-items: center; gap: 10px; pointer-events: auto; animation: toast-in .2s ease; transition: opacity .3s ease, transform .3s ease; }
+.toast-success { background: #fff; border-left: 4px solid var(--green); color: var(--text); }
+.toast-error   { background: #fff; border-left: 4px solid var(--red);   color: var(--text); }
+.toast-info    { background: #fff; border-left: 4px solid var(--blue);  color: var(--text); }
+.toast-icon    { font-size: 15px; flex-shrink: 0; }
+.toast-fade-out { opacity: 0; transform: translateX(20px); }
+@keyframes toast-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ─── Sidebar scroll ─────────────────────────────────────────────── */
+.sidebar-nav { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.1) transparent; }
+.sidebar-nav::-webkit-scrollbar { width: 4px; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
+
+/* ─── DevStack Service Cards ─────────────────────────────────────── */
+.service-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.service-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+.service-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.service-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.service-desc { font-size: 12px; color: var(--gray-400); margin-bottom: 10px; line-height: 1.5; }
+.service-checked { font-size: 11px; color: var(--gray-400); border-top: 1px solid var(--gray-100); padding-top: 8px; margin-top: 6px; }
+
+/* ─── IAM Tabs ───────────────────────────────────────────────────── */
+.tab-bar { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 24px; }
+.tab-btn { padding: 9px 18px; font-size: 13px; font-weight: 500; color: var(--gray-600); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color .15s, border-color .15s; }
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ─── Monitoring Overview ────────────────────────────────────────── */
+.mon-overview-counts { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.moc { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+.moc-label { font-size: 11px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+.moc-value { font-size: 28px; font-weight: 700; color: var(--text); }
+.moc-sub   { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+
+/* ─── Service Quotas ─────────────────────────────────────────────── */
+.quota-row { margin-bottom: 18px; }
+.quota-row-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.quota-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.quota-counts { font-size: 12px; color: var(--gray-600); }
+.quota-used  { font-weight: 600; color: var(--text); }
+.quota-sep   { color: var(--gray-400); margin: 0 2px; }
+.quota-limit { color: var(--gray-600); }
+.quota-avail { color: var(--gray-400); }
+.quota-bar-track { height: 8px; background: var(--gray-100); border-radius: 4px; overflow: hidden; }
+.quota-bar-fill  { height: 100%; border-radius: 4px; transition: width .4s ease; }
+.quota-bar-green  { background: var(--green); }
+.quota-bar-orange { background: #f59e0b; }
+.quota-bar-red    { background: var(--red); }
+.quota-pct { font-size: 11px; color: var(--gray-400); margin-top: 3px; text-align: right; }

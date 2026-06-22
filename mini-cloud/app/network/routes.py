@@ -192,6 +192,13 @@ def list_fips():
 @network_bp.route('/floating-ips', methods=['POST'])
 @require_auth
 def allocate_fip():
+    from app.quotas.models import check_quota
+    ok, limit, used = check_quota(g.current_user['id'], 'floating_ips')
+    if not ok:
+        return jsonify({'error': 'QUOTA_EXCEEDED',
+                        'message': f'Floating IP quota exceeded. Limit: {limit}, Current: {used}',
+                        'statusCode': 403}), 403
+
     fip = get_next_floating_ip()
     if not fip:
         return jsonify({'error': 'POOL_EXHAUSTED',

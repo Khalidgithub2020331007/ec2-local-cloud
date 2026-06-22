@@ -116,10 +116,11 @@ async function uploadKeyPair() {
 
 
 async function deleteKeyPair(keypairId, keypairName) {
-  if (!confirm(`Delete key pair "${keypairName}"? Running instances that use it will not be affected.`)) return;
+  if (!await showConfirm(`Delete key pair "${keypairName}"? Running instances that use it will not be affected.`)) return;
 
   const { ok, data } = await apiCall('DELETE', `/api/v1/keypairs/${keypairId}`);
-  if (!ok) { alert(data.message || 'Delete failed.'); return; }
+  if (!ok) { showToast(data.message || 'Delete failed.', 'error'); return; }
+  showToast(`Key pair "${keypairName}" deleted.`, 'success');
   loadKeyPairs();
 }
 
@@ -143,10 +144,42 @@ async function loadKeyPairsForLaunch() {
   const select = document.getElementById('inst-keypair-select');
   while (select.options.length > 1) select.remove(1);
 
-  data.keypairs.forEach(kp => {
+  (data.keypairs || []).forEach(kp => {
     const opt = document.createElement('option');
     opt.value = kp.id;
     opt.textContent = `${kp.name}  (${kp.fingerprint.slice(0, 14)}…)`;
+    select.appendChild(opt);
+  });
+}
+
+// Populate the network dropdown in the launch modal
+async function loadNetworksForLaunch() {
+  const select = document.getElementById('inst-network-select');
+  if (!select) return;
+  while (select.options.length > 1) select.remove(1);
+
+  const { ok, data } = await apiCall('GET', '/api/v1/network/networks');
+  if (!ok || !data.networks) return;
+  data.networks.forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n.id;
+    opt.textContent = `${n.name}  (${n.cidr})`;
+    select.appendChild(opt);
+  });
+}
+
+// Populate the security-group multi-select in the launch modal
+async function loadSgsForLaunch() {
+  const select = document.getElementById('inst-sg-select');
+  if (!select) return;
+  select.innerHTML = '';
+
+  const { ok, data } = await apiCall('GET', '/api/v1/security-groups');
+  if (!ok || !data.security_groups) return;
+  data.security_groups.forEach(sg => {
+    const opt = document.createElement('option');
+    opt.value = sg.id;
+    opt.textContent = `${sg.name}  (${sg.rules ? sg.rules.length : 0} rules)`;
     select.appendChild(opt);
   });
 }

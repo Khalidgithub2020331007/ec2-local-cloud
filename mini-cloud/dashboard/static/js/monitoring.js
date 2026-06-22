@@ -11,7 +11,8 @@
   // ── Helpers ──────────────────────────────────────────────────────
 
   function authHeaders() {
-    const token = localStorage.getItem('token');
+    // mc_token is the key used by the rest of the dashboard — must match auth.js getToken()
+    const token = localStorage.getItem('mc_token');
     return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
   }
 
@@ -175,7 +176,7 @@
   // monitoring section becoming visible so we start/stop the refresh timer.
 
   function observeSection() {
-    const section = document.getElementById('section-monitoring');
+    const section = document.getElementById('section-metrics');
     if (!section) return;
 
     // MutationObserver on the display style change
@@ -198,7 +199,7 @@
     observeSection();
 
     // If monitoring is the active section on first load, start immediately
-    const section = document.getElementById('section-monitoring');
+    const section = document.getElementById('section-metrics');
     if (section && section.style.display !== 'none') {
       startAutoRefresh();
     }
