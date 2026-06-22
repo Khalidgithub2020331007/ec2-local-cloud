@@ -8,6 +8,7 @@ from app.network.routes import network_bp
 from app.network.sg_routes import sg_bp
 from app.keypairs.routes import keypairs_bp
 from app.storage.routes import storage_bp
+from app.monitoring.routes import monitoring_bp
 
 
 def restore_all_sg_chains():
@@ -46,6 +47,7 @@ def create_app():
     app.register_blueprint(sg_bp)
     app.register_blueprint(keypairs_bp)
     app.register_blueprint(storage_bp)
+    app.register_blueprint(monitoring_bp)
 
     # Dashboard page routes
     @app.route('/')

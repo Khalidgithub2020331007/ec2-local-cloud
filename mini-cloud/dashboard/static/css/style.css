@@ -198,3 +198,25 @@ select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px r
 
 /* ─── Table row sub-hint ─────────────────────────────────────────── */
 .row-hint { font-size: 11px; color: var(--gray-400); font-weight: 400; }
+
+/* ─── Monitoring ─────────────────────────────────────────────────── */
+.mon-host-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+
+.mon-metric-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+.mon-metric-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.mon-metric-label { font-size: 12px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: .04em; }
+.mon-metric-value { font-size: 20px; font-weight: 700; color: var(--text); }
+.mon-metric-sub   { font-size: 11px; color: var(--gray-400); margin-top: 6px; }
+
+.mon-bar-track { height: 8px; background: var(--gray-200); border-radius: 99px; overflow: hidden; }
+.mon-bar-fill  { height: 100%; width: 0%; border-radius: 99px; transition: width .4s ease, background-color .4s ease; }
+.mon-bar-green  { background: #16a34a; }
+.mon-bar-orange { background: #ea580c; }
+.mon-bar-red    { background: var(--red); }
+
+.mon-net-row  { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--gray-100); }
+.mon-net-row:last-of-type { border-bottom: none; }
+.mon-net-dir  { font-size: 12px; font-weight: 600; color: var(--gray-600); }
+.mon-net-val  { font-size: 13px; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
+
+.mon-note { font-size: 12px; color: var(--gray-400); margin-top: 20px; padding: 10px 14px; background: var(--gray-100); border-radius: var(--radius); border-left: 3px solid var(--gray-200); }

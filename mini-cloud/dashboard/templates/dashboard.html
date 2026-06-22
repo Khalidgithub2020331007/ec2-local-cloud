@@ -192,7 +192,7 @@
           <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 6 — Security Groups</strong><span>Firewall rules per instance</span></div></div>
           <div class="step done"><div class="step-dot"></div><div class="step-body"><strong>Step 7 — SSH Key Pairs</strong><span>Generate/import RSA keypairs, inject via cloud-init ISO at boot</span></div></div>
           <div class="step done"><div class="step-dot"></div><div class="step-body"><strong>Step 8 — Block Storage</strong><span>LVM volumes, LVM snapshots, libvirt hotplug attach/detach</span></div></div>
-          <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 9 — Monitoring</strong><span>CPU, RAM, disk usage per instance</span></div></div>
+          <div class="step done"><div class="step-dot"></div><div class="step-body"><strong>Step 9 — Monitoring</strong><span>Host CPU/RAM/disk/network + per-VM metrics via libvirt and /proc</span></div></div>
           <div class="step pending"><div class="step-dot"></div><div class="step-body"><strong>Step 10 — Load Balancers + Auto Scaling</strong><span>Traffic distribution, scale groups</span></div></div>
         </div>
       </div>
@@ -341,8 +341,81 @@
 
     <!-- Monitoring -->
     <section id="section-monitoring" class="console-section" style="display:none;">
-      <div class="section-header"><div><h2>Monitoring</h2><p>Real-time resource usage per instance</p></div></div>
-      <div class="coming-soon-card"><div class="cs-icon">📊</div><div class="cs-title">Monitoring — Coming in Step 9</div><p>CPU %, RAM usage, disk I/O, network traffic — pulled from libvirt stats and /proc.</p></div>
+      <div class="section-header">
+        <div><h2>Monitoring</h2><p>Host resources and per-VM metrics — auto-refreshes every 10 seconds</p></div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span id="mon-last-updated" style="font-size:12px;color:var(--gray-400);"></span>
+          <button class="btn btn-ghost btn-sm" id="mon-refresh-btn">Refresh Now</button>
+        </div>
+      </div>
+
+      <!-- Host resource bars -->
+      <div id="mon-host-error" class="alert alert-error" style="display:none;"></div>
+      <div class="mon-host-grid" id="mon-host-grid">
+        <div class="mon-metric-card" id="mon-cpu-card">
+          <div class="mon-metric-header">
+            <span class="mon-metric-label">CPU Usage</span>
+            <span class="mon-metric-value" id="mon-cpu-value">—</span>
+          </div>
+          <div class="mon-bar-track"><div class="mon-bar-fill" id="mon-cpu-bar"></div></div>
+          <div class="mon-metric-sub" id="mon-cpu-sub">Reading...</div>
+        </div>
+        <div class="mon-metric-card" id="mon-ram-card">
+          <div class="mon-metric-header">
+            <span class="mon-metric-label">RAM</span>
+            <span class="mon-metric-value" id="mon-ram-value">—</span>
+          </div>
+          <div class="mon-bar-track"><div class="mon-bar-fill" id="mon-ram-bar"></div></div>
+          <div class="mon-metric-sub" id="mon-ram-sub">Reading...</div>
+        </div>
+        <div class="mon-metric-card" id="mon-disk-card">
+          <div class="mon-metric-header">
+            <span class="mon-metric-label">Disk (/)</span>
+            <span class="mon-metric-value" id="mon-disk-value">—</span>
+          </div>
+          <div class="mon-bar-track"><div class="mon-bar-fill" id="mon-disk-bar"></div></div>
+          <div class="mon-metric-sub" id="mon-disk-sub">Reading...</div>
+        </div>
+        <div class="mon-metric-card">
+          <div class="mon-metric-header">
+            <span class="mon-metric-label">Network (wlp0s20f3)</span>
+          </div>
+          <div class="mon-net-row">
+            <span class="mon-net-dir">&#8595; RX</span>
+            <span class="mon-net-val" id="mon-rx-val">—</span>
+          </div>
+          <div class="mon-net-row">
+            <span class="mon-net-dir">&#8593; TX</span>
+            <span class="mon-net-val" id="mon-tx-val">—</span>
+          </div>
+          <div class="mon-metric-sub">Cumulative totals since last boot</div>
+        </div>
+      </div>
+
+      <!-- VM metrics table -->
+      <div style="margin-top:28px;">
+        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px;">Virtual Machine Metrics</h3>
+        <p id="mon-vms-empty" class="empty-state" style="display:none;">No instances yet. Launch one from the Instances section.</p>
+        <div id="mon-vms-table-wrap" style="display:none;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>CPU Time (ns)</th>
+                <th>RAM Alloc</th>
+                <th>Disk Read</th>
+                <th>Disk Write</th>
+                <th>Net RX</th>
+                <th>Net TX</th>
+              </tr>
+            </thead>
+            <tbody id="mon-vms-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="mon-note">All VM counters are cumulative totals since VM started, not per-second rates</p>
     </section>
 
     <!-- Volumes -->
@@ -860,5 +933,6 @@
 <script src="/static/js/security-groups.js"></script>
 <script src="/static/js/keypairs.js"></script>
 <script src="/static/js/volumes.js"></script>
+<script src="/static/js/monitoring.js"></script>
 <script src="/static/js/dashboard.js"></script>
 {% endblock %}
