@@ -271,44 +271,65 @@ This project builds a local cloud computing environment that replicates the core
 ```
 ec2-local-cloud/
 ├── PROJECT_REQUIREMENTS.md     ← This file
-├── INSTALLATION.md             ← Step-by-step DevStack setup
-├── COMMANDS_CHEATSHEET.md      ← Quick reference for all openstack commands
+├── INSTALLATION.md             ← Mini cloud setup guide
+├── COMMANDS_CHEATSHEET.md      ← REST API curl reference
 ├── DEMO_SCRIPT.md              ← Presentation walkthrough
-├── screenshots/                ← Dashboard and CLI screenshots
-│   ├── dashboard_login.png
-│   ├── launch_instance.png
-│   ├── floating_ip.png
-│   └── ssh_access.png
-└── configs/
-    └── local.conf              ← DevStack configuration file used
+├── DASHBOARD_GUIDE.md          ← UI testing and startup guide
+├── restart-fix.sh              ← Run after reboot to restore state
+├── fix-uwsgi-configs.sh        ← Health check script
+├── mini-cloud/                 ← Flask application
+│   ├── run.py                  ← Entry point (port 5001)
+│   ├── config.py               ← JWT secret, paths
+│   ├── database/cloud.db       ← SQLite database
+│   ├── storage/images/         ← Uploaded OS images (qcow2)
+│   ├── storage/instances/      ← Per-VM disk overlays
+│   ├── scripts/restore_fip.py  ← Boot-time floating IP restore
+│   └── app/                    ← Feature modules
+│       ├── auth/               ← Login, JWT middleware
+│       ├── compute/            ← Instances (libvirt)
+│       ├── images/             ← OS image store
+│       ├── network/            ← Networks, floating IPs, security groups
+│       ├── storage/            ← Volumes, snapshots (LVM)
+│       ├── load_balancers/     ← HAProxy management
+│       ├── autoscaling/        ← Background scaling monitor
+│       ├── monitoring/         ← Host + VM metrics
+│       ├── quotas/             ← Resource limits
+│       ├── iam/                ← IAM users/groups/roles/policies
+│       ├── keypairs/           ← SSH key management
+│       └── console/            ← VNC WebSocket proxy
+└── screenshots/                ← Dashboard screenshots
 ```
 
 ---
 
 ## Comparison: This Project vs Real AWS EC2
 
-| Feature | AWS EC2 | This Project (DevStack) |
+| Feature | AWS EC2 | This Project (Mini Cloud) |
 |---|---|---|
-| Installer / Platform | AWS proprietary | **DevStack** (single-node OpenStack installer) |
-| Compute Engine | KVM (AWS Nitro) | Nova + KVM (open source) |
-| Image Store | S3-backed AMIs | Glance (stored on local disk) |
-| Networking | AWS VPC | Neutron + **LinuxBridge** (WiFi-compatible) |
-| Block Storage | EBS (NVMe SSD) | Cinder (local disk, LVM backend) |
-| Identity | IAM | Keystone |
-| Dashboard | AWS Management Console | Horizon |
-| CLI | AWS CLI (`aws`) | OpenStack CLI (`openstack`) |
-| Monitoring | CloudWatch (Ceilometer) | Nova diagnostics API — no extra services needed |
+| Platform | AWS proprietary | Flask + Linux kernel tools |
+| Compute Engine | KVM (AWS Nitro) | libvirt + KVM (QEMU) |
+| Image Store | S3-backed AMIs | Local qcow2 files + SQLite metadata |
+| Networking | AWS VPC | Linux Bridge + dnsmasq DHCP |
+| Floating IPs | Elastic IPs | iptables DNAT/SNAT on dummy interface |
+| Block Storage | EBS (NVMe SSD) | LVM Logical Volumes |
+| Firewall | Security Groups | Per-VM iptables chains (MC-SG-<id>) |
+| Identity | IAM | Custom SQLite-backed IAM layer |
+| Database | Aurora / RDS | SQLite (cloud.db) |
+| Message Queue | SQS | None needed (single process) |
+| Dashboard | AWS Management Console | Flask + vanilla JS (port 5001) |
+| CLI | AWS CLI (`aws`) | REST API + curl |
+| Monitoring | CloudWatch | /proc + libvirt stats |
 | Scale | Global, millions of nodes | Single machine (your laptop) |
 | HA / Redundancy | Multi-AZ, automatic failover | None — single node |
-| Setup time | Instant (managed service) | ~1 hour (`./stack.sh`) |
+| Setup time | Instant (managed service) | ~30 min (apt install + python venv) |
 | Cost | Pay-per-use | Free (your own hardware) |
 
 ---
 
 ## Team / Author
 
-- **Project Title:** Local Cloud Infrastructure — EC2 Replica Using DevStack
-- **Platform:** DevStack stable/2024.2 (Dalmatian) on Ubuntu 24.04 LTS
+- **Project Title:** Local Cloud Infrastructure — EC2 Replica (Mini Cloud)
+- **Platform:** Flask + libvirt/KVM + LVM + iptables on Ubuntu 24.04 LTS
 - **Machine:** Acer TravelMate P215-53 | 8GB RAM | 16 CPU | WiFi
 - **Semester:** Final Semester
 - **Course:** Cloud Computing / Distributed Systems

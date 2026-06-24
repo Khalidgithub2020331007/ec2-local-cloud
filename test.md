@@ -99,7 +99,7 @@ When you launch an instance, you pick how powerful it is. These size options are
 A **key pair** is a pair of cryptographic keys used to log into instances securely instead of using a password.
 
 - **Private key (.pem file)** — lives on your machine, never share it
-- **Public key** — uploaded to AWS/OpenStack; installed on every instance at launch
+- **Public key** — uploaded to the server; injected into the instance via cloud-init at launch
 
 **How it works:**
 1. You create a key pair and download the `.pem` file
@@ -758,7 +758,6 @@ python3 run.py
 
 **Verify from CLI:**
 ```bash
-source /opt/stack/devstack/openrc admin admin
 sudo virsh list --all | grep ui-test-vm
 ```
 Expected: `running`
@@ -824,9 +823,9 @@ Expected: `shut off`
 
 **Verify from CLI:**
 ```bash
-openstack server list --all-projects
+sudo virsh list --all | grep ui-test-vm || echo "confirmed: not found"
 ```
-Expected: `ui-test-vm` does NOT appear.
+Expected: no output (VM is gone).
 
 **Pass:** Instance is removed from the table and CLI confirms it no longer exists.
 **Fail:** Instance still shows in the list, or an error toast appears.
@@ -852,9 +851,9 @@ Expected: `ui-test-vm` does NOT appear.
 
 **Verify from CLI:**
 ```bash
-openstack volume show ui-test-disk -f value -c status
+sudo lvdisplay mini-cloud-vg | grep "LV Name"
+# ui-test-disk LV should appear
 ```
-Expected: `available`
 
 **Pass:** Volume appears with status `available`.
 **Fail:** Error notification, or volume shows `error` status.
@@ -936,7 +935,7 @@ Expected: `available`
 
 **Verify from CLI:**
 ```bash
-openstack image list
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/images | python3 -c "import sys,json; [print(i['name'], i['status']) for i in json.load(sys.stdin)['images']]"
 ```
 Expected: new image appears with `active` status.
 
@@ -984,7 +983,7 @@ Expected: new image appears with `active` status.
 
 **Verify from CLI:**
 ```bash
-openstack image list
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/images | python3 -c "import sys,json; [print(i['name'], i['status']) for i in json.load(sys.stdin)['images']]"
 ```
 Expected: `cirros-copy-test` appears with `active` status.
 
@@ -1010,7 +1009,7 @@ Expected: `cirros-copy-test` appears with `active` status.
 
 **Verify from CLI:**
 ```bash
-openstack image list
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/images | python3 -c "import sys,json; [print(i['name'], i['status']) for i in json.load(sys.stdin)['images']]"
 ```
 Expected: `cirros-copy-test` does NOT appear.
 
@@ -1033,7 +1032,7 @@ Expected: `cirros-copy-test` does NOT appear.
 - An info bar at the top reminds you that private keys are one-time only
 
 **Pass:** Key pairs table loads with at least `project-key` visible.
-**Fail:** Error message, or empty table when key pairs exist in CLI (`openstack keypair list`).
+**Fail:** Error message, or empty table when key pairs exist in CLI (`curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/keypairs | python3 -m json.tool`).
 
 ---
 
@@ -1054,7 +1053,7 @@ Expected: `cirros-copy-test` does NOT appear.
 
 **Verify from CLI:**
 ```bash
-openstack keypair list
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/keypairs | python3 -m json.tool
 ```
 Expected: `ui-test-key` appears.
 
@@ -1105,7 +1104,7 @@ ssh -i ~/Downloads/ui-test-key.pem cirros@<floating-ip>
 
 **Verify from CLI:**
 ```bash
-openstack keypair list
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/keypairs | python3 -m json.tool
 ```
 Expected: `ui-test-key` does NOT appear.
 
@@ -1156,7 +1155,7 @@ Expected: `ui-test-key` does NOT appear.
 
 **Verify from CLI:**
 ```bash
-openstack security group rule list ui-test-sg
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/network/security-groups | python3 -m json.tool
 ```
 Expected: TCP port 22 and TCP port 80 rules appear.
 
@@ -1182,7 +1181,7 @@ Expected: TCP port 22 and TCP port 80 rules appear.
 
 **Verify from CLI:**
 ```bash
-openstack server show <instance-name> | grep security_groups
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/compute/instances | python3 -m json.tool
 ```
 Expected: `ui-test-sg` appears alongside any previous groups.
 
@@ -1224,7 +1223,7 @@ Expected: `ui-test-sg` appears alongside any previous groups.
 **Expected result:**
 - `ui-test-sg` disappears from the table
 
-**Note:** If the security group is still attached to a running instance, OpenStack will refuse the delete and return a 409 error. Detach it from all instances first.
+**Note:** If the security group is still attached to a running instance, the API will refuse the delete with a 409 error. Detach it from all instances first.
 
 **Pass:** Group removed from the table.
 **Fail:** Error toast about the group being in use (expected if still attached — detach first).
@@ -1251,7 +1250,7 @@ Expected: `ui-test-sg` appears alongside any previous groups.
 
 **Verify from CLI:**
 ```bash
-openstack volume snapshot list
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/storage/snapshots | python3 -m json.tool
 ```
 Expected: `ui-test-snapshot` appears with `available` status.
 
@@ -1280,7 +1279,7 @@ Expected: `ui-test-snapshot` appears with `available` status.
 
 **Verify from CLI:**
 ```bash
-openstack volume list
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/storage/volumes | python3 -m json.tool
 ```
 Expected: `restored-from-snap` appears with `available` status.
 
@@ -1352,7 +1351,7 @@ Expected: `restored-from-snap` appears with `available` status.
 
 **Verify from CLI:**
 ```bash
-openstack server show <instance-name> | grep addresses
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/network/floating-ips | python3 -m json.tool
 ```
 Expected: A second IP address appears in the output.
 
@@ -1379,7 +1378,7 @@ Expected: A second IP address appears in the output.
 
 **Verify from CLI:**
 ```bash
-openstack port list
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/network/networks | python3 -m json.tool
 ```
 Expected: `ui-test-eni` appears with `DOWN` status.
 
@@ -1401,7 +1400,7 @@ Expected: `ui-test-eni` appears with `DOWN` status.
 **Expected result:**
 - `ui-test-eni` disappears from the table
 
-**Note:** Ports that show a device owner (e.g. `compute:nova` or `network:dhcp`) have "In use" text instead of a Delete button — they are managed by OpenStack and cannot be manually deleted.
+**Note:** Ports that show a device owner (e.g. `compute:libvirt` or `network:dhcp`) have "In use" text instead of a Delete button — they are managed by the network layer and cannot be manually deleted.
 
 **Pass:** Port removed from the table.
 **Fail:** Error toast, or port remains.
@@ -1471,7 +1470,7 @@ Expected: `ui-test-eni` appears with `DOWN` status.
 - Toast: *"Subnet ui-test-subnet created"*
 - The subnet count badge on `ui-test-net` increases by 1
 
-**Pass:** Subnet badge increments; subnet visible in CLI (`openstack subnet list`).
+**Pass:** Subnet badge increments; subnet visible in mini-cloud dashboard → Networks.
 **Fail:** Error toast (check if CIDR overlaps an existing subnet).
 
 ---
@@ -1495,7 +1494,7 @@ Expected: `ui-test-eni` appears with `DOWN` status.
 - Router appears with a gateway IP from the public network
 
 **Pass:** Router has an external gateway IP in the table.
-**Fail:** Error setting gateway (check if `public` network exists in `openstack network list`).
+**Fail:** Error setting gateway (check networks exist in dashboard → Networks).
 
 ---
 
@@ -1655,7 +1654,7 @@ Expected: `ui-test-eni` appears with `DOWN` status.
 2. Click the red **Delete** button
 3. Confirm in the dialog
 
-**Note:** OpenStack requires you to delete listeners and members before deleting the LB. The dashboard sends the delete request — if it fails, check the LB is in `ACTIVE` state and has no pending operations.
+**Note:** Delete all members before deleting the load balancer. If the delete fails, check that HAProxy has no running operations on that backend.
 
 **Expected result:**
 - `ui-test-lb` disappears from the table
@@ -1906,7 +1905,7 @@ This table covers every operation available in the dashboard — use it as a qui
 
 ---
 
-### Images (AMI — Glance)
+### Images (AMI — qcow2 + SQLite)
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
@@ -1917,7 +1916,7 @@ This table covers every operation available in the dashboard — use it as a qui
 
 ---
 
-### Volumes (EBS — Cinder)
+### Volumes (EBS — LVM)
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
@@ -1930,7 +1929,7 @@ This table covers every operation available in the dashboard — use it as a qui
 
 ---
 
-### Snapshots (EBS Snapshot — Cinder)
+### Snapshots (EBS Snapshot — LVM CoW)
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
@@ -1941,7 +1940,7 @@ This table covers every operation available in the dashboard — use it as a qui
 
 ---
 
-### Key Pairs (SSH Keys — Nova)
+### Key Pairs (SSH Keys — cloud-init)
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
@@ -1952,7 +1951,7 @@ This table covers every operation available in the dashboard — use it as a qui
 
 ---
 
-### Security Groups (Firewall — Neutron)
+### Security Groups (Firewall — iptables)
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
@@ -1966,7 +1965,7 @@ This table covers every operation available in the dashboard — use it as a qui
 
 ---
 
-### Floating IPs (Elastic IP — Neutron)
+### Floating IPs (Elastic IP — iptables NAT)
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
@@ -1978,7 +1977,7 @@ This table covers every operation available in the dashboard — use it as a qui
 
 ---
 
-### Networks (VPC — Neutron)
+### Networks (VPC — Linux Bridge)
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
@@ -1990,7 +1989,7 @@ This table covers every operation available in the dashboard — use it as a qui
 
 ---
 
-### Routers (Internet Gateway — Neutron)
+### Routers (Internet Gateway — iptables)
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
@@ -2007,7 +2006,7 @@ This table covers every operation available in the dashboard — use it as a qui
 
 ---
 
-### Network Interfaces / Ports (ENI — Neutron)
+### Network Interfaces / Ports (ENI — Linux Bridge)
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
@@ -2034,7 +2033,7 @@ This table covers every operation available in the dashboard — use it as a qui
 
 ---
 
-### Auto Scaling Groups (ASG — Nova)
+### Auto Scaling Groups (ASG — Python thread)
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
@@ -2049,7 +2048,7 @@ This table covers every operation available in the dashboard — use it as a qui
 
 ---
 
-### Resource Quotas (Service Quotas — Nova/Cinder/Neutron)
+### Resource Quotas (Service Quotas — SQLite)
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
@@ -2057,21 +2056,21 @@ This table covers every operation available in the dashboard — use it as a qui
 
 ---
 
-### Users & Projects (IAM — Keystone)
+### Users & Projects (IAM — SQLite)
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
-| List users | Click **Users & Projects** in sidebar | Shows all Keystone users and their projects |
+| List users | Click **Users & Projects** in sidebar | Shows all users and their project assignments |
 
 ---
 
-### DevStack Monitor
+### System Monitor
 
 | Operation | How | What It Does |
 |-----------|-----|-------------|
-| View service status | Click **DevStack Monitor** in sidebar | Shows all `devstack@*` systemd units live |
-| View service log | **View Log** on any service row | Streams the last 50 lines of that service log |
-| Stop a service | **Stop** on any service row | Kills the systemd unit (for debugging only) |
+| View libvirtd status | `sudo systemctl is-active libvirtd` | Confirms VM manager is running |
+| View service log | `sudo journalctl -u mini-cloud -n 50` | Last 50 lines of mini-cloud log |
+| View all KVM VMs | `sudo virsh list --all` | Shows all defined/running VMs |
 
 ---
 
@@ -2082,8 +2081,8 @@ Here is a complete checklist. Go through each item and write **PASS** or **FAIL*
 ### CLI Tests (run in terminal)
 
 ```
-[ ] 1.  openstack token issue           → Shows a token (not an error)
-[ ] 2.  openstack server list           → Shows ACTIVE instances
+[ ] 1.  curl -s http://localhost:5001/api/v1/auth/health → Shows {"status": "ok"}
+[ ] 2.  GET /api/v1/compute/instances (with TOKEN) → Shows running instances
 [ ] 3.  Ping 10.200.195.153             → 0% packet loss
 [ ] 4.  SSH into demo-instance-01       → Shell prompt appears
 [ ] 5.  Stop demo-instance-01           → Status becomes SHUTOFF
@@ -2091,7 +2090,7 @@ Here is a complete checklist. Go through each item and write **PASS** or **FAIL*
 [ ] 7.  Launch a new instance (CLI)     → Reaches ACTIVE in < 30 seconds
 [ ] 8.  Create and attach a volume      → Status goes available → in-use
 [ ] 9.  Assign a floating IP            → IP is linked in the list
-[ ] 10. openstack image list            → CirrOS and Ubuntu images active
+[ ] 10. curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/images | python3 -c "import sys,json; [print(i['name'], i['status']) for i in json.load(sys.stdin)['images']]"            → CirrOS and Ubuntu images active
 [ ] 11. Security group rules visible    → Port 22 and ICMP rules exist
 [ ] 12. devuser sees only dev-vm-01     → No cross-project visibility
 [ ] 13. opsuser sees empty list         → Isolation working
@@ -2111,7 +2110,7 @@ Here is a complete checklist. Go through each item and write **PASS** or **FAIL*
 [ ] 21. Create AMI button                 → snapshot modal opens; image appears in Images within 5 min
 [ ] 22. Console button (UI Test 25)       → boot log visible; VNC link present
 [ ] 23. NIC button (UI Test 26)           → second interface attached; new IP visible in server details
-[ ] 24. SG button (UI Test 19)            → attach ui-test-sg; visible in openstack server show
+[ ] 24. SG button (UI Test 19)            → attach ui-test-sg; visible in GET /api/v1/compute/instances response
 ```
 
 #### Images (AMI)
@@ -2218,13 +2217,13 @@ Here is a complete checklist. Go through each item and write **PASS** or **FAIL*
 
 #### Users & Projects
 ```
-[ ] 79. Users & Projects section loads    → devuser, opsuser, devadmin listed with projects
+[ ] 79. IAM section loads                 → Users, Groups, Roles, Policies tabs visible
 ```
 
-#### DevStack Monitor
+#### System Status
 ```
-[ ] 80. DevStack Monitor section loads    → all devstack@* services show active/inactive status
-[ ] 81. View Log button                   → last 50 lines of service log appear
+[ ] 80. libvirtd is active                → sudo systemctl is-active libvirtd → active
+[ ] 81. LVM VG is present                 → sudo vgdisplay mini-cloud-vg → shows VG info
 ```
 
 ---
@@ -2240,7 +2239,7 @@ Take a screenshot or copy-paste the full output from the terminal. Include the c
 Example format:
 ```
 Command I ran:
-  openstack server list
+  curl -s -H "Authorization: Bearer " http://localhost:5001/api/v1/compute/instances | python3 -m json.tool
 
 Output I got:
   HTTPConnectionPool: Max retries exceeded
@@ -2251,17 +2250,18 @@ Output I got:
 Run these quick checks and copy the output:
 
 ```bash
-# Check if all services are running
-sudo systemctl list-units 'devstack@*' --all --no-pager | grep -v running
+# Check libvirtd and mini-cloud service
+sudo systemctl is-active libvirtd
+sudo systemctl is-active mini-cloud
 
 # Check your current IP
 ip addr show wlp0s20f3 | grep 'inet '
 
-# Check Keystone is responding
-curl -s -o /dev/null -w "%{http_code}" http://10.200.195.97/identity/v3/
+# Check mini-cloud API is responding
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/api/v1/auth/health
 ```
 
-- If Keystone returns `200` → the API is up
+- If mini-cloud returns `200` → the API is up
 - If it returns `503` or `000` → services are down, run `restart-fix.sh`
 
 ### Step 3 — Run the restart script
@@ -2284,9 +2284,9 @@ Share the following in your report:
 | Test number that failed | Test 3 — SSH |
 | Command you ran | `ssh -i ... cirros@10.200.195.153` |
 | Exact error message | `ssh: connect to host... port 22: Connection refused` |
-| Output of `openstack server list` | (paste the table) |
+| Output of GET /api/v1/compute/instances | (paste the JSON) |
 | Output of `ip addr show wlp0s20f3` | `inet 10.200.195.97/22` |
-| Keystone HTTP response code | `200` or `503` |
+| Mini-cloud API HTTP response code | `200` or `503` |
 
 ---
 
@@ -2295,7 +2295,7 @@ Share the following in your report:
 | Item | Value |
 |------|-------|
 | Admin username | `admin` |
-| Admin password | `Admin1234OpenStack` |
+| Admin password | `Admin1234` |
 | API endpoint | `http://10.200.195.97/identity` |
 | Main instance floating IP | `10.200.195.153` |
 | SSH key location | `/home/khalid/ec2-local-cloud/configs/project-key.pem` |

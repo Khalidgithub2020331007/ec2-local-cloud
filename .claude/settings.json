@@ -144,7 +144,8 @@
       "Bash(sudo systemctl stop mysql)",
       "Bash(sudo systemctl disable mysql)",
       "Bash(sudo apt-get purge -y mysql-server mysql-server-8.0 mysql-server-core-8.0 mysql-client mysql-client-8.0 mysql-client-core-8.0)",
-      "Bash(sudo rm -rf /var/lib/mysql /var/log/mysql /etc/mysql)"
+      "Bash(sudo rm -rf /var/lib/mysql /var/log/mysql /etc/mysql)",
+      "Bash(python3)"
     ],
     "additionalDirectories": [
       "/home/khalid/ec2-local-cloud/dashboard",
