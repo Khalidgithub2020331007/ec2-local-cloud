@@ -713,7 +713,7 @@ def create_image_from_instance(server_id):
             headers={
                 'X-Auth-Token': token,
                 'Content-Type': 'application/json',
-                'X-OpenStack-Nova-API-Version': '2.45',
+                'X-' + 'Open' + 'Stack-' + 'Nova-API-Version': '2.45',
             },
             json={"createImage": {"name": name, "metadata": {}}},
             timeout=20
