@@ -1,11 +1,11 @@
 # Local EC2 Replica — Final Semester Project
-### Platform: DevStack (OpenStack Dalmatian) | OS: Ubuntu 24.04 LTS | Scale: Single Node
+### Platform: Mini Cloud (Flask + libvirt/KVM + LVM + iptables) | OS: Ubuntu 24.04 LTS | Scale: Single Node
 
 ---
 
 ## Project Overview
 
-This project builds a local cloud computing environment that replicates the core features of **Amazon EC2 (Elastic Compute Cloud)** using **DevStack** — the official single-node OpenStack installer — on a single physical machine. DevStack installs and configures all OpenStack services (Nova, Neutron, Glance, Cinder, Keystone, Horizon) automatically, giving a fully functional private cloud without needing multiple servers. The system allows users to launch, manage, and terminate virtual machines through both a web dashboard and a command-line interface — mirroring the real-world cloud experience.
+This project builds a local cloud computing environment that replicates the core features of **Amazon EC2 (Elastic Compute Cloud)** using Linux kernel tools directly — KVM runs the virtual machines, LVM manages block storage, Linux Bridge creates virtual networks, iptables enforces firewall rules and floating IPs. A Python Flask application provides the REST API and web dashboard. No cloud management framework is used — every feature is implemented from scratch on a single physical machine.
 
 ---
 
@@ -26,9 +26,9 @@ This project builds a local cloud computing environment that replicates the core
 - **Machine:** Acer TravelMate P215-53
 - **Host IP:** `10.200.194.146` (WiFi — `wlp0s20f3`)
 - **Ethernet:** `enp43s0` — NO-CARRIER (unplugged)
-- **Docker:** installed — must stop Docker before running DevStack to avoid iptables conflicts
+- **Docker:** installed — stop Docker before running mini-cloud to avoid iptables conflicts
 
-> **Note on WiFi:** DevStack works on WiFi but floating IPs will only be reachable from the same machine. For the semester project demo this is fine — the dashboard and SSH to instances both work normally.
+> **Note on WiFi:** Mini cloud works on WiFi. Floating IPs are only reachable from the same machine (no external routing). For the semester project demo this is fine — the dashboard and SSH to instances both work normally.
 
 ---
 
