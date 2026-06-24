@@ -776,8 +776,102 @@
 
     <!-- Users & Projects -->
     <section id="section-users-projects" class="console-section" style="display:none;">
-      <div class="section-header"><div><h2>Users &amp; Projects</h2><p>Manage accounts and project isolation</p></div></div>
-      <div class="coming-soon-card"><div class="cs-icon">👥</div><div class="cs-title">Users &amp; Projects — Coming Soon</div><p>Multi-user accounts, project-level resource isolation (like OpenStack projects / AWS Organizations).</p><p style="margin-top:10px;font-size:12px;color:var(--gray-400);">Registration is already live at <a href="/register">/register</a>. Admin user management UI is planned for a future step.</p></div>
+      <div class="section-header">
+        <div><h2>Users &amp; Projects</h2><p>Manage cloud accounts and view per-user resource usage</p></div>
+        <button class="btn btn-primary btn-sm" id="up-create-btn">+ Create User</button>
+      </div>
+
+      <div id="up-admin-notice" class="error-banner" style="display:none;">
+        You need <strong>admin</strong> role to manage users.
+      </div>
+
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="up-users-panel">Users</button>
+        <button class="tab-btn" data-tab="up-resources-panel">Resource Usage</button>
+      </div>
+
+      <!-- ── Users Tab ──────────────────────────────────────────────────────── -->
+      <div id="up-users-panel" class="tab-panel active">
+        <div id="up-users-empty" class="empty-state" style="display:none;">No users found.</div>
+        <table id="up-users-table" class="data-table" style="display:none;">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Instances</th>
+              <th>Volumes</th>
+              <th>Networks</th>
+              <th>Joined</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="up-users-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- ── Resource Usage Tab ─────────────────────────────────────────────── -->
+      <div id="up-resources-panel" class="tab-panel">
+        <div id="up-res-empty" class="empty-state" style="display:none;">No users found.</div>
+        <div id="up-res-cards" class="res-cards-grid"></div>
+      </div>
+
+      <!-- ── Create User Modal ──────────────────────────────────────────────── -->
+      <div id="up-create-modal" class="modal-backdrop" style="display:none;">
+        <div class="modal-box" style="max-width:440px;">
+          <div class="modal-header">
+            <h3>Create User</h3>
+            <button class="modal-close" id="up-create-close">&times;</button>
+          </div>
+          <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+            <div id="up-create-error" class="error-banner" style="display:none;"></div>
+            <div>
+              <label class="form-label">Username</label>
+              <input type="text" id="up-new-username" placeholder="e.g. alice" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;box-sizing:border-box;" />
+            </div>
+            <div>
+              <label class="form-label">Email</label>
+              <input type="email" id="up-new-email" placeholder="alice@example.com" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;box-sizing:border-box;" />
+            </div>
+            <div>
+              <label class="form-label">Password</label>
+              <input type="password" id="up-new-password" placeholder="Min 8 characters" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;box-sizing:border-box;" />
+            </div>
+            <div>
+              <label class="form-label">Role</label>
+              <select id="up-new-role" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);">
+                <option value="user">user</option>
+                <option value="admin">admin</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="up-create-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="up-create-save">Create User</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Reset Password Modal ───────────────────────────────────────────── -->
+      <div id="up-reset-modal" class="modal-backdrop" style="display:none;">
+        <div class="modal-box" style="max-width:400px;">
+          <div class="modal-header">
+            <h3>Reset Password — <span id="up-reset-username"></span></h3>
+            <button class="modal-close" id="up-reset-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div id="up-reset-error" class="error-banner" style="display:none;"></div>
+            <label class="form-label">New Password</label>
+            <input type="password" id="up-reset-password" placeholder="Min 8 characters"
+              style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;box-sizing:border-box;margin-top:6px;" />
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-sm" id="up-reset-cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="up-reset-save">Reset Password</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- IAM -->
@@ -1452,5 +1546,6 @@
 <script src="/static/js/loadbalancers.js"></script>
 <script src="/static/js/autoscaling.js"></script>
 <script src="/static/js/iam.js"></script>
+<script src="/static/js/users.js"></script>
 <script src="/static/js/dashboard.js"></script>
 {% endblock %}

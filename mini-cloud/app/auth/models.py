@@ -107,6 +107,72 @@ def delete_api_key(key_id, user_id):
         conn.close()
 
 
+def list_all_users():
+    # Admin view — returns all users with per-user resource counts (no password hashes)
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            '''SELECT id, username, email, role, is_active, created_at FROM users ORDER BY created_at DESC'''
+        ).fetchall()
+        users = [dict(r) for r in rows]
+
+        for u in users:
+            uid = u['id']
+            u['instance_count'] = conn.execute(
+                "SELECT COUNT(*) FROM instances WHERE user_id=? AND status != 'terminated'", (uid,)
+            ).fetchone()[0]
+            u['volume_count'] = conn.execute(
+                "SELECT COUNT(*) FROM volumes WHERE user_id=? AND status != 'deleted'", (uid,)
+            ).fetchone()[0]
+            u['network_count'] = conn.execute(
+                "SELECT COUNT(*) FROM networks WHERE user_id=?", (uid,)
+            ).fetchone()[0]
+            u['api_key_count'] = conn.execute(
+                "SELECT COUNT(*) FROM api_keys WHERE user_id=? AND is_active=1", (uid,)
+            ).fetchone()[0]
+
+        return users
+    finally:
+        conn.close()
+
+
+def update_user(user_id, role=None, is_active=None):
+    # Partial update — only fields explicitly passed are changed
+    conn = get_connection()
+    try:
+        if role is not None:
+            conn.execute('UPDATE users SET role=? WHERE id=?', (role, user_id))
+        if is_active is not None:
+            conn.execute('UPDATE users SET is_active=? WHERE id=?', (int(is_active), user_id))
+        conn.commit()
+        row = conn.execute(
+            'SELECT id, username, email, role, is_active, created_at FROM users WHERE id=?', (user_id,)
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def reset_user_password(user_id, new_password):
+    password_hash = generate_password_hash(new_password)
+    conn = get_connection()
+    try:
+        conn.execute('UPDATE users SET password_hash=? WHERE id=?', (password_hash, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_user(user_id):
+    # Soft-delete — keeps the row but blocks login; hard constraints prevent real deletion
+    conn = get_connection()
+    try:
+        conn.execute('UPDATE users SET is_active=0 WHERE id=?', (user_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def get_user_by_access_key(access_key):
     # API key authentication-এর জন্য — access_key দিয়ে user খোঁজে
     conn = get_connection()

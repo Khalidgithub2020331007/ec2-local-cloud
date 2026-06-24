@@ -20,6 +20,7 @@
   setupStatCards();
   setupIamTabs();
   if (window.setupIam) window.setupIam();
+  if (window.setupUsersProjects) window.setupUsersProjects();
   setupInstances();
   setupImages();
   setupNetworks();
@@ -80,6 +81,7 @@ function switchSection(sectionId) {
     'load-balancers':   () => window.loadLoadBalancers && window.loadLoadBalancers(),
     'autoscaling':      () => window.loadAutoscaling   && window.loadAutoscaling(),
     'iam':              () => window.loadIam            && window.loadIam(),
+    'users-projects':   () => window.loadUsersProjects  && window.loadUsersProjects(),
   };
   if (loaders[sectionId]) loaders[sectionId]();
   // metrics section auto-refresh is handled by monitoring.js MutationObserver
