@@ -89,10 +89,10 @@ This project builds a local cloud computing environment that replicates the core
 ### FR-02: Machine Images (AMI Equivalent)
 - **FR-02.1** — System shall provide a default CirrOS test image pre-loaded on setup
 - **FR-02.2** — Admin can upload custom disk images (qcow2, raw, vmdk formats)
-- **FR-02.3** — User can create a snapshot of a running or stopped instance as a new image (Create AMI) — via dashboard AMI button on any instance row or OpenStack CLI
+- **FR-02.3** — User can create a snapshot of a running or stopped instance as a new image (Create AMI) — via dashboard AMI button on any instance row
 - **FR-02.4** — Images can be set as `public` (available to all) or `private`
 - **FR-02.5** — User can delete images they own — via dashboard Delete button in Images table
-- **FR-02.6** — User can duplicate an existing image with a new name (Copy AMI) — data is streamed via Glance; CirrOS copies in seconds, Ubuntu in several minutes
+- **FR-02.6** — User can duplicate an existing image with a new name (Copy AMI) — qcow2 file is copied on disk; CirrOS copies in seconds, Ubuntu in several minutes
 - **FR-02.7** — User can launch a new instance directly from the Images table (Launch from AMI) — opens the launch wizard with the selected image pre-filled
 
 ### FR-03: Instance Types / Flavors (EC2 Instance Types Equivalent)
@@ -149,15 +149,13 @@ This project builds a local cloud computing environment that replicates the core
 
 ### FR-09: Identity & Multi-User Management (IAM Equivalent)
 
-#### FR-09A: OpenStack Keystone Users & Projects
+#### FR-09A: Login Accounts (SQLite-backed)
 - **FR-09.1** — System shall have a default `admin` superuser
 - **FR-09.2** — Admin can create new user accounts with username and password
-- **FR-09.3** — Admin can create projects (like AWS accounts/namespaces)
-- **FR-09.4** — Admin can assign users to projects with specific roles (`admin`, `member`, `reader`)
-- **FR-09.5** — Users in different projects cannot see each other's instances or volumes
-- **FR-09.6** — Admin can disable or delete users
+- **FR-09.3** — Users are isolated — each can only see their own instances, volumes, and networks
+- **FR-09.4** — Admin can disable or delete users
 
-#### FR-09B: AWS-Style IAM Layer (dashboard-managed, stored in `iam_data.json`)
+#### FR-09B: AWS-Style IAM Layer (SQLite-backed, managed via dashboard)
 - **FR-09.7** — Dashboard shall provide an IAM section under the Identity sidebar group, reachable via the **IAM** nav item
 - **FR-09.8** — IAM section shall have four sub-tabs: **Users**, **Groups**, **Roles**, and **Policies**
 - **FR-09.9** — Admin can create **IAM Users** with a username; each user receives a unique ARN (`arn:aws:iam::123456789012:user/<name>`)
@@ -191,26 +189,25 @@ This project builds a local cloud computing environment that replicates the core
 - **FR-12.2** — Monitoring section shall display hypervisor resource utilization: vCPU (used / total), RAM (used / total), and Disk (used / total), each with a visual progress bar that turns orange above 60% and red above 80%
 - **FR-12.3** — Monitoring section shall display a per-instance metrics table for all instances; ACTIVE instances show live diagnostic counters (CPU time, memory allocated, disk read/write bytes, network RX/TX bytes); non-ACTIVE instances show a placeholder row
 - **FR-12.4** — Overview page shall include a compact Resource Utilization panel (vCPU, RAM, Disk bars) with a "View full metrics →" link to the Monitoring section
-- **FR-12.5** — Metrics are sourced from `GET /os-hypervisors/statistics` (aggregate) and `GET /servers/{id}/diagnostics` (per-instance) — no Ceilometer required
+- **FR-12.5** — Metrics are sourced from `/proc/stat` + `/proc/meminfo` (host) and libvirt `getCPUStats()` + `memoryStats()` (per-instance) — no external monitoring daemon required
 - **FR-12.6** — All metric values are cumulative counters at time of request (not time-series rates); the page shows a note explaining this
 
 ---
 
 ### FR-10: Web Dashboard (AWS Management Console Equivalent)
-- **FR-10.1** — Horizon dashboard accessible at `http://<HOST_IP>/dashboard`
-- **FR-10.2** — Login with domain, username, and password
+- **FR-10.1** — Mini cloud dashboard accessible at `http://localhost:5001`
+- **FR-10.2** — Login with username and password; JWT token returned for API access
 - **FR-10.3** — Dashboard shall show instance list with status, IP, flavor, and image
 - **FR-10.4** — User can perform all instance operations (launch, stop, reboot, delete) from GUI
-- **FR-10.5** — Dashboard shall provide VNC console access to instances (like EC2 Instance Connect)
-- **FR-10.6** — Dashboard shall show volume list, network topology, and security group rules
-- **FR-10.7** — Admin panel accessible to `admin` user for system-wide management
-- **FR-10.8** — Launch wizard shall support: selectable network, multi-select security groups, instance count (1–5), and user data (cloud-init) input — matching the AWS EC2 launch wizard scope
+- **FR-10.5** — Dashboard shall provide VNC console access to instances via websockify + noVNC
+- **FR-10.6** — Dashboard shall show volume list, network list, floating IPs, and security group rules
+- **FR-10.7** — Admin can manage quotas and see all users' resources
 
-### FR-11: Command Line Interface (AWS CLI Equivalent)
-- **FR-11.1** — `openstack` CLI available for all operations
-- **FR-11.2** — Credentials loaded via `source openrc admin admin`
-- **FR-11.3** — CLI shall support all operations available in the dashboard
-- **FR-11.4** — CLI shall return structured output (table/JSON/YAML formats)
+### FR-11: REST API (AWS CLI Equivalent)
+- **FR-11.1** — All operations available via REST API at `http://localhost:5001/api/v1/`
+- **FR-11.2** — Authentication via JWT Bearer token (`Authorization: Bearer <token>`)
+- **FR-11.3** — API returns JSON with consistent envelope shape (`{data, error, statusCode}`)
+- **FR-11.4** — All list endpoints support pagination (`page`, `limit`, `total`)
 
 ---
 
@@ -222,23 +219,25 @@ This project builds a local cloud computing environment that replicates the core
 - System must support at least 3 simultaneous running instances
 
 ### NFR-02: Availability
-- All DevStack services must auto-recover via systemd if they crash
-- Stack must survive a `./rejoin-stack.sh` restart after host reboot without re-running `./stack.sh`
+- libvirtd must be set to auto-restart via systemd
+- Floating IP state (iptables rules + mc-fip interface) must be restored on boot via `restore_fip.py`
+- LVM loop device must be re-attached on boot via startup script
 
 ### NFR-03: Security
-- All service communication uses token-based authentication via Keystone
+- All API endpoints require JWT Bearer token authentication
 - Default security group must deny all inbound traffic
-- Dashboard login is protected by username/password
-- SSH to instances requires a valid private key
+- Dashboard login is protected by username/password (Werkzeug PBKDF2-SHA256 hashing)
+- SSH to instances requires a valid private key (injected via cloud-init seed ISO)
+- Private keys are never stored — shown once and discarded
 
 ### NFR-04: Usability
-- Horizon dashboard must be accessible from any browser on the same LAN
-- All CLI operations must work without memorizing API endpoints
-- Error messages from failed operations must be human-readable
+- Dashboard accessible from any browser on the same LAN at port 5001
+- All operations available via REST API with curl
+- Error messages must include `error` code, `message`, and `statusCode`
 
 ### NFR-05: Resource Constraints (Single Node Limits)
-- Total RAM usage by OpenStack services: under 5 GB (leaving 3 GB for VMs)
-- Disk usage by images and volumes: under 100 GB
+- Flask + SQLite use under 200 MB RAM (leaving the rest for VMs)
+- Disk usage by images and volumes managed by LVM VG (20 GB backing file by default)
 - Swap space: 8 GB configured and active
 
 ---
@@ -255,9 +254,9 @@ This project builds a local cloud computing environment that replicates the core
 - [x] SSH key pair management
 - [x] Persistent block storage (volumes + snapshots)
 - [x] Multi-user and multi-project setup
-- [x] Web dashboard (Horizon)
-- [x] OpenStack CLI
-- [x] Monitoring/metrics — hypervisor resource utilization + per-instance diagnostics via Nova API (CloudWatch equivalent, no Ceilometer needed)
+- [x] Web dashboard (Flask + vanilla JS, port 5001)
+- [x] REST API (JWT-authenticated, full CRUD for all resources)
+- [x] Monitoring/metrics — hypervisor + per-instance diagnostics via /proc and libvirt (CloudWatch equivalent)
 
 ### Out of Scope
 - [ ] Object storage (S3 / Swift) — disabled for RAM constraints

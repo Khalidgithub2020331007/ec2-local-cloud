@@ -106,7 +106,7 @@ The dashboard lets you create, stop, start, and delete resources directly from t
 
 ### Test A — Launch a New Instance
 
-**What it proves:** The compute engine (Nova) can create virtual machines on demand.
+**What it proves:** The compute engine (libvirt/KVM) can create virtual machines on demand.
 
 **Steps:**
 1. Click **Instances** in the sidebar
