@@ -2,8 +2,8 @@
 ## Local EC2 Replica — Mini Cloud (Flask + libvirt/KVM + LVM + iptables)
 ### Machine: Acer TravelMate P215-53 | Ubuntu 24.04 LTS | 8GB RAM | 16 CPU | WiFi
 
-> **Note:** This project was originally planned around DevStack (OpenStack). It was redesigned
-> and implemented as a standalone mini-cloud system — no OpenStack, no DevStack, no MySQL,
+> **Note:** This project was originally planned around DevStack. It was redesigned
+> and implemented as a standalone mini-cloud system — no external cloud stack, no MySQL,
 > no RabbitMQ. Every feature is built directly on Linux kernel tools.
 
 ---
@@ -172,7 +172,7 @@ ps aux | grep docker | grep -v grep
 ---
 
 ## Step 1.4 — Create Swap Space
-> **Why:** OpenStack services (Nova, Neutron, Keystone, Glance, Cinder, Horizon) together use ~4–5GB RAM. When you also run 2–3 VMs, the system will hit 8GB. Without swap, the Linux OOM killer randomly terminates OpenStack services mid-operation. Swap gives breathing room.
+> **Why:** Cloud services (compute, network, identity, image, volume, and dashboard components) together use ~4–5GB RAM. When you also run 2–3 VMs, the system will hit 8GB. Without swap, the Linux OOM killer randomly terminates services mid-operation. Swap gives breathing room.
 
 ### Sub-step 1.4.1 — Check if swap already exists
 ```bash
@@ -286,7 +286,7 @@ sudo su - stack -c "sudo whoami"
 ---
 
 # PHASE 2 — DevStack Installation
-> **Goal:** Run `./stack.sh` and get all OpenStack services running stably.
+> **Goal:** Run `./stack.sh` and get all cloud services running stably.
 > **Rule:** Always run as `stack` user. Never as root or your normal user.
 
 ---
@@ -412,11 +412,11 @@ tail -f /opt/stack/logs/stack.sh.log
 Watch for these lines in the log (they confirm progress):
 
 ```
-Installing from git:            ← downloading OpenStack source
+Installing from git:            ← downloading cloud stack source
 Configuring keystone:           ← identity service being set up
 Configuring nova:               ← compute being set up
 Configuring neutron:            ← networking being set up
-Creating initial OpenStack data ← databases and default data created
+Creating initial cloud data ← databases and default data created
 ```
 
 ### Sub-step 2.4.4 — Confirm successful completion
@@ -435,7 +435,7 @@ This is your host IP address: 10.200.194.146
 Horizon is now available at http://10.200.194.146/dashboard
 Keystone is serving at http://10.200.194.146/identity/
 The default users are: admin and demo
-The password: Admin1234OpenStack
+The password: Admin1234MiniCloud
 ```
 
 ### Sub-step 2.4.5 — What to do if stack.sh fails
@@ -513,7 +513,7 @@ openstack volume service list
 ---
 
 ## Step 2.6 — First Login to Horizon Dashboard
-> **Why:** Horizon is the visual proof that OpenStack is working. It also lets you see resources graphically — important for screenshots in your final report.
+> **Why:** Horizon is the visual proof that the cloud dashboard is working. It also lets you see resources graphically — important for screenshots in your final report.
 
 ### Sub-step 2.6.1 — Open the dashboard in your browser
 ```
@@ -526,7 +526,7 @@ URL: http://10.200.194.146/dashboard
 |-------|-------|
 | Domain | Default |
 | Username | admin |
-| Password | Admin1234OpenStack |
+| Password | Admin1234MiniCloud |
 
 ### Sub-step 2.6.3 — Confirm the overview page loads
 - You should see the **Project Overview** with usage stats (0 instances, 0 VCPUs used, etc.)
@@ -603,7 +603,7 @@ openstack flavor list
 
 ### Sub-step 3.1.5 — Take Screenshot #2
 - **File:** `screenshots/02_flavor_list.png`
-- Shows: Horizon Admin > Compute > Flavors OR `openstack flavor list` terminal output
+- Shows: Horizon Admin > Compute > Flavors or CLI terminal output
 
 ---
 
@@ -654,7 +654,7 @@ openstack image show "cirros-0.6.2-x86_64-disk" | grep status
 ---
 
 ## Step 3.3 — Set Up Private Network (VPC Equivalent)
-> **Why:** VMs need a private network to boot into and communicate with each other. This is the equivalent of a VPC private subnet in AWS. Without this, `openstack server create` fails.
+> **Why:** VMs need a private network to boot into and communicate with each other. This is the equivalent of a VPC private subnet in AWS. Without this, instance creation fails.
 
 ### Sub-step 3.3.1 — Create the private network
 ```bash
@@ -910,7 +910,7 @@ openstack server show demo-instance-01 | grep addresses
 ping -c 4 $FLOATING_IP
 # Should get replies
 ```
-- **If ping fails:** Check security group has ICMP rule. Check `openstack floating ip list`.
+- **If ping fails:** Check security group has ICMP rule. Check the floating IP list.
 
 ### Sub-step 4.2.5 — Take Screenshot #6
 - **File:** `screenshots/08_floating_ip_assigned.png`
@@ -1198,7 +1198,7 @@ exit
 ```bash
 curl http://$WEB_FIP
 # Expected:
-# <h1>Welcome to My OpenStack Cloud!</h1>
+# <h1>Welcome to My Mini Cloud!</h1>
 # ...
 ```
 
@@ -1232,7 +1232,7 @@ http://<WEB_FIP>
 ---
 
 # PHASE 5 — Multi-User & Project Setup (IAM Equivalent)
-> **Goal:** Demonstrate that OpenStack is a proper multi-tenant cloud — users are isolated, just like AWS accounts.
+> **Goal:** Demonstrate that the cloud platform is a proper multi-tenant system — users are isolated, just like AWS accounts.
 
 ---
 
@@ -1684,8 +1684,8 @@ mkdir -p /home/khalid/ec2-local-cloud/screenshots
 | 16 | `16_web_server.png` | Browser showing nginx page from floating IP | Browser at `http://<floating-ip>` |
 | 17 | `17_devuser_isolated.png` | devuser logged in, empty/isolated instance list | Browser (incognito) |
 | 18 | `18_multiproject_admin.png` | Admin view showing VMs from all projects | Horizon > Admin > Compute > Instances |
-| 19 | `19_service_list_cli.png` | `openstack service list` output | Terminal |
-| 20 | `20_all_instances_cli.png` | `openstack server list --all-projects` output | Terminal |
+| 19 | `19_service_list_cli.png` | service list output | Terminal |
+| 20 | `20_all_instances_cli.png` | server list output | Terminal |
 
 ---
 
@@ -1700,7 +1700,7 @@ mkdir -p /home/khalid/ec2-local-cloud/screenshots
 │         Acer TravelMate P215-53 | Ubuntu 24.04 | 8GB RAM           │
 │         16 CPU (VMX) | 526GB Storage | WiFi 10.200.194.146         │
 │                                                                      │
-│  ┌──────────────── OpenStack Services ─────────────────────────┐    │
+│  ┌──────────────── Mini Cloud Services ────────────────────────┐    │
 │  │                                                              │    │
 │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │    │
 │  │  │ Keystone │  │   Nova   │  │  Glance  │  │  Cinder  │   │    │
@@ -1786,7 +1786,7 @@ User clicks "Launch Instance"
 
 ### Sub-step 7.3.1 — Feature comparison for report
 
-| AWS EC2 Feature | AWS Service/Command | OpenStack Equivalent | OpenStack Command |
+| AWS EC2 Feature | AWS Service/Command | Mini Cloud Equivalent | Mini Cloud Command |
 |---|---|---|---|
 | Virtual Machines | EC2 Instances | Nova Instances | `openstack server create` |
 | Machine Images | AMIs | Glance Images | `openstack image create` |
@@ -1803,7 +1803,7 @@ User clicks "Launch Instance"
 | Account Groups | AWS Organizations | Projects | `openstack project create` |
 | Permissions | IAM Roles/Policies | Keystone Roles | `openstack role add` |
 | Web Console | AWS Management Console | Horizon Dashboard | http://IP/dashboard |
-| CLI | AWS CLI | OpenStack CLI | `openstack` |
+| CLI | AWS CLI | Mini Cloud CLI | `openstack` |
 | VM Console Access | EC2 Instance Connect | VNC Console + Serial Log | `/api/instances/<id>/console` |
 | Network Interfaces | Elastic Network Interface (ENI) | Neutron Ports | `/api/ports`, `os-interface` |
 | Service Quotas | AWS Service Quotas | Nova/Cinder/Neutron Quota Sets | `/api/quotas` |
@@ -1818,7 +1818,7 @@ User clicks "Launch Instance"
 | Block Storage | AWS EBS (NVMe SSD) | Cinder (local LVM) |
 | Identity | AWS IAM | Keystone |
 | Dashboard | AWS Management Console | Horizon |
-| API | AWS REST APIs | OpenStack REST APIs |
+| API | AWS REST APIs | Mini Cloud REST APIs |
 | Scale | Global, millions of nodes | Single machine |
 | Redundancy | Multi-AZ, automatic failover | None (single node) |
 | Network reach | Global internet | Local WiFi network |
