@@ -140,7 +140,11 @@
       "Bash(curl -s http://127.0.0.1/identity/)",
       "Bash(sed -i 's/10\\\\.200\\\\.193\\\\.64/10.100.164.234/g' /opt/stack/devstack/.stackenv && grep \"10\\\\.\" /opt/stack/devstack/.stackenv)",
       "Bash(sudo sed -i 's/10\\\\.200\\\\.193\\\\.64/10.100.164.234/g' /opt/stack/devstack/.stackenv)",
-      "Bash(mysql -u root -pAdmin1234OpenStack keystone -e \"SELECT id, url FROM endpoint WHERE url LIKE '%10.200.193.64%';\")"
+      "Bash(mysql -u root -pAdmin1234OpenStack keystone -e \"SELECT id, url FROM endpoint WHERE url LIKE '%10.200.193.64%';\")",
+      "Bash(sudo systemctl stop mysql)",
+      "Bash(sudo systemctl disable mysql)",
+      "Bash(sudo apt-get purge -y mysql-server mysql-server-8.0 mysql-server-core-8.0 mysql-client mysql-client-8.0 mysql-client-core-8.0)",
+      "Bash(sudo rm -rf /var/lib/mysql /var/log/mysql /etc/mysql)"
     ],
     "additionalDirectories": [
       "/home/khalid/ec2-local-cloud/dashboard",

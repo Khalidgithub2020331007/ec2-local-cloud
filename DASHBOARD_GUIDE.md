@@ -1,5 +1,5 @@
 # Dashboard Startup Guide
-## Local EC2 Replica — OpenStack Dashboard
+## Mini Cloud System — Dashboard
 
 This guide explains exactly what to run every time you want to show the project, how to test every feature from the UI, and how to verify the system is working accurately.
 
@@ -10,9 +10,9 @@ This guide explains exactly what to run every time you want to show the project,
 Every time you want to show the dashboard:
 
 ```
-Step 1 → Run restart-fix.sh         (fixes network + services after reboot)
-Step 2 → Run python3 app.py         (starts the web dashboard)
-Step 3 → Open browser at localhost:8080
+Step 1 → Run restart-fix.sh         (restores LVM loop, IP forwarding, floating IP rules)
+Step 2 → Run python3 run.py         (starts mini-cloud API + dashboard on port 5001)
+Step 3 → Open browser at localhost:5001
 ```
 
 Full commands and testing instructions are in the sections below.
@@ -43,25 +43,24 @@ The IP is the number before the `/22`. Write it down.
 
 ### Step 2 — Run the Restart Fix Script
 
-This fixes everything that breaks after a reboot: HOST_IP drift, OVN networking, floating IP routing, and stuck Nova workers.
+This restores everything that is lost on reboot: LVM loop device, IP forwarding, floating IP iptables rules, and the mc-fip dummy interface.
 
 ```bash
 cd /home/khalid/ec2-local-cloud
-echo "2923" | sudo -S bash restart-fix.sh
+bash restart-fix.sh
 ```
 
-Wait for it to finish. The last section should show all services as `running`.
+Wait for it to finish. The last section should show libvirtd as `active` and LVM VG as found.
 
 ---
 
-### Step 3 — Verify OpenStack is Responding
+### Step 3 — Verify Mini Cloud API is Responding
 
 ```bash
-source /opt/stack/devstack/openrc admin admin
-openstack token issue
+curl -s http://localhost:5001/api/v1/auth/health
 ```
 
-If you see a table with a token ID: **OpenStack is working. Move to Part 2.**
+If you see `{"status": "ok"}`: **mini-cloud is working. Move to Part 2.**
 If you see an error: see Part 5 — Troubleshooting.
 
 ---
@@ -73,15 +72,15 @@ If you see an error: see Part 5 — Troubleshooting.
 Open a terminal and run:
 
 ```bash
-cd /home/khalid/ec2-local-cloud/dashboard
-python3 app.py
+cd /home/khalid/ec2-local-cloud/mini-cloud
+source venv/bin/activate
+python3 run.py
 ```
 
 You will see:
 ```
-  Dashboard  →  http://localhost:8080
-  Network    →  http://10.200.195.97:8080
-  OpenStack  →  http://10.200.195.97/identity
+  * Running on http://0.0.0.0:5001
+  * Database initialized
 ```
 
 **Leave this terminal open.** Do not press Ctrl+C — that stops the dashboard.
@@ -92,10 +91,10 @@ You will see:
 
 Open Firefox or Chrome and go to:
 ```
-http://localhost:8080
+http://localhost:5001
 ```
 
-You should see the **OpenStack EC2 Dashboard** with a dark header bar, sidebar, and stat cards.
+You should see the **Mini Cloud Dashboard** with a dark header bar, sidebar, and stat cards.
 
 ---
 
@@ -129,9 +128,13 @@ The dashboard lets you create, stop, start, and delete resources directly from t
 
 **CLI verification (optional — in a second terminal):**
 ```bash
-source /opt/stack/devstack/openrc admin admin
-openstack server show test-vm-01 -f value -c status
-# Expected: ACTIVE
+TOKEN=$(curl -s -X POST http://localhost:5001/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin1234"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/compute/instances \
+  | python3 -c "import sys,json; [print(i['name'], i['status']) for i in json.load(sys.stdin)['instances']]"
 ```
 
 ---
@@ -181,8 +184,8 @@ openstack server show test-vm-01 -f value -c status
 
 **CLI verification:**
 ```bash
-openstack server list --all-projects
-# test-vm-01 should NOT appear
+# VM's libvirt domain should be gone
+sudo virsh list --all | grep test-vm-01 || echo "confirmed: not found"
 ```
 
 ---
@@ -209,8 +212,8 @@ openstack server list --all-projects
 
 **CLI verification:**
 ```bash
-openstack volume show test-disk-01 -f value -c status
-# Expected: available
+sudo lvdisplay mini-cloud-vg | grep "LV Name"
+# test-disk-01's LVM LV should appear in the list
 ```
 
 ---
@@ -264,7 +267,7 @@ openstack volume show test-disk-01 -f value -c status
 
 ### Test I — Monitoring: Resource Utilization and Instance Metrics
 
-**What it proves:** The dashboard can report live compute resource usage without CloudWatch or Ceilometer — using the Nova diagnostics API directly.
+**What it proves:** The dashboard can report live compute resource usage — reading `/proc/stat`, `/proc/meminfo`, and libvirt stats directly (no separate monitoring daemon).
 
 **Steps:**
 1. Click **Monitoring** in the sidebar (under the Monitoring group)
