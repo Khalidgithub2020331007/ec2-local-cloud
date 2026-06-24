@@ -323,7 +323,7 @@ df -h /opt/stack
 
 ### Sub-step 2.2.1 — Clone the stable branch
 ```bash
-git clone https://opendev.org/openstack/devstack -b stable/2024.2
+git clone https://opendev.org/mini-cloud/devstack -b stable/2024.2
 ```
 - **Expected:** `Cloning into 'devstack'...` then `Branch 'stable/2024.2' set up to track...`
 - **Time:** 1–2 minutes
@@ -490,23 +490,23 @@ sudo journalctl -u devstack@<service-name> -n 30
 source /opt/stack/devstack/openrc admin admin
 
 # Keystone
-openstack token issue
+mini-cloud token issue
 # Should return a token table
 
 # Nova (compute)
-openstack compute service list
+mini-cloud compute service list
 # Should list nova-conductor, nova-scheduler, nova-compute
 
 # Neutron (network)
-openstack network agent list
+mini-cloud network agent list
 # Should list linuxbridge agents
 
 # Glance (images)
-openstack image list
+mini-cloud image list
 # Should list the CirrOS image
 
 # Cinder (volumes)
-openstack volume service list
+mini-cloud volume service list
 # Should list cinder-scheduler, cinder-volume
 ```
 
@@ -572,7 +572,7 @@ source /opt/stack/devstack/openrc admin admin
 
 ### Sub-step 3.1.2 — List existing default flavors
 ```bash
-openstack flavor list
+mini-cloud flavor list
 ```
 Note what DevStack created. You may see `m1.tiny`, `m1.small`, etc. already.
 
@@ -580,19 +580,19 @@ Note what DevStack created. You may see `m1.tiny`, `m1.small`, etc. already.
 ```bash
 # Remove defaults if they exist (ignore errors if they don't)
 for f in m1.tiny m1.small m1.medium m1.large; do
-    openstack flavor delete $f 2>/dev/null && echo "Deleted $f" || echo "$f not found, skipping"
+    mini-cloud flavor delete $f 2>/dev/null && echo "Deleted $f" || echo "$f not found, skipping"
 done
 
 # Create EC2-mapped flavors
-openstack flavor create --id 1 --vcpus 1 --ram 512  --disk 5  m1.tiny    # → t2.nano
-openstack flavor create --id 2 --vcpus 1 --ram 1024 --disk 10 m1.small   # → t2.micro
-openstack flavor create --id 3 --vcpus 1 --ram 2048 --disk 20 m1.medium  # → t2.small
-openstack flavor create --id 4 --vcpus 2 --ram 4096 --disk 40 m1.large   # → t2.medium
+mini-cloud flavor create --id 1 --vcpus 1 --ram 512  --disk 5  m1.tiny    # → t2.nano
+mini-cloud flavor create --id 2 --vcpus 1 --ram 1024 --disk 10 m1.small   # → t2.micro
+mini-cloud flavor create --id 3 --vcpus 1 --ram 2048 --disk 20 m1.medium  # → t2.small
+mini-cloud flavor create --id 4 --vcpus 2 --ram 4096 --disk 40 m1.large   # → t2.medium
 ```
 
 ### Sub-step 3.1.4 — Verify all 4 flavors exist
 ```bash
-openstack flavor list
+mini-cloud flavor list
 ```
 | ID | Name | vCPUs | RAM | Disk | EC2 Equiv |
 |----|------|-------|-----|------|-----------|
@@ -612,7 +612,7 @@ openstack flavor list
 
 ### Sub-step 3.2.1 — Confirm CirrOS image exists
 ```bash
-openstack image list
+mini-cloud image list
 # Should show: cirros-0.6.2-x86_64-disk | active
 ```
 
@@ -626,7 +626,7 @@ wget -O /tmp/ubuntu-22.04-cloud.img \
 
 ### Sub-step 3.2.3 — Upload Ubuntu image to Glance
 ```bash
-openstack image create "Ubuntu-22.04-LTS" \
+mini-cloud image create "Ubuntu-22.04-LTS" \
   --file /tmp/ubuntu-22.04-cloud.img \
   --disk-format qcow2 \
   --container-format bare \
@@ -636,14 +636,14 @@ openstack image create "Ubuntu-22.04-LTS" \
 
 ### Sub-step 3.2.4 — Wait for image to become active
 ```bash
-watch openstack image list
+watch mini-cloud image list
 # Wait until Ubuntu-22.04-LTS shows status: active
 ```
 
 ### Sub-step 3.2.5 — Verify both images are ready
 ```bash
-openstack image show "Ubuntu-22.04-LTS" | grep status
-openstack image show "cirros-0.6.2-x86_64-disk" | grep status
+mini-cloud image show "Ubuntu-22.04-LTS" | grep status
+mini-cloud image show "cirros-0.6.2-x86_64-disk" | grep status
 # Both: status | active
 ```
 
@@ -658,14 +658,14 @@ openstack image show "cirros-0.6.2-x86_64-disk" | grep status
 
 ### Sub-step 3.3.1 — Create the private network
 ```bash
-openstack network create private-network \
+mini-cloud network create private-network \
   --description "Private tenant network — VPC equivalent"
 ```
-- **Verify:** `openstack network show private-network | grep status` → `ACTIVE`
+- **Verify:** `mini-cloud network show private-network | grep status` → `ACTIVE`
 
 ### Sub-step 3.3.2 — Create a subnet within the network
 ```bash
-openstack subnet create private-subnet \
+mini-cloud subnet create private-subnet \
   --network private-network \
   --subnet-range 192.168.100.0/24 \
   --gateway 192.168.100.1 \
@@ -677,13 +677,13 @@ openstack subnet create private-subnet \
 
 ### Sub-step 3.3.3 — Verify the subnet
 ```bash
-openstack subnet show private-subnet
+mini-cloud subnet show private-subnet
 # Check: cidr=192.168.100.0/24, gateway_ip=192.168.100.1
 ```
 
 ### Sub-step 3.3.4 — Verify DHCP agent is serving this network
 ```bash
-openstack dhcp agent list --network private-network
+mini-cloud dhcp agent list --network private-network
 # Should show at least one dhcp agent
 ```
 
@@ -694,24 +694,24 @@ openstack dhcp agent list --network private-network
 
 ### Sub-step 3.4.1 — Create the router
 ```bash
-openstack router create main-router
+mini-cloud router create main-router
 ```
-- **Verify:** `openstack router show main-router | grep status` → `ACTIVE`
+- **Verify:** `mini-cloud router show main-router | grep status` → `ACTIVE`
 
 ### Sub-step 3.4.2 — Attach router to the external/public network
 ```bash
-openstack router set main-router --external-gateway public
+mini-cloud router set main-router --external-gateway public
 ```
 - This gives the router a port on the public network (like attaching an IGW to a VPC)
 
 ### Sub-step 3.4.3 — Connect the private subnet to the router
 ```bash
-openstack router add subnet main-router private-subnet
+mini-cloud router add subnet main-router private-subnet
 ```
 
 ### Sub-step 3.4.4 — Verify full routing chain
 ```bash
-openstack router show main-router
+mini-cloud router show main-router
 # Look for:
 #   external_gateway_info: {..., "network_id": "..."} ← connected to public
 #   interfaces_info: [...] ← connected to private-subnet
@@ -728,7 +728,7 @@ openstack router show main-router
 
 ### Sub-step 3.5.1 — Generate a new key pair and save private key
 ```bash
-openstack keypair create project-key > /opt/stack/project-key.pem
+mini-cloud keypair create project-key > /opt/stack/project-key.pem
 ```
 - This generates the keypair server-side, prints the private key once, and saves it to `project-key.pem`
 
@@ -740,10 +740,10 @@ chmod 600 /opt/stack/project-key.pem
 
 ### Sub-step 3.5.3 — Verify key pair is registered
 ```bash
-openstack keypair list
+mini-cloud keypair list
 # Should show: project-key
 
-openstack keypair show project-key
+mini-cloud keypair show project-key
 # Shows fingerprint and type (ssh-rsa)
 ```
 
@@ -763,13 +763,13 @@ head -2 /opt/stack/project-key.pem
 
 ### Sub-step 3.6.1 — Create the SSH-only security group
 ```bash
-openstack security group create ssh-only \
+mini-cloud security group create ssh-only \
   --description "Allow SSH and ICMP only — for management VMs"
 ```
 
 ### Sub-step 3.6.2 — Add SSH inbound rule
 ```bash
-openstack security group rule create ssh-only \
+mini-cloud security group rule create ssh-only \
   --protocol tcp \
   --dst-port 22 \
   --remote-ip 0.0.0.0/0 \
@@ -778,7 +778,7 @@ openstack security group rule create ssh-only \
 
 ### Sub-step 3.6.3 — Add ICMP (ping) rule
 ```bash
-openstack security group rule create ssh-only \
+mini-cloud security group rule create ssh-only \
   --protocol icmp \
   --remote-ip 0.0.0.0/0 \
   --description "Allow ping"
@@ -786,34 +786,34 @@ openstack security group rule create ssh-only \
 
 ### Sub-step 3.6.4 — Create the web-server security group
 ```bash
-openstack security group create web-server \
+mini-cloud security group create web-server \
   --description "Allow HTTP, HTTPS, SSH — for public web servers"
 ```
 
 ### Sub-step 3.6.5 — Add all web server rules
 ```bash
 # SSH
-openstack security group rule create web-server \
+mini-cloud security group rule create web-server \
   --protocol tcp --dst-port 22 --remote-ip 0.0.0.0/0
 
 # HTTP
-openstack security group rule create web-server \
+mini-cloud security group rule create web-server \
   --protocol tcp --dst-port 80 --remote-ip 0.0.0.0/0
 
 # HTTPS
-openstack security group rule create web-server \
+mini-cloud security group rule create web-server \
   --protocol tcp --dst-port 443 --remote-ip 0.0.0.0/0
 
 # ICMP
-openstack security group rule create web-server \
+mini-cloud security group rule create web-server \
   --protocol icmp --remote-ip 0.0.0.0/0
 ```
 
 ### Sub-step 3.6.6 — Verify both security groups and their rules
 ```bash
-openstack security group list
-openstack security group rule list ssh-only
-openstack security group rule list web-server
+mini-cloud security group list
+mini-cloud security group rule list ssh-only
+mini-cloud security group rule list web-server
 ```
 
 ### Sub-step 3.6.7 — Take Screenshot #5
@@ -824,7 +824,7 @@ openstack security group rule list web-server
 
 ## Phase 3 Checklist
 
-- [ ] **3.1.4** All 4 flavors visible in `openstack flavor list`
+- [ ] **3.1.4** All 4 flavors visible in `mini-cloud flavor list`
 - [ ] **3.2.5** Both images (CirrOS + Ubuntu) show `active` in Glance
 - [ ] **3.3.3** Private network `192.168.100.0/24` created and active
 - [ ] **3.4.4** Router connected to both public and private-subnet
@@ -849,7 +849,7 @@ openstack security group rule list web-server
 ```bash
 source /opt/stack/devstack/openrc admin admin
 
-openstack server create \
+mini-cloud server create \
   --image "cirros-0.6.2-x86_64-disk" \
   --flavor m1.tiny \
   --network private-network \
@@ -860,19 +860,19 @@ openstack server create \
 
 ### Sub-step 4.1.2 — Watch status change from BUILD to ACTIVE
 ```bash
-watch -n 2 openstack server list
+watch -n 2 mini-cloud server list
 # Status should go: BUILD → ACTIVE within 60 seconds
 ```
 
 ### Sub-step 4.1.3 — Get the instance's private IP
 ```bash
-openstack server show demo-instance-01 | grep addresses
+mini-cloud server show demo-instance-01 | grep addresses
 # addresses | private-network=192.168.100.XX
 ```
 
 ### Sub-step 4.1.4 — View the boot console log (proves VM is alive)
 ```bash
-openstack console log show demo-instance-01
+mini-cloud console log show demo-instance-01
 # Should show Linux boot messages
 # Last lines should show login prompt: "login as 'cirros' user"
 ```
@@ -890,18 +890,18 @@ openstack console log show demo-instance-01
 
 ### Sub-step 4.2.1 — Allocate a floating IP from the public pool
 ```bash
-FLOATING_IP=$(openstack floating ip create public -f value -c floating_ip_address)
+FLOATING_IP=$(mini-cloud floating ip create public -f value -c floating_ip_address)
 echo "Allocated floating IP: $FLOATING_IP"
 ```
 
 ### Sub-step 4.2.2 — Associate floating IP with the instance
 ```bash
-openstack server add floating ip demo-instance-01 $FLOATING_IP
+mini-cloud server add floating ip demo-instance-01 $FLOATING_IP
 ```
 
 ### Sub-step 4.2.3 — Verify the association
 ```bash
-openstack server show demo-instance-01 | grep addresses
+mini-cloud server show demo-instance-01 | grep addresses
 # Should show: private-network=192.168.100.XX, 10.200.195.XXX
 ```
 
@@ -958,9 +958,9 @@ exit
 
 ### Sub-step 4.4.1 — Stop the instance (graceful shutdown)
 ```bash
-openstack server stop demo-instance-01
+mini-cloud server stop demo-instance-01
 sleep 5
-openstack server show demo-instance-01 | grep status
+mini-cloud server show demo-instance-01 | grep status
 # status | SHUTOFF
 ```
 
@@ -972,20 +972,20 @@ ssh -i /opt/stack/project-key.pem cirros@$FLOATING_IP
 
 ### Sub-step 4.4.3 — Start the instance again
 ```bash
-openstack server start demo-instance-01
-watch openstack server list
+mini-cloud server start demo-instance-01
+watch mini-cloud server list
 # Status: ACTIVE again
 ```
 
 ### Sub-step 4.4.4 — Soft reboot (graceful OS restart)
 ```bash
-openstack server reboot demo-instance-01
+mini-cloud server reboot demo-instance-01
 # Sends ACPI shutdown signal to OS — OS restarts cleanly
 ```
 
 ### Sub-step 4.4.5 — Hard reboot (equivalent to power cycle)
 ```bash
-openstack server reboot --hard demo-instance-01
+mini-cloud server reboot --hard demo-instance-01
 # Forces immediate restart — like pulling the power plug and reconnecting
 ```
 
@@ -1000,25 +1000,25 @@ openstack server reboot --hard demo-instance-01
 
 ### Sub-step 4.5.1 — Create a 5GB persistent volume
 ```bash
-openstack volume create --size 5 demo-volume-01
+mini-cloud volume create --size 5 demo-volume-01
 ```
 
 ### Sub-step 4.5.2 — Wait for volume to become available
 ```bash
-watch openstack volume list
+watch mini-cloud volume list
 # Status: available
 ```
 
 ### Sub-step 4.5.3 — Attach volume to the running instance
 ```bash
-openstack server add volume demo-instance-01 demo-volume-01 --device /dev/vdb
+mini-cloud server add volume demo-instance-01 demo-volume-01 --device /dev/vdb
 ```
 
 ### Sub-step 4.5.4 — Verify volume is in-use
 ```bash
-openstack volume show demo-volume-01 | grep status
+mini-cloud volume show demo-volume-01 | grep status
 # status | in-use
-openstack volume show demo-volume-01 | grep attachments
+mini-cloud volume show demo-volume-01 | grep attachments
 # Shows instance ID and /dev/vdb
 ```
 
@@ -1039,15 +1039,15 @@ exit
 
 ### Sub-step 4.5.6 — Detach the volume
 ```bash
-openstack server remove volume demo-instance-01 demo-volume-01
-openstack volume show demo-volume-01 | grep status
+mini-cloud server remove volume demo-instance-01 demo-volume-01
+mini-cloud volume show demo-volume-01 | grep status
 # status | available  ← data is preserved even though detached
 ```
 
 ### Sub-step 4.5.7 — Prove data persists: attach to a different instance
 ```bash
 # Create a second VM
-openstack server create \
+mini-cloud server create \
   --image "cirros-0.6.2-x86_64-disk" \
   --flavor m1.tiny \
   --network private-network \
@@ -1056,11 +1056,11 @@ openstack server create \
   demo-instance-02
 
 # Assign floating IP
-FIP2=$(openstack floating ip create public -f value -c floating_ip_address)
-openstack server add floating ip demo-instance-02 $FIP2
+FIP2=$(mini-cloud floating ip create public -f value -c floating_ip_address)
+mini-cloud server add floating ip demo-instance-02 $FIP2
 
 # Attach the same volume to the new VM
-openstack server add volume demo-instance-02 demo-volume-01 --device /dev/vdb
+mini-cloud server add volume demo-instance-02 demo-volume-01 --device /dev/vdb
 
 # SSH into second VM and read the file
 ssh -i /opt/stack/project-key.pem cirros@$FIP2
@@ -1081,12 +1081,12 @@ exit
 
 ### Sub-step 4.6.1 — Detach volume before snapshotting (best practice)
 ```bash
-openstack server remove volume demo-instance-02 demo-volume-01
+mini-cloud server remove volume demo-instance-02 demo-volume-01
 ```
 
 ### Sub-step 4.6.2 — Create snapshot
 ```bash
-openstack volume snapshot create \
+mini-cloud volume snapshot create \
   --volume demo-volume-01 \
   --description "Snapshot before major changes" \
   demo-snapshot-01
@@ -1094,13 +1094,13 @@ openstack volume snapshot create \
 
 ### Sub-step 4.6.3 — Wait for snapshot to complete
 ```bash
-watch openstack volume snapshot list
+watch mini-cloud volume snapshot list
 # Status: available
 ```
 
 ### Sub-step 4.6.4 — Restore a new volume from snapshot
 ```bash
-openstack volume create \
+mini-cloud volume create \
   --snapshot demo-snapshot-01 \
   --size 5 \
   restored-from-snapshot
@@ -1108,7 +1108,7 @@ openstack volume create \
 
 ### Sub-step 4.6.5 — Verify restored volume has the data
 ```bash
-openstack server add volume demo-instance-01 restored-from-snapshot
+mini-cloud server add volume demo-instance-01 restored-from-snapshot
 ssh -i /opt/stack/project-key.pem cirros@$FLOATING_IP
   sudo mount /dev/vdb /mnt
   cat /mnt/proof.txt     # ← same content from original volume ✅
@@ -1122,20 +1122,20 @@ exit
 
 ### Sub-step 4.7.1 — Create a custom image from running instance
 ```bash
-openstack server image create \
+mini-cloud server image create \
   --name "my-custom-ami-v1" \
   demo-instance-01
 ```
 
 ### Sub-step 4.7.2 — Wait for image to become active
 ```bash
-watch openstack image list
+watch mini-cloud image list
 # my-custom-ami-v1 status: saving → active (takes 2–5 min)
 ```
 
 ### Sub-step 4.7.3 — Launch a brand new instance from the custom image
 ```bash
-openstack server create \
+mini-cloud server create \
   --image "my-custom-ami-v1" \
   --flavor m1.small \
   --network private-network \
@@ -1146,7 +1146,7 @@ openstack server create \
 
 ### Sub-step 4.7.4 — Verify it booted correctly
 ```bash
-openstack console log show launched-from-custom-ami
+mini-cloud console log show launched-from-custom-ami
 # Should show same boot sequence as original
 ```
 
@@ -1158,7 +1158,7 @@ openstack console log show launched-from-custom-ami
 
 ### Sub-step 4.8.1 — Launch Ubuntu 22.04 instance
 ```bash
-openstack server create \
+mini-cloud server create \
   --image "Ubuntu-22.04-LTS" \
   --flavor m1.medium \
   --network private-network \
@@ -1169,15 +1169,15 @@ openstack server create \
 
 ### Sub-step 4.8.2 — Assign a floating IP to the web server
 ```bash
-WEB_FIP=$(openstack floating ip create public -f value -c floating_ip_address)
-openstack server add floating ip web-server-01 $WEB_FIP
+WEB_FIP=$(mini-cloud floating ip create public -f value -c floating_ip_address)
+mini-cloud server add floating ip web-server-01 $WEB_FIP
 echo "Web server floating IP: $WEB_FIP"
 ```
 
 ### Sub-step 4.8.3 — Wait for Ubuntu to fully boot (3–5 minutes)
 ```bash
 # Keep checking console log until you see "cloud-init finished" or login prompt
-openstack console log show web-server-01 | tail -20
+mini-cloud console log show web-server-01 | tail -20
 ```
 
 ### Sub-step 4.8.4 — SSH in and install nginx
@@ -1251,7 +1251,7 @@ http://<WEB_FIP>
 ### Sub-step 5.1.2 — Confirm you are logged in as admin
 ```bash
 source /opt/stack/devstack/openrc admin admin
-openstack token issue | grep project_name
+mini-cloud token issue | grep project_name
 # project_name | admin
 ```
 
@@ -1262,7 +1262,7 @@ openstack token issue | grep project_name
 
 ### Sub-step 5.2.1 — Create development project
 ```bash
-openstack project create \
+mini-cloud project create \
   --domain Default \
   --description "Development team — internal testing only" \
   dev-project
@@ -1270,7 +1270,7 @@ openstack project create \
 
 ### Sub-step 5.2.2 — Create production project
 ```bash
-openstack project create \
+mini-cloud project create \
   --domain Default \
   --description "Production team — live deployments" \
   prod-project
@@ -1278,7 +1278,7 @@ openstack project create \
 
 ### Sub-step 5.2.3 — Verify both projects exist
 ```bash
-openstack project list
+mini-cloud project list
 # Should show: admin, demo, dev-project, prod-project
 ```
 
@@ -1289,7 +1289,7 @@ openstack project list
 
 ### Sub-step 5.3.1 — Create developer user
 ```bash
-openstack user create \
+mini-cloud user create \
   --domain Default \
   --password DevUser@123 \
   --description "Developer — has access to dev-project" \
@@ -1298,7 +1298,7 @@ openstack user create \
 
 ### Sub-step 5.3.2 — Create ops user
 ```bash
-openstack user create \
+mini-cloud user create \
   --domain Default \
   --password OpsUser@123 \
   --description "DevOps engineer — has access to prod-project" \
@@ -1307,7 +1307,7 @@ openstack user create \
 
 ### Sub-step 5.3.3 — Create a dev team lead (admin of dev-project only)
 ```bash
-openstack user create \
+mini-cloud user create \
   --domain Default \
   --password DevAdmin@123 \
   devadmin
@@ -1315,7 +1315,7 @@ openstack user create \
 
 ### Sub-step 5.3.4 — Verify all users exist
 ```bash
-openstack user list
+mini-cloud user list
 # admin, demo, devuser, opsuser, devadmin
 ```
 
@@ -1326,13 +1326,13 @@ openstack user list
 ### Sub-step 5.4.1 — Assign roles to users in their projects
 ```bash
 # devuser → member of dev-project (can use resources, can't manage them)
-openstack role add --project dev-project --user devuser member
+mini-cloud role add --project dev-project --user devuser member
 
 # devadmin → admin of dev-project (can manage other users in the project)
-openstack role add --project dev-project --user devadmin admin
+mini-cloud role add --project dev-project --user devadmin admin
 
 # opsuser → member of prod-project
-openstack role add --project prod-project --user opsuser member
+mini-cloud role add --project prod-project --user opsuser member
 ```
 
 ### Sub-step 5.4.2 — Log in as devuser and create a VM
@@ -1340,7 +1340,7 @@ openstack role add --project prod-project --user opsuser member
 source /opt/stack/devstack/openrc devuser DevUser@123
 # This now scopes all commands to dev-project
 
-openstack server create \
+mini-cloud server create \
   --image "cirros-0.6.2-x86_64-disk" \
   --flavor m1.tiny \
   --network private-network \
@@ -1348,7 +1348,7 @@ openstack server create \
   --security-group ssh-only \
   dev-vm-01
 
-openstack server list
+mini-cloud server list
 # Shows dev-vm-01 only
 ```
 
@@ -1356,7 +1356,7 @@ openstack server list
 ```bash
 source /opt/stack/devstack/openrc opsuser OpsUser@123
 
-openstack server list
+mini-cloud server list
 # Empty list — opsuser is in prod-project, cannot see dev-project VMs ✅
 ```
 
@@ -1364,7 +1364,7 @@ openstack server list
 ```bash
 source /opt/stack/devstack/openrc admin admin
 
-openstack server list --all-projects
+mini-cloud server list --all-projects
 # Shows ALL VMs from ALL projects ✅
 ```
 
@@ -1376,8 +1376,8 @@ openstack server list --all-projects
 
 ### Sub-step 5.4.6 — List available roles and role assignments
 ```bash
-openstack role list
-openstack role assignment list --project dev-project
+mini-cloud role list
+mini-cloud role assignment list --project dev-project
 ```
 
 ---
@@ -1412,7 +1412,7 @@ source /opt/stack/devstack/openrc admin admin
 
 ### Sub-step 6.1.2 — Test T-01: Instance Launch and Boot
 ```bash
-openstack server create \
+mini-cloud server create \
   --image cirros-0.6.2-x86_64-disk \
   --flavor m1.tiny \
   --network private-network \
@@ -1421,20 +1421,20 @@ openstack server create \
   test-t01
 
 sleep 60
-openstack server show test-t01 | grep status
+mini-cloud server show test-t01 | grep status
 # PASS: status | ACTIVE
 ```
 
 ### Sub-step 6.1.3 — Test T-02: Console Log (VM actually booted)
 ```bash
-openstack console log show test-t01 | tail -5
+mini-cloud console log show test-t01 | tail -5
 # PASS: shows Linux login prompt or cloud-init messages
 ```
 
 ### Sub-step 6.1.4 — Test T-03: Floating IP + Ping
 ```bash
-T01_FIP=$(openstack floating ip create public -f value -c floating_ip_address)
-openstack server add floating ip test-t01 $T01_FIP
+T01_FIP=$(mini-cloud floating ip create public -f value -c floating_ip_address)
+mini-cloud server add floating ip test-t01 $T01_FIP
 sleep 10
 ping -c 5 $T01_FIP
 # PASS: 5 packets transmitted, 5 received, 0% packet loss
@@ -1451,71 +1451,71 @@ ssh -i /opt/stack/project-key.pem \
 
 ### Sub-step 6.1.6 — Test T-05: Stop and Start
 ```bash
-openstack server stop test-t01
+mini-cloud server stop test-t01
 sleep 10
-openstack server show test-t01 | grep status   # SHUTOFF
-openstack server start test-t01
+mini-cloud server show test-t01 | grep status   # SHUTOFF
+mini-cloud server start test-t01
 sleep 30
-openstack server show test-t01 | grep status   # ACTIVE
+mini-cloud server show test-t01 | grep status   # ACTIVE
 # PASS: both states observed
 ```
 
 ### Sub-step 6.1.7 — Test T-06: Volume Lifecycle
 ```bash
-openstack volume create --size 2 test-vol
+mini-cloud volume create --size 2 test-vol
 sleep 5
-openstack volume show test-vol | grep status   # available
-openstack server add volume test-t01 test-vol
-openstack volume show test-vol | grep status   # in-use
-openstack server remove volume test-t01 test-vol
-openstack volume show test-vol | grep status   # available
+mini-cloud volume show test-vol | grep status   # available
+mini-cloud server add volume test-t01 test-vol
+mini-cloud volume show test-vol | grep status   # in-use
+mini-cloud server remove volume test-t01 test-vol
+mini-cloud volume show test-vol | grep status   # available
 # PASS: volume goes available → in-use → available
 ```
 
 ### Sub-step 6.1.8 — Test T-07: Volume Snapshot
 ```bash
-openstack volume snapshot create --volume test-vol test-snap
+mini-cloud volume snapshot create --volume test-vol test-snap
 sleep 10
-openstack volume snapshot show test-snap | grep status   # available
+mini-cloud volume snapshot show test-snap | grep status   # available
 # PASS: snapshot status is available
 ```
 
 ### Sub-step 6.1.9 — Test T-08: Custom Image from Instance
 ```bash
-openstack server image create --name test-custom-img test-t01
+mini-cloud server image create --name test-custom-img test-t01
 sleep 120   # wait for image capture
-openstack image show test-custom-img | grep status   # active
+mini-cloud image show test-custom-img | grep status   # active
 # PASS: image status is active
 ```
 
 ### Sub-step 6.1.10 — Test T-09: Launch from Custom Image
 ```bash
-openstack server create \
+mini-cloud server create \
   --image test-custom-img \
   --flavor m1.tiny \
   --network private-network \
   test-t09
 
 sleep 60
-openstack server show test-t09 | grep status
+mini-cloud server show test-t09 | grep status
 # PASS: ACTIVE
 ```
 
 ### Sub-step 6.1.11 — Test T-10: Security Group Rule Enforcement
 ```bash
 # Remove SSH rule temporarily and verify SSH is blocked
-openstack security group create test-block-sg
+mini-cloud security group create test-block-sg
 # No rules added — all inbound blocked
 
-openstack server create \
+mini-cloud server create \
   --image cirros-0.6.2-x86_64-disk \
   --flavor m1.tiny \
   --network private-network \
   --security-group test-block-sg \
   test-blocked
 
-BLOCKED_FIP=$(openstack floating ip create public -f value -c floating_ip_address)
-openstack server add floating ip test-blocked $BLOCKED_FIP
+BLOCKED_FIP=$(mini-cloud floating ip create public -f value -c floating_ip_address)
+mini-cloud server add floating ip test-blocked $BLOCKED_FIP
 sleep 30
 
 ssh -i /opt/stack/project-key.pem \
@@ -1541,12 +1541,12 @@ ssh -i /opt/stack/project-key.pem \
 
 ### Sub-step 6.1.13 — Clean up test resources
 ```bash
-openstack server delete test-t01 test-t09 test-blocked
-openstack volume delete test-vol
-openstack volume snapshot delete test-snap
-openstack image delete test-custom-img
-openstack floating ip delete $T01_FIP $BLOCKED_FIP
-openstack security group delete test-block-sg
+mini-cloud server delete test-t01 test-t09 test-blocked
+mini-cloud volume delete test-vol
+mini-cloud volume snapshot delete test-snap
+mini-cloud image delete test-custom-img
+mini-cloud floating ip delete $T01_FIP $BLOCKED_FIP
+mini-cloud security group delete test-block-sg
 ```
 
 ---
@@ -1557,7 +1557,7 @@ openstack security group delete test-block-sg
 ### Sub-step 6.2.1 — Measure instance launch time
 ```bash
 START=$(date +%s)
-openstack server create \
+mini-cloud server create \
   --image cirros-0.6.2-x86_64-disk \
   --flavor m1.tiny \
   --network private-network \
@@ -1565,7 +1565,7 @@ openstack server create \
 
 # Poll until ACTIVE
 while true; do
-  STATUS=$(openstack server show perf-vm-01 -f value -c status)
+  STATUS=$(mini-cloud server show perf-vm-01 -f value -c status)
   if [ "$STATUS" = "ACTIVE" ]; then
     END=$(date +%s)
     echo "Launch time: $((END - START)) seconds"
@@ -1579,8 +1579,8 @@ done
 ### Sub-step 6.2.2 — Measure resource usage with 3 VMs running
 ```bash
 # Launch 2 more
-openstack server create --image cirros-0.6.2-x86_64-disk --flavor m1.tiny --network private-network perf-vm-02
-openstack server create --image cirros-0.6.2-x86_64-disk --flavor m1.tiny --network private-network perf-vm-03
+mini-cloud server create --image cirros-0.6.2-x86_64-disk --flavor m1.tiny --network private-network perf-vm-02
+mini-cloud server create --image cirros-0.6.2-x86_64-disk --flavor m1.tiny --network private-network perf-vm-03
 
 sleep 30
 
@@ -1595,7 +1595,7 @@ echo "=== Disk Usage ==="
 df -h /opt/stack
 
 # Cleanup
-openstack server delete perf-vm-01 perf-vm-02 perf-vm-03
+mini-cloud server delete perf-vm-01 perf-vm-02 perf-vm-03
 ```
 
 ### Sub-step 6.2.3 — Record numbers for report
@@ -1628,13 +1628,13 @@ done
 source /opt/stack/devstack/openrc admin admin
 
 # Launch → floating IP → ping → delete (should complete in under 3 minutes)
-openstack server create --image cirros-0.6.2-x86_64-disk --flavor m1.tiny --network private-network smoke-test
+mini-cloud server create --image cirros-0.6.2-x86_64-disk --flavor m1.tiny --network private-network smoke-test
 sleep 60
-SMOKE_FIP=$(openstack floating ip create public -f value -c floating_ip_address)
-openstack server add floating ip smoke-test $SMOKE_FIP
+SMOKE_FIP=$(mini-cloud floating ip create public -f value -c floating_ip_address)
+mini-cloud server add floating ip smoke-test $SMOKE_FIP
 ping -c 3 $SMOKE_FIP && echo "SMOKE TEST PASSED" || echo "SMOKE TEST FAILED"
-openstack server delete smoke-test
-openstack floating ip delete $SMOKE_FIP
+mini-cloud server delete smoke-test
+mini-cloud floating ip delete $SMOKE_FIP
 ```
 
 ---
@@ -1788,22 +1788,22 @@ User clicks "Launch Instance"
 
 | AWS EC2 Feature | AWS Service/Command | Mini Cloud Equivalent | Mini Cloud Command |
 |---|---|---|---|
-| Virtual Machines | EC2 Instances | Nova Instances | `openstack server create` |
-| Machine Images | AMIs | Glance Images | `openstack image create` |
-| Instance Types | t2.micro, m5.large | Flavors | `openstack flavor create` |
-| Persistent Disk | EBS Volumes | Cinder Volumes | `openstack volume create` |
-| Disk Backup | EBS Snapshots | Cinder Snapshots | `openstack volume snapshot create` |
-| Public IPs | Elastic IPs | Floating IPs | `openstack floating ip create` |
-| Private Network | VPC | Neutron Network | `openstack network create` |
-| Subnets | VPC Subnet | Neutron Subnet | `openstack subnet create` |
-| Internet Gateway | IGW | Neutron Router | `openstack router create` |
-| Firewall Rules | Security Groups | Security Groups | `openstack security group create` |
-| SSH Keys | Key Pairs | Key Pairs | `openstack keypair create` |
-| User Accounts | IAM Users | Keystone Users | `openstack user create` |
-| Account Groups | AWS Organizations | Projects | `openstack project create` |
-| Permissions | IAM Roles/Policies | Keystone Roles | `openstack role add` |
+| Virtual Machines | EC2 Instances | Nova Instances | `mini-cloud server create` |
+| Machine Images | AMIs | Glance Images | `mini-cloud image create` |
+| Instance Types | t2.micro, m5.large | Flavors | `mini-cloud flavor create` |
+| Persistent Disk | EBS Volumes | Cinder Volumes | `mini-cloud volume create` |
+| Disk Backup | EBS Snapshots | Cinder Snapshots | `mini-cloud volume snapshot create` |
+| Public IPs | Elastic IPs | Floating IPs | `mini-cloud floating ip create` |
+| Private Network | VPC | Neutron Network | `mini-cloud network create` |
+| Subnets | VPC Subnet | Neutron Subnet | `mini-cloud subnet create` |
+| Internet Gateway | IGW | Neutron Router | `mini-cloud router create` |
+| Firewall Rules | Security Groups | Security Groups | `mini-cloud security group create` |
+| SSH Keys | Key Pairs | Key Pairs | `mini-cloud keypair create` |
+| User Accounts | IAM Users | Keystone Users | `mini-cloud user create` |
+| Account Groups | AWS Organizations | Projects | `mini-cloud project create` |
+| Permissions | IAM Roles/Policies | Keystone Roles | `mini-cloud role add` |
 | Web Console | AWS Management Console | Horizon Dashboard | http://IP/dashboard |
-| CLI | AWS CLI | Mini Cloud CLI | `openstack` |
+| CLI | AWS CLI | Mini Cloud CLI | `mini-cloud` |
 | VM Console Access | EC2 Instance Connect | VNC Console + Serial Log | `/api/instances/<id>/console` |
 | Network Interfaces | Elastic Network Interface (ENI) | Neutron Ports | `/api/ports`, `os-interface` |
 | Service Quotas | AWS Service Quotas | Nova/Cinder/Neutron Quota Sets | `/api/quotas` |
