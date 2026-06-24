@@ -37,35 +37,42 @@ This project builds a local cloud computing environment that replicates the core
 | Software | Version | Purpose |
 |----------|---------|---------|
 | Ubuntu | 24.04 LTS (Noble) ✅ | Host Operating System |
-| DevStack | stable/2024.2 (Dalmatian) | Single-node OpenStack installer — chosen over manual OpenStack for speed and simplicity |
-| Python | 3.12 (Ubuntu 24.04 default) | OpenStack services are written in Python |
-| KVM / QEMU | Latest from apt | Hypervisor that runs the virtual machines |
-| libvirt | Latest from apt | API layer between Nova and KVM |
-| LinuxBridge | Kernel built-in | Virtual networking — used instead of OVS for WiFi compatibility |
-| Git | 2.x | DevStack clones all OpenStack service repos during install |
-| MySQL | 8.x | Stores all OpenStack service state (instances, volumes, images metadata) |
-| RabbitMQ | 3.x | Message queue — Nova, Neutron, Cinder communicate through it |
-| Apache2 | 2.4.x | Serves the Horizon dashboard and Keystone API |
-| Memcached | Latest | Caches Keystone tokens to reduce auth overhead |
+| Python | 3.12 (Ubuntu 24.04 default) ✅ | Flask API server and all business logic |
+| Flask | 3.0.0 | REST API framework + web dashboard |
+| PyJWT | 2.8.0 | JWT-based authentication |
+| libvirt-python | 10.0.0 | Python bindings to call libvirt API |
+| KVM / QEMU | Latest from apt ✅ | Hypervisor that runs the virtual machines |
+| libvirt | Latest from apt ✅ | API layer between Flask and KVM |
+| Linux Bridge | Kernel built-in ✅ | Virtual networking for VM subnets |
+| dnsmasq | Latest from apt ✅ | DHCP server for each virtual network |
+| iptables | Kernel built-in ✅ | Security group rules and floating IP NAT |
+| LVM2 | Latest from apt ✅ | Block storage volumes and snapshots |
+| HAProxy | Latest from apt ✅ | Load balancing |
+| websockify | Latest from apt ✅ | VNC-to-WebSocket bridge for browser console |
+| genisoimage | Latest from apt ✅ | Builds cloud-init seed ISOs for SSH key injection |
+| SQLite | 3.x (Python built-in) ✅ | Database — stores all resource state |
 
 ---
 
-## DevStack Services Installed (EC2 Feature Map)
+## Mini Cloud Feature Map (EC2 Equivalent)
 
-> DevStack installs and manages all of these as systemd units (`devstack@nova-api`, etc.).
-
-| OpenStack Service | Service Code | EC2 / AWS Equivalent | Description |
-|---|---|---|---|
-| **Keystone** | `key` | IAM (Identity & Access Management) | User authentication, project/role management |
-| **Nova** | `n-api, n-cpu, n-sch, n-cond` | EC2 Compute | Create, start, stop, terminate virtual machines |
-| **Glance** | `g-api, g-reg` | AMI (Amazon Machine Images) | Store and manage VM disk images |
-| **Neutron** | `q-svc, q-agt, q-dhcp, q-l3` | VPC + Security Groups | Virtual networking, floating IPs, firewall rules |
-| **Cinder** | `c-api, c-vol, c-sch` | EBS (Elastic Block Store) | Persistent block storage volumes for VMs |
-| **Horizon** | `horizon` | AWS Management Console | Web-based GUI dashboard |
-| **Placement** | `placement-api` | EC2 Resource Scheduler | Tracks and allocates compute resources |
-| ~~Swift~~ | ~~s-proxy~~ | ~~S3 Object Storage~~ | Disabled — saves ~1GB RAM on 8GB machine |
-| ~~Heat~~ | ~~h-api~~ | ~~CloudFormation~~ | Disabled — saves RAM |
-| ~~Ceilometer~~ | ~~ceilometer-*~~ | ~~CloudWatch~~ | Disabled — saves RAM; replaced by Nova diagnostics API (Option 3) |
+| Feature | EC2 / AWS Equivalent | Implementation |
+|---|---|---|
+| Virtual Machines | EC2 Instances | libvirt + KVM (QEMU) |
+| OS Templates | AMIs | qcow2 files + SQLite metadata |
+| Instance Sizes | Instance Types | Hardcoded flavor table (t1.nano … t1.medium) |
+| Block Storage | EBS Volumes | LVM Logical Volumes |
+| Storage Snapshots | EBS Snapshots | LVM CoW snapshots |
+| Public IPs | Elastic IPs | iptables DNAT/SNAT on dummy interface |
+| Private Networks | VPC Subnets | Linux Bridge + dnsmasq DHCP |
+| Firewall Rules | Security Groups | Per-VM iptables chains (MC-SG-<id>) |
+| SSH Keys | EC2 Key Pairs | RSA keys via cryptography library; cloud-init ISO injection |
+| Identity | IAM | Custom SQLite-backed IAM layer |
+| Web Console | AWS Management Console | Flask + vanilla JS dashboard (port 5001) |
+| Load Balancing | ELB | HAProxy frontends/backends |
+| Auto Scaling | Auto Scaling Groups | Python background thread with libvirt CPU metrics |
+| Resource Monitoring | CloudWatch | /proc/stat + libvirt stats |
+| Resource Limits | Service Quotas | SQLite quota tables with per-user overrides |
 
 ---
 

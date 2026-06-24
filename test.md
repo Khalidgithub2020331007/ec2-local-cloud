@@ -1,4 +1,4 @@
-# Test Guide — Local EC2 Replica (OpenStack)
+# Test Guide — Local EC2 Replica (Mini Cloud)
 
 ---
 
@@ -14,7 +14,7 @@ Think of it like this:
 
 **Key idea:** You do not buy a physical computer. You get a virtual one that behaves exactly like a real computer.
 
-This project is a **local copy** of EC2 running on your own machine using a tool called **OpenStack**. It works the same way as real AWS EC2, but it runs on your laptop instead of Amazon's servers.
+This project is a **local copy** of EC2 running on your own machine — built from scratch using Flask, libvirt/KVM, LVM, Linux Bridge, and iptables. It works the same way as real AWS EC2, but runs on your laptop instead of Amazon's servers.
 
 ---
 
@@ -74,7 +74,7 @@ You have installed your app on an instance. You save it as an image. Now you can
 
 ### 3. Instance Types / Flavors — Choosing the Right Size
 
-When you launch an instance, you pick how powerful it is. These size options are called **instance types** in AWS and **flavors** in OpenStack.
+When you launch an instance, you pick how powerful it is. These size options are called **instance types** in AWS and **flavors** in mini-cloud.
 
 **AWS naming pattern:** `t3.micro`, `m5.large`, `c6i.xlarge`
 - The letter(s) = family (t = general, m = memory, c = compute)
@@ -83,13 +83,12 @@ When you launch an instance, you pick how powerful it is. These size options are
 
 **Common instance types and what they mean:**
 
-| AWS Type | OpenStack Flavor | vCPU | RAM | Disk | Use Case |
+| AWS Type | Mini Cloud Flavor | vCPU | RAM | Disk | Use Case |
 |----------|-----------------|------|-----|------|----------|
-| t2.nano | m1.nano | 1 | 64 MB | 1 GB | Test and dev only |
-| t2.micro | m1.tiny | 1 | 512 MB | 1 GB | Very small apps, free tier |
-| t2.small | m1.small | 1 | 2 GB | 20 GB | Light web apps |
-| t2.medium | m1.medium | 2 | 4 GB | 40 GB | Medium web servers |
-| t2.large | m1.large | 4 | 8 GB | 80 GB | Databases, busier apps |
+| t2.nano | t1.nano | 1 | 512 MB | 5 GB | Test and dev only |
+| t2.micro | t1.micro | 1 | 1 GB | 10 GB | Very small apps |
+| t2.small | t1.small | 1 | 2 GB | 20 GB | Light web apps |
+| t2.medium | t1.medium | 2 | 4 GB | 40 GB | Medium web servers |
 
 **Rule:** Pick the smallest size that meets your needs. You can always resize later.
 
@@ -241,9 +240,9 @@ A **VPC** is your own private, isolated section of the cloud network. All your i
 | **Route Table** | Rules for where traffic goes | The building directory |
 | **NAT Gateway** | Lets private instances reach the internet without being reachable from it | Outgoing-only exit |
 
-**In this local system (OpenStack):**
-- `private-network` = your VPC/private subnet
-- `public` = the external network pool (where floating IPs come from)
+**In this local system (mini-cloud):**
+- Custom networks you create = your VPC/private subnet (Linux Bridge + dnsmasq)
+- Floating IP pool = the external IP range (iptables DNAT/SNAT)
 - Floating IPs = the bridge from private to public
 
 ---
@@ -267,7 +266,7 @@ A **VPC** is your own private, isolated section of the cloud network. All your i
 - Desired: the target count under normal conditions
 - Max: never go above this count (cost control)
 
-> This local OpenStack system does not simulate Auto Scaling, but knowing the concept is important for working with real AWS EC2.
+> This local mini-cloud system implements Auto Scaling Groups — a Python background thread monitors CPU via libvirt and scales instances up/down based on configured thresholds.
 
 ---
 
@@ -296,22 +295,23 @@ A **Load Balancer** sits in front of multiple instances and spreads incoming req
 - `app.example.com` → Route to app instances
 - `admin.example.com` → Route to admin instances
 
-> This local OpenStack system has basic load balancing support via Octavia, but it is not configured in these tests.
+> This local mini-cloud system implements Load Balancers via HAProxy — you can create load balancer frontends and add VM instances as backend members through the dashboard.
 
 ---
 
 ### 12. IAM — Identity and Access Management (Users & Projects)
 
-**IAM** controls who can do what inside your AWS account. In OpenStack, this is handled by **Users**, **Projects (Tenants)**, and **Roles**.
+**IAM** controls who can do what inside your AWS account. In mini-cloud, this is handled by a custom IAM layer with **Users**, **Groups**, **Roles**, and **Policies** stored in SQLite.
 
 **Core concepts:**
 
-| Concept | AWS Name | OpenStack Name | What It Is |
+| Concept | AWS Name | Mini-Cloud Name | What It Is |
 |---------|----------|----------------|-----------|
-| Account | AWS Account | Project / Tenant | A container that owns resources |
-| Person | IAM User | User | A human with login credentials |
-| Permission set | IAM Policy | Role | A list of allowed actions |
-| Assumed identity | IAM Role | Role assignment | Temporary permission to act as something |
+| Account | AWS Account | Login User | A person who can log in to the dashboard |
+| Service identity | IAM User | IAM User | An identity for apps/services (has ARN, no password) |
+| Permission set | IAM Policy | IAM Policy | JSON document defining Allow/Deny actions |
+| Collection | IAM Group | IAM Group | A set of IAM users that share policies |
+| Assumed identity | IAM Role | IAM Role | Temporary permission for a trusted service |
 
 **Key principle — least privilege:**
 Give a user only the permissions they absolutely need. Nothing more.
@@ -440,21 +440,17 @@ This system simulates the following AWS services:
 
 ### Before You Start
 
-Open a terminal and run this command to load credentials:
+Open a terminal and get an auth token:
 
 ```bash
-source /opt/stack/devstack/openrc admin admin
+TOKEN=$(curl -s -X POST http://localhost:5001/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin1234"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+echo $TOKEN
 ```
 
-You should see no error. This loads your admin password so the system knows who you are.
-
-Verify it works:
-
-```bash
-openstack token issue
-```
-
-If you see a table with a token ID, you are connected. If you see an error, stop and report it (see Section 5).
+You should see a long JWT string. This is your session token. If you see an error, make sure mini-cloud is running (`python3 run.py` in the mini-cloud folder).
 
 ---
 
@@ -463,18 +459,15 @@ If you see a table with a token ID, you are connected. If you see an error, stop
 **What this tests:** Can the system list virtual computers?
 
 ```bash
-openstack server list --all-projects
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/compute/instances \
+  | python3 -m json.tool
 ```
 
-**Expected result:** A table showing instances. You should see:
+**Expected result:** A JSON list of instances with their status.
 
-| Name | Status | Networks |
-|------|--------|----------|
-| demo-instance-01 | ACTIVE | private-network=... |
-| dev-vm-01 | ACTIVE | private-network=... |
-
-**Pass:** Both instances show `ACTIVE`.
-**Fail:** You see `ERROR` status, empty list, or a connection error.
+**Pass:** Instances appear with `"status": "running"`.
+**Fail:** Empty list or connection error.
 
 ---
 
@@ -525,27 +518,40 @@ Type `exit` to leave.
 **What this tests:** Can you turn a virtual computer off and on again?
 
 ```bash
-# Stop it (like shutting down a computer)
-openstack server stop demo-instance-01
+# Get the instance ID first
+INSTANCE_ID=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/compute/instances \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['instances'][0]['id'])")
+
+# Stop it (graceful ACPI shutdown)
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/compute/instances/$INSTANCE_ID/stop
 
 # Wait 10 seconds, then check the status
-openstack server show demo-instance-01 -f value -c status
+sleep 10
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/compute/instances/$INSTANCE_ID \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
 ```
 
-**Expected result:** `SHUTOFF`
+**Expected result:** `stopped`
 
 ```bash
 # Start it again
-openstack server start demo-instance-01
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/compute/instances/$INSTANCE_ID/start
 
 # Wait 15 seconds, then check again
-openstack server show demo-instance-01 -f value -c status
+sleep 15
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/compute/instances/$INSTANCE_ID \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
 ```
 
-**Expected result:** `ACTIVE`
+**Expected result:** `running`
 
-**Pass:** Status goes from `ACTIVE` → `SHUTOFF` → `ACTIVE`.
-**Fail:** Status stays stuck, shows `ERROR`, or never comes back to `ACTIVE`.
+**Pass:** Status goes from `running` → `stopped` → `running`.
+**Fail:** Status stays stuck, shows `error`, or never comes back to `running`.
 
 ---
 
@@ -554,31 +560,29 @@ openstack server show demo-instance-01 -f value -c status
 **What this tests:** Can you create a new virtual computer from scratch?
 
 ```bash
-openstack server create \
-  --image "cirros-0.6.2-x86_64-disk" \
-  --flavor m1.tiny \
-  --network private-network \
-  --key-name project-key \
-  --security-group ssh-only \
-  my-test-vm
+# Get an image ID first
+IMAGE_ID=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/images \
+  | python3 -c "import sys,json; imgs=json.load(sys.stdin)['images']; print(imgs[0]['id'] if imgs else '')")
+
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:5001/api/v1/compute/instances \
+  -d "{\"name\": \"my-test-vm\", \"flavor\": \"t1.nano\", \"image_id\": \"$IMAGE_ID\"}"
 ```
 
 Wait 20–30 seconds, then check:
 
 ```bash
-openstack server show my-test-vm -f value -c status
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/compute/instances \
+  | python3 -c "import sys,json; [print(i['name'], i['status']) for i in json.load(sys.stdin)['instances'] if i['name']=='my-test-vm']"
 ```
 
-**Expected result:** `ACTIVE`
+**Expected result:** `running`
 
-Clean up after the test:
-
-```bash
-openstack server delete my-test-vm
-```
-
-**Pass:** Instance reaches `ACTIVE` within 30 seconds.
-**Fail:** Status is `ERROR`, `BUILD` for more than 2 minutes, or command fails.
+**Pass:** Instance reaches `running` within 30 seconds.
+**Fail:** Status is `error`, or command fails.
 
 ---
 
@@ -587,20 +591,30 @@ openstack server delete my-test-vm
 **What this tests:** Can you give a virtual computer a public IP address?
 
 ```bash
-# Create a new floating IP
-openstack floating ip create public
+# Allocate a floating IP from the pool
+FIP=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/network/floating-ips \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['id'], d['ip_address'])")
+echo "FIP: $FIP"
 
-# Note the IP address printed. Then attach it to the test VM if you still have one:
-openstack server add floating ip my-test-vm <THE-IP-SHOWN>
+FIP_ID=$(echo $FIP | awk '{print $1}')
 
-# Verify it was attached
-openstack floating ip list
+# Associate with an instance
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:5001/api/v1/network/floating-ips/$FIP_ID/associate \
+  -d "{\"instance_id\": \"$INSTANCE_ID\"}"
+
+# Verify
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/network/floating-ips \
+  | python3 -m json.tool
 ```
 
-**Expected result:** Table shows the floating IP linked to the instance's private IP.
+**Expected result:** Floating IP appears with `"status": "associated"` and the instance's private IP.
 
-**Pass:** Floating IP appears in the list and is linked to an instance.
-**Fail:** Error message, or floating IP shows "None" for fixed IP address.
+**Pass:** Floating IP is linked to an instance.
+**Fail:** Error message, or IP shows unassociated.
 
 ---
 
@@ -610,32 +624,43 @@ openstack floating ip list
 
 ```bash
 # Create a 1GB volume
-openstack volume create --size 1 test-volume
+VOL_ID=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:5001/api/v1/storage/volumes \
+  -d '{"name": "test-volume", "size_gb": 1}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 
 # Check it is ready
-openstack volume show test-volume -f value -c status
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/storage/volumes/$VOL_ID \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
 ```
 
 **Expected result:** `available`
 
 ```bash
 # Attach to an instance
-openstack server add volume demo-instance-01 test-volume
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:5001/api/v1/storage/volumes/$VOL_ID/attach \
+  -d "{\"instance_id\": \"$INSTANCE_ID\"}"
 
-# Check it is attached
-openstack volume show test-volume -f value -c status
+# Verify LVM device was created
+sudo lvdisplay mini-cloud-vg | grep "LV Name"
 ```
 
-**Expected result:** `in-use`
+**Expected result:** Volume LV appears in LVM output
 
 Clean up:
 
 ```bash
-openstack server remove volume demo-instance-01 test-volume
-openstack volume delete test-volume
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/storage/volumes/$VOL_ID/detach
+curl -s -X DELETE -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/storage/volumes/$VOL_ID
 ```
 
-**Pass:** Volume goes `available` → `in-use` → `available` after detach.
+**Pass:** Volume is created as LVM LV, attaches to VM, detaches cleanly.
 **Fail:** Status shows `error`, or attach command fails.
 
 ---
@@ -646,18 +671,15 @@ openstack volume delete test-volume
 
 ```bash
 # View existing security groups
-openstack security group list
-
-# View rules for ssh-only group
-openstack security group rule list ssh-only
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/network/security-groups \
+  | python3 -m json.tool
 ```
 
-**Expected result:** You see rules for:
-- TCP port 22 (SSH)
-- ICMP (ping)
+**Expected result:** Security groups appear with their rules (TCP port 22, ICMP).
 
 **Pass:** Rules appear as expected.
-**Fail:** No rules found, or unexpected rules (e.g., port 80 open when it should not be).
+**Fail:** No security groups found, or empty rules list.
 
 ---
 
@@ -666,61 +688,51 @@ openstack security group rule list ssh-only
 **What this tests:** Are the operating system templates available?
 
 ```bash
-openstack image list
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/images \
+  | python3 -c "import sys,json; [print(i['name'], i['status']) for i in json.load(sys.stdin)['images']]"
 ```
 
-**Expected result:** Table includes at least:
-- `cirros-0.6.2-x86_64-disk` — status `active`
-- `Ubuntu-22.04-LTS` — status `active`
+**Expected result:** At least one image listed with status `active`.
 
-**Pass:** Both images are listed and `active`.
-**Fail:** Empty list, images show `killed` or `queued`.
+**Pass:** Images are listed and active.
+**Fail:** Empty list or error.
 
 ---
 
-### Test 10 — Multi-Project Isolation
+### Test 10 — Multi-User Isolation
 
 **What this tests:** Can different users only see their own resources?
 
 ```bash
-# Switch to devuser (developer account)
-source /opt/stack/devstack/openrc devuser DevUser@123
+# Login as a second user
+TOKEN2=$(curl -s -X POST http://localhost:5001/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"devuser","password":"DevUser@123"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin).get('token','LOGIN FAILED'))")
 
-# devuser should only see their own instances
-openstack server list
+# devuser should only see THEIR instances (not admin's)
+curl -s -H "Authorization: Bearer $TOKEN2" \
+  http://localhost:5001/api/v1/compute/instances \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('Instances visible:', d.get('count',0))"
 ```
 
-**Expected result:** `dev-vm-01` appears. `demo-instance-01` does NOT appear.
+**Expected result:** Only this user's own instances appear — not admin's.
 
-```bash
-# Switch to opsuser (operations account)
-source /opt/stack/devstack/openrc opsuser OpsUser@123
-
-# opsuser should see nothing (empty list)
-openstack server list
-```
-
-**Expected result:** Empty table — `No servers found.`
-
-Go back to admin when done:
-
-```bash
-source /opt/stack/devstack/openrc admin admin
-```
-
-**Pass:** Each user only sees what belongs to them.
+**Pass:** Each user only sees what belongs to them (enforced at DB query level with `user_id` filter).
 **Fail:** Users can see each other's instances.
 
 ---
 
 ## Section 3B — UI Tests: Create, Update, Delete from the Dashboard
 
-Open the dashboard at `http://localhost:8080` before running these tests.
+Open the dashboard at `http://localhost:5001` before running these tests.
 If the dashboard is not running, start it first:
 
 ```bash
-cd /home/khalid/ec2-local-cloud/dashboard
-python3 app.py
+cd /home/khalid/ec2-local-cloud/mini-cloud
+source venv/bin/activate
+python3 run.py
 ```
 
 ---
@@ -747,12 +759,12 @@ python3 app.py
 **Verify from CLI:**
 ```bash
 source /opt/stack/devstack/openrc admin admin
-openstack server show ui-test-vm -f value -c status
+sudo virsh list --all | grep ui-test-vm
 ```
-Expected: `ACTIVE`
+Expected: `running`
 
-**Pass:** Instance appears in table with `ACTIVE` status within 30 seconds.
-**Fail:** Error notification appears, or instance stays in `BUILD` for more than 2 minutes.
+**Pass:** Instance appears in table with `running` status within 30 seconds.
+**Fail:** Error notification appears, or instance never becomes running.
 
 ---
 
@@ -761,19 +773,19 @@ Expected: `ACTIVE`
 **What this tests:** Can you shut down a running VM from the UI?
 
 **Steps:**
-1. Find `ui-test-vm` in the Instances table (status: `ACTIVE`)
+1. Find `ui-test-vm` in the Instances table (status: `running`)
 2. Click the yellow **Stop** button on that row
 
 **Expected result:**
 - A toast notification appears: *"ui-test-vm is shutting down"*
-- Click **Refresh** after 10 seconds — status changes to `SHUTOFF`
+- Click **Refresh** after 10 seconds — status changes to `stopped`
 - The Stop button disappears; a green **Start** button appears in its place
 
 **Verify from CLI:**
 ```bash
-openstack server show ui-test-vm -f value -c status
+sudo virsh list --all | grep ui-test-vm
 ```
-Expected: `SHUTOFF`
+Expected: `shut off`
 
 **Pass:** Status changes from `ACTIVE` to `SHUTOFF`.
 **Fail:** Status stays `ACTIVE` or shows `ERROR`.
