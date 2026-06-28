@@ -22,7 +22,7 @@ def _connect():
 
 
 def _build_domain_xml(libvirt_name, vcpus, ram_mb, disk_path, instance_id, seed_iso_path=None):
-    # KVM VM এর XML definition — Nova এর বদলে এটাই সরাসরি libvirt কে পাঠানো হয়
+    # KVM VM এর XML definition — libvirt কে সরাসরি পাঠানো হয়
     # Linux interface names are capped at 15 chars; we use the first 8 hex chars of the UUID.
     tap_name = f'tap-{instance_id[:8]}'
 

@@ -69,7 +69,7 @@ def init_db():
         )
     ''')
 
-    # Images table — stores metadata for uploaded OS images (like AWS AMI / Glance)
+    # Images table — stores metadata for uploaded OS images
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS images (
             id          TEXT PRIMARY KEY,
