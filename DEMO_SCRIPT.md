@@ -1,5 +1,5 @@
-# Demo Script — Local EC2 Replica Presentation
-### DevStack (OpenStack Dalmatian) on Ubuntu 24.04 LTS
+# Demo Script — Mini Cloud Presentation
+### Flask + libvirt/KVM + LVM + iptables on Ubuntu 24.04 LTS
 ### Machine: Acer TravelMate P215-53 | 8GB RAM | 16 CPU | WiFi
 
 ---
@@ -9,30 +9,31 @@
 Run this **5 minutes before** your presentation:
 
 ```bash
-# 1. Verify your WiFi IP hasn't changed (DHCP can reassign)
+# 1. Verify WiFi IP
 ip addr show wlp0s20f3 | grep 'inet '
-# Must match HOST_IP in local.conf
 
-# 2. Verify all OpenStack services are running
-source /opt/stack/devstack/openrc admin admin
-SERVICES="key n-api n-cpu n-cond n-sch g-api c-api c-vol q-svc q-agt q-dhcp q-l3 placement-api"
-for svc in $SERVICES; do
-    echo -n "$svc: "
-    sudo systemctl is-active devstack@$svc
-done
-# All must print: active
+# 2. Run the startup fix script
+cd /home/khalid/ec2-local-cloud
+bash restart-fix.sh
 
-# 3. Quick smoke test — launch a VM, ping it, delete it
-openstack server create --image cirros-0.6.2-x86_64-disk --flavor m1.tiny --network private-network smoke-test
-sleep 60
-SMOKE_FIP=$(openstack floating ip create public -f value -c floating_ip_address)
-openstack server add floating ip smoke-test $SMOKE_FIP
-ping -c 3 $SMOKE_FIP && echo "ALL GOOD — ready to demo" || echo "NETWORKING ISSUE — check Neutron"
-openstack server delete smoke-test
-openstack floating ip delete $SMOKE_FIP
+# 3. Start mini-cloud
+cd mini-cloud
+source venv/bin/activate
+python3 run.py &
+sleep 3
 
-# 4. Open Horizon dashboard in browser
-# http://10.200.194.146/dashboard  (login: admin / Admin@OpenStack1)
+# 4. Smoke test — get a token and list instances
+TOKEN=$(curl -s -X POST http://localhost:5001/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin1234"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/compute/instances \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('Instances:', d.get('count',0))"
+
+# 5. Open dashboard in browser
+# http://localhost:5001   (admin / Admin1234)
 ```
 
 ---
@@ -42,14 +43,12 @@ openstack floating ip delete $SMOKE_FIP
 | Section | Duration | What You Show |
 |---------|----------|---------------|
 | [1] Introduction | 2 min | What the project is and why |
-| [2] Architecture Overview | 3 min | Diagram + service mapping to AWS |
-| [3] Live Demo — Dashboard | 3 min | Login, overview, flavors, images |
+| [2] Architecture Overview | 3 min | Diagram + how each feature maps to AWS |
+| [3] Live Demo — Dashboard | 2 min | Login, overview cards |
 | [4] Live Demo — Launch VM | 4 min | Create instance, floating IP, SSH |
-| [5] Live Demo — Storage | 3 min | Create volume, attach, mount, read data |
-| [6] Live Demo — Multi-User | 2 min | Two users, isolated views |
-| [7] Comparison + Conclusion | 3 min | AWS vs DevStack feature table |
-
----
+| [5] Live Demo — Storage | 3 min | Create volume, attach, mount, write data |
+| [6] Live Demo — IAM & Quotas | 2 min | Multi-user isolation, quota enforcement |
+| [7] Comparison + Conclusion | 4 min | AWS vs mini-cloud table, what it proved |
 
 ---
 
@@ -59,142 +58,124 @@ openstack floating ip delete $SMOKE_FIP
 
 > "This project builds a local private cloud that replicates the core features of Amazon EC2 —
 > virtual machines, persistent storage, networking, floating IPs, and multi-user isolation —
-> all on a single laptop using open-source software called DevStack."
+> all on a single laptop using open-source Linux tools."
 
-> "DevStack is the official single-node installer for OpenStack — the same open-source cloud
-> platform that powers large public clouds like Rackspace and OVH. Using OpenStack means every
-> feature we build has a direct equivalent in real AWS, and we can compare them side by side."
+> "It is written entirely in Python using Flask, and talks directly to the Linux kernel — KVM
+> for virtual machines, LVM for block storage, Linux Bridge for networking, and iptables for
+> firewall rules and floating IPs. No cloud management framework is used."
 
 **Key point to make:**
-- This is not a simulator. These are real virtual machines running under KVM hypervisor, the same hypervisor AWS uses under the hood.
+- These are real virtual machines running under KVM — the same hypervisor AWS uses under the hood.
 
 ---
 
 ## SECTION 2 — Architecture Overview (3 minutes)
 
-**Show the diagram from PLAN.md and explain each layer:**
+**Show the ASCII diagram from mini-cloud/DEMO.md and explain each layer:**
 
 ```
-Physical host → OpenStack services → Virtual machines
+Browser → Flask API (port 5001) → libvirt/KVM / LVM / iptables / HAProxy
 ```
 
-**Map each service to AWS:**
+**Map each feature to AWS:**
 
-| Say this... | Point to this... |
-|-------------|-----------------|
-| "Keystone is our IAM" | Keystone |
-| "Nova is our EC2 compute engine" | Nova |
-| "Glance stores our AMIs" | Glance |
-| "Cinder is our EBS block storage" | Cinder |
-| "Neutron is our VPC and networking" | Neutron |
-| "Horizon is our AWS Management Console" | Horizon |
-
-**Key talking point:**
-> "All inter-service communication goes through RabbitMQ — just like in production OpenStack at scale. When you click 'Launch Instance', Nova calls Glance for the image, calls Neutron for a network port, calls Cinder if you want a volume, and then hands off to KVM to actually boot the VM."
+| Say this... | Implemented with... |
+|-------------|---------------------|
+| "EC2 compute engine" | libvirt + KVM (QEMU) |
+| "AMI image store" | local filesystem + SQLite metadata |
+| "EBS block storage" | LVM Logical Volumes |
+| "Elastic IPs" | iptables DNAT/SNAT + dummy interface |
+| "VPC networking" | Linux Bridge + dnsmasq DHCP |
+| "Security Groups" | per-VM iptables chains |
+| "IAM users/roles" | custom IAM layer in SQLite |
+| "AWS Management Console" | Flask dashboard (port 5001) |
 
 ---
 
-## SECTION 3 — Live Demo: Dashboard (3 minutes)
+## SECTION 3 — Live Demo: Dashboard (2 minutes)
 
-**Open browser → `http://10.200.194.146/dashboard`**
+**Open browser → `http://localhost:5001`**
 
-### Step 3.1 — Login
-- Domain: `Default`
+### Login
 - Username: `admin`
-- Password: `Admin@OpenStack1`
+- Password: `Admin1234`
 
-**Say:** "This is our Management Console — equivalent to logging into AWS at console.aws.amazon.com."
+**Say:** "This is our management console — same concept as logging into AWS at console.aws.amazon.com."
 
-### Step 3.2 — Show Project Overview
-- Point to: RAM usage, vCPU usage, instance count
-- **Say:** "This is the same resource quota view you'd see in EC2 limits."
-
-### Step 3.3 — Show Flavors (Horizon → Admin → Compute → Flavors)
-- Point out the 4 flavors: m1.tiny, m1.small, m1.medium, m1.large
-- **Say:** "These are our instance types — the equivalent of t2.nano, t2.micro, t2.small, t2.medium in EC2."
-
-### Step 3.4 — Show Images (Horizon → Project → Compute → Images)
-- Point to CirrOS and Ubuntu-22.04-LTS both in `active` state
-- **Say:** "These are our AMIs — CirrOS is a tiny 15MB test image, Ubuntu is the real OS we use for the web server demo."
+### Show Overview Cards
+- Point to: instance count, volume count, image count, quota usage bars
+- **Say:** "These pull from libvirt and SQLite in real time — no separate monitoring daemon."
 
 ---
 
 ## SECTION 4 — Live Demo: Launch a VM + SSH (4 minutes)
 
-**Switch to terminal. Load credentials:**
+### Step 4.1 — Upload a CirrOS image (if not already uploaded)
 
 ```bash
-source /opt/stack/devstack/openrc admin admin
+# In the dashboard: Images → Upload Image → select /tmp/cirros-0.6.2-x86_64-disk.img
 ```
 
-### Step 4.1 — Launch an instance
+### Step 4.2 — Launch an instance
 
+In the dashboard: **Instances → Launch Instance**
+
+Fill in:
+- Name: `live-demo-vm`
+- Flavor: `t1.nano — 1 vCPU · 512MB RAM`
+- Image: `CirrOS 0.6.2`
+- Key Pair: `demo-key` (generate one first if needed)
+
+Click **Launch**.
+
+**Say:** "This is equivalent to `aws ec2 run-instances`. Flask validates the request, checks quotas, creates a qcow2 overlay disk with qemu-img, builds a libvirt XML domain definition, and calls `virsh define` + `virsh start`."
+
+### Step 4.3 — Watch it go Running
+
+**Say:** "Status goes pending → running — same as EC2's pending → running. CirrOS takes under 30 seconds."
+
+Refresh until `running`.
+
+### Step 4.4 — Allocate a Floating IP
+
+In the dashboard: **Network → Floating IPs → Allocate IP**
+
+**Say:** "A floating IP is our Elastic IP. When we allocate one, the IP is added to a dummy interface on the host. When we associate it with a VM, two iptables rules are added: DNAT for inbound traffic and SNAT for replies."
+
+### Step 4.5 — Associate the Floating IP to the VM
+
+Click **Associate** → select `live-demo-vm`.
+
+Show the iptables rule:
 ```bash
-openstack server create \
-  --image "cirros-0.6.2-x86_64-disk" \
-  --flavor m1.tiny \
-  --network private-network \
-  --key-name project-key \
-  --security-group ssh-only \
-  live-demo-vm
+sudo iptables -t nat -L -n | grep DNAT
+# Expected: DNAT ... to:<vm-private-ip>
 ```
 
-**Say:** "This is the equivalent of `aws ec2 run-instances`. We're specifying the image, the instance type, the network, our SSH key, and the firewall rules."
-
-### Step 4.2 — Watch it go ACTIVE
+### Step 4.6 — SSH into the VM
 
 ```bash
-watch -n 2 openstack server list
-```
-
-**Say:** "The status goes BUILD → ACTIVE — same as EC2's pending → running. On CirrOS this takes under 30 seconds."
-
-Wait for `ACTIVE`, then press Ctrl+C.
-
-### Step 4.3 — Assign a Floating IP (Elastic IP)
-
-```bash
-DEMO_FIP=$(openstack floating ip create public -f value -c floating_ip_address)
-openstack server add floating ip live-demo-vm $DEMO_FIP
-echo "Floating IP: $DEMO_FIP"
-```
-
-**Say:** "A floating IP is OpenStack's Elastic IP. It's a public-facing IP that we can associate and disassociate from any instance."
-
-### Step 4.4 — Ping it
-
-```bash
-ping -c 4 $DEMO_FIP
-```
-
-**Say:** "ICMP is reaching the VM through the security group rule we added — same as an EC2 security group with an Allow ICMP inbound rule."
-
-### Step 4.5 — SSH into the VM
-
-```bash
-ssh -i /opt/stack/project-key.pem \
+ssh -i ~/.ssh/demo-key.pem \
   -o StrictHostKeyChecking=no \
-  cirros@$DEMO_FIP
+  cirros@<floating-ip>
 ```
 
-**Inside the VM, run:**
-
+Inside the VM:
 ```bash
 whoami          # cirros
 hostname        # live-demo-vm
-uname -a        # Linux kernel version
-ip addr show    # shows private IP 192.168.100.XX
-df -h           # disk layout
-free -m         # memory — shows 512MB (m1.tiny)
+ip addr show    # shows private IP from Linux bridge DHCP
+free -m         # 512MB RAM (t1.nano)
 exit
 ```
 
-**Say:** "We're SSH'd into a real virtual machine — same private key workflow as EC2. The `ip addr` output shows the private IP from our 192.168.100.0/24 subnet, which is our VPC subnet equivalent."
+**Say:** "We're SSH'd into a real virtual machine. The private key was injected via a cloud-init seed ISO — the same mechanism AWS uses. The VM got its IP from our dnsmasq DHCP server running on the Linux bridge."
 
-### Step 4.6 — Show VNC Console (EC2 Instance Connect equivalent)
+### Step 4.7 — Open VNC Console (EC2 Instance Connect equivalent)
 
-- Open Horizon → Instances → click `live-demo-vm` → Console tab
-- **Say:** "This is browser-based console access — the equivalent of EC2 Instance Connect. No SSH needed. You get a terminal directly in the browser."
+In the dashboard: **Instances → Console** on `live-demo-vm`.
+
+**Say:** "VNC is a TCP protocol — browsers can only open WebSockets. We use websockify as a bridge. The console endpoint starts websockify, returns a ws:// URL, and noVNC renders the VM screen in the browser."
 
 ---
 
@@ -202,180 +183,177 @@ exit
 
 ### Step 5.1 — Create a volume
 
+In the dashboard: **Volumes → Create Volume**, name: `demo-vol`, size: `1 GB`.
+
+**Say:** "This runs `lvcreate -L 1G -n <id> mini-cloud-vg`. LVM creates a block device at `/dev/mini-cloud-vg/<id>`."
+
 ```bash
-openstack volume create --size 5 live-demo-volume
-sleep 5
-openstack volume list
-# status: available
+# Prove it with:
+sudo lvdisplay /dev/mini-cloud-vg/
 ```
 
-**Say:** "This is our EBS volume — 5 gigabytes of persistent block storage."
+### Step 5.2 — Attach to the VM
 
-### Step 5.2 — Attach to the running instance
+Click **Attach** → select `live-demo-vm`.
 
-```bash
-openstack server add volume live-demo-vm live-demo-volume --device /dev/vdb
-openstack volume show live-demo-volume | grep status
-# status: in-use
-```
+**Say:** "Attachment calls libvirt's `attachDevice()` — the block device appears inside the VM without a reboot. This is hot-attach, same as EBS."
 
-**Say:** "Just like attaching an EBS volume to an EC2 instance. It shows up as a block device inside the OS."
-
-### Step 5.3 — SSH in and format + mount it
+### Step 5.3 — SSH in and format it
 
 ```bash
-ssh -i /opt/stack/project-key.pem -o StrictHostKeyChecking=no cirros@$DEMO_FIP
+ssh -i ~/.ssh/demo-key.pem cirros@<floating-ip>
 
-# Inside VM:
 sudo fdisk -l            # see /dev/vdb listed
-sudo mkfs.ext4 /dev/vdb  # format it
+sudo mkfs.ext4 /dev/vdb
 sudo mkdir /data
 sudo mount /dev/vdb /data
-df -h                    # /data now shows 4.8G available
 echo "Persistent storage demo" | sudo tee /data/proof.txt
 cat /data/proof.txt
 exit
 ```
 
-**Say:** "We formatted and mounted the volume inside the VM. The data written here survives the VM being deleted — the volume is independent of the instance lifecycle, exactly like EBS."
+**Say:** "Data written here survives the VM being deleted — the volume is independent of the instance lifecycle, exactly like EBS."
 
-### Step 5.4 — Show volume snapshot (optional, if time allows)
+### Step 5.4 — Volume Snapshot
 
 ```bash
-openstack server remove volume live-demo-vm live-demo-volume
-openstack volume snapshot create --volume live-demo-volume demo-snap
-openstack volume snapshot list
+# In dashboard: Volumes → Snapshots → Create Snapshot
+# Or via API:
+curl -s -X POST http://localhost:5001/api/v1/storage/snapshots \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "demo-snap", "volume_id": "<volume-id>"}'
 ```
 
-**Say:** "And we can snapshot the volume at any point — same as creating an EBS snapshot for backup or migration."
+**Say:** "LVM snapshots are instant copy-on-write — no data is copied at creation time. Only changed blocks are stored in the snapshot's reserved space."
 
 ---
 
-## SECTION 6 — Live Demo: Multi-User Isolation (2 minutes)
+## SECTION 6 — Live Demo: IAM & Quotas (2 minutes)
 
-**Say:** "One of the things that makes this a real cloud platform — not just a VM host — is multi-tenancy. Different users are completely isolated from each other."
+### Step 6.1 — Create an IAM user
 
-### Step 6.1 — Show the user structure (CLI)
+Dashboard: **IAM → Users → Create User**, name: `devbot`.
 
-```bash
-source /opt/stack/devstack/openrc admin admin
-openstack user list
-# admin, demo, devuser, opsuser, devadmin
+**Say:** "IAM users are service identities — separate from login accounts. They get permissions through policies, not passwords."
 
-openstack project list
-# admin, demo, dev-project, prod-project
-```
+### Step 6.2 — Attach a policy
 
-### Step 6.2 — Login as devuser in incognito browser
+Click **Attach Policy** on `devbot` → select `AmazonEC2ReadOnlyAccess`.
 
-- Open a second browser window (incognito)
-- URL: `http://10.200.194.146/dashboard`
-- Domain: `Default`, Username: `devuser`, Password: `DevUser@123`
+**Say:** "Seven AWS-managed policies are pre-seeded — AdministratorAccess, PowerUserAccess, ReadOnlyAccess, AmazonEC2FullAccess, etc. Custom policies use the same JSON document format as real AWS IAM."
 
-**Say:** "devuser is assigned to dev-project — same concept as an IAM user scoped to a specific AWS account."
+### Step 6.3 — Show Quotas
 
-- Show: only dev-project's instances visible (isolation from admin's VMs)
+Dashboard: **Quotas** sidebar.
 
-### Step 6.3 — Show admin sees everything
-
-```bash
-source /opt/stack/devstack/openrc admin admin
-openstack server list --all-projects
-# Shows VMs from ALL projects
-```
-
-**Say:** "Admin is the equivalent of the AWS root account — sees across all projects."
+**Say:** "Quotas are checked before every resource-creating call. The `check_quota()` function counts current usage in SQLite and rejects the request with 403 QUOTA_EXCEEDED if the limit would be breached."
 
 ---
 
-## SECTION 7 — Comparison + Conclusion (3 minutes)
+## SECTION 7 — Comparison + Conclusion (4 minutes)
 
-**Show the comparison table from PROJECT_REQUIREMENTS.md:**
-
-| AWS EC2 | This Project |
-|---------|-------------|
-| EC2 Instances | Nova Instances |
-| AMIs | Glance Images |
-| Instance Types | Flavors |
-| EBS Volumes | Cinder Volumes |
-| Elastic IPs | Floating IPs |
-| VPC | Neutron Network |
-| Security Groups | Security Groups |
-| IAM Users | Keystone Users |
-| AWS Management Console | Horizon Dashboard |
-| AWS CLI | OpenStack CLI |
+| AWS EC2 | Mini Cloud | Implementation |
+|---------|-----------|----------------|
+| EC2 Instances | Instances | libvirt + KVM |
+| AMIs | Images | qcow2 files + SQLite |
+| Instance Types | Flavors | hardcoded flavor table |
+| EBS Volumes | Volumes | LVM Logical Volumes |
+| EBS Snapshots | Snapshots | LVM snapshots (CoW) |
+| Elastic IPs | Floating IPs | iptables DNAT/SNAT |
+| VPC Subnets | Networks | Linux Bridge + dnsmasq |
+| Security Groups | Security Groups | per-VM iptables chains |
+| IAM | IAM | custom SQLite-backed layer |
+| AWS CLI | REST API | Flask + JWT |
+| AWS Console | Dashboard | Flask + vanilla JS |
+| Auto Scaling | Autoscaling | Python background thread |
+| ELB | Load Balancers | HAProxy |
+| CloudWatch | Monitoring | /proc + libvirt stats |
+| Service Quotas | Quotas | SQLite quota tables |
 
 **Closing statement:**
 
-> "This project demonstrates that the core architecture of commercial cloud platforms is not proprietary magic —
-> it's a well-understood set of open-source components: a compute scheduler, a hypervisor,
-> a network virtualization layer, a block storage system, and an identity service.
-> DevStack ties all of these together in a way that's reproducible on a single laptop."
+> "This project demonstrates that the core architecture of commercial cloud platforms is not
+> proprietary magic — it is a well-understood set of Linux kernel features: KVM for isolation,
+> LVM for storage, bridges and iptables for networking. Python orchestrates all of it.
+> Understanding these primitives is understanding how AWS works under the hood."
 
 ---
 
 ## Cleanup After Demo
 
 ```bash
-source /opt/stack/devstack/openrc admin admin
+TOKEN=$(curl -s -X POST http://localhost:5001/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin1234"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
-# Delete demo resources
-openstack server remove volume live-demo-vm live-demo-volume 2>/dev/null
-openstack server delete live-demo-vm
-openstack floating ip delete $DEMO_FIP
-openstack volume snapshot delete demo-snap 2>/dev/null
-openstack volume delete live-demo-volume
+# Disassociate and release floating IP
+FIP_ID=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/network/floating-ips \
+  | python3 -c "import sys,json; fips=json.load(sys.stdin)['floating_ips']; print(fips[0]['id'] if fips else '')")
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/network/floating-ips/$FIP_ID/disassociate
+curl -s -X DELETE -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/network/floating-ips/$FIP_ID
+
+# Detach and delete volume
+curl -s -X DELETE -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/storage/volumes/<volume-id>
+
+# Terminate instance
+curl -s -X DELETE -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/compute/instances/<instance-id>
 ```
 
 ---
 
 ## If Something Goes Wrong During the Demo
 
-### Instance stuck in BUILD (not going ACTIVE)
+### Instance stuck in pending / not going running
 
 ```bash
-sudo systemctl restart devstack@n-cpu
-openstack server delete <stuck-instance>
-# Re-launch it
+sudo systemctl restart libvirtd
+sudo virsh list --all
 ```
 
 ### SSH connection refused
 
 ```bash
-# Check floating IP is assigned
-openstack server show live-demo-vm | grep addresses
+# Check floating IP is associated
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/network/floating-ips
 
-# Check security group has SSH rule
-openstack security group rule list ssh-only | grep 22
+# Check iptables DNAT is in place
+sudo iptables -t nat -L PREROUTING -n | grep DNAT
 
-# Re-ping to confirm network is up
-ping -c 3 $DEMO_FIP
+# Verify VM is actually running
+sudo virsh list | grep live-demo-vm
 ```
 
-### Horizon not loading (502/500 error)
+### Dashboard won't load
 
 ```bash
-sudo systemctl restart apache2
-# Wait 10 seconds, reload browser
+# Check mini-cloud is running
+curl -s http://localhost:5001/api/v1/auth/health
+
+# Restart it if not
+cd /home/khalid/ec2-local-cloud/mini-cloud
+source venv/bin/activate
+python3 run.py
 ```
 
-### Neutron broken (no network to VMs)
+### Floating IP ping fails
 
 ```bash
-sudo systemctl restart devstack@q-svc devstack@q-agt devstack@q-dhcp devstack@q-l3
-# Wait 30 seconds before launching new VMs
-```
+# Restore FIP state
+sudo python3 /home/khalid/ec2-local-cloud/mini-cloud/scripts/restore_fip.py
 
-### No floating IPs available
-
-```bash
-# Check if old ones are still allocated
-openstack floating ip list
-# Release unused ones
-openstack floating ip delete <ip>
+# Verify mc-fip interface has the IP
+ip addr show mc-fip
 ```
 
 ---
 
-*Project: Local EC2 Replica | DevStack stable/2024.2 | Ubuntu 24.04 LTS*
-*Machine: Acer TravelMate P215-53 | 10.200.194.146 | wlp0s20f3*
+*Project: Mini Cloud System | Flask + libvirt/KVM + LVM + iptables | Ubuntu 24.04 LTS*
+*Machine: Acer TravelMate P215-53 | wlp0s20f3*

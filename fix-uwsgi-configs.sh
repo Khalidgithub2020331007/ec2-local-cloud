@@ -1,73 +1,65 @@
 #!/bin/bash
-# Recreates the three uwsgi ini files that DevStack generates during stack.sh
-# but doesn't persist after cleanup. Run once with sudo from a terminal.
-# 16-core machine → API_WORKERS=4 (max(2, nproc/4))
+# Mini Cloud health check — verifies all system dependencies are in place.
+# Run any time you suspect something is broken before starting mini-cloud.
 
 set -e
 
-# nova-api: unix socket, apache proxies /compute to it
-sudo tee /etc/nova/nova-api-uwsgi.ini > /dev/null <<'EOF'
-[uwsgi]
-module = nova.wsgi.osapi_compute:application
-processes = 4
-master = true
-die-on-term = true
-exit-on-reload = false
-worker-reload-mercy = 80
-enable-threads = true
-plugins = http,python3
-thunder-lock = true
-hook-master-start = unix_signal:15 gracefully_kill_them_all
-buffer-size = 65535
-add-header = Connection: close
-lazy-apps = true
-start-time = %t
-socket = /var/run/uwsgi/nova-api.socket
-chmod-socket = 666
-EOF
+PASS=0
+FAIL=0
 
-# nova-metadata: binds directly to HTTP 0.0.0.0:8775 (no apache proxy)
-sudo tee /etc/nova/nova-metadata-uwsgi.ini > /dev/null <<'EOF'
-[uwsgi]
-module = nova.wsgi.metadata:application
-processes = 4
-master = true
-die-on-term = true
-exit-on-reload = false
-worker-reload-mercy = 80
-enable-threads = true
-plugins = http,python3
-thunder-lock = true
-hook-master-start = unix_signal:15 gracefully_kill_them_all
-buffer-size = 65535
-add-header = Connection: close
-lazy-apps = true
-start-time = %t
-http = 0.0.0.0:8775
-EOF
+check() {
+    local label=$1
+    local cmd=$2
+    if eval "$cmd" &>/dev/null; then
+        echo "  OK  $label"
+        PASS=$((PASS+1))
+    else
+        echo " FAIL $label"
+        FAIL=$((FAIL+1))
+    fi
+}
 
-# cinder-api: unix socket, apache proxies /volume to it
-sudo tee /etc/cinder/cinder-api-uwsgi.ini > /dev/null <<'EOF'
-[uwsgi]
-module = cinder.wsgi.api:application
-processes = 4
-master = true
-die-on-term = true
-exit-on-reload = false
-worker-reload-mercy = 80
-enable-threads = true
-plugins = http,python3
-thunder-lock = true
-hook-master-start = unix_signal:15 gracefully_kill_them_all
-buffer-size = 65535
-add-header = Connection: close
-lazy-apps = true
-start-time = %t
-socket = /var/run/uwsgi/cinder-api.socket
-chmod-socket = 666
-EOF
+echo "=== Mini Cloud Health Check ==="
+echo ""
 
-sudo systemctl restart devstack@n-api devstack@n-api-meta devstack@c-api
-sleep 3
-systemctl is-active devstack@n-api devstack@n-api-meta devstack@c-api
-echo "Done."
+echo "-- System Services --"
+check "libvirtd running"       "sudo systemctl is-active libvirtd -q"
+check "dnsmasq installed"      "which dnsmasq"
+check "haproxy installed"      "which haproxy"
+
+echo ""
+echo "-- KVM / Virtualisation --"
+check "KVM device exists"      "[ -e /dev/kvm ]"
+check "virsh available"        "which virsh"
+check "qemu-img available"     "which qemu-img"
+check "genisoimage available"  "which genisoimage"
+
+echo ""
+echo "-- Networking --"
+check "iptables available"     "which iptables"
+check "IP forwarding on"       "[ \"\$(cat /proc/sys/net/ipv4/ip_forward)\" = '1' ]"
+
+echo ""
+echo "-- Storage --"
+check "LVM tools installed"    "which lvcreate"
+check "mini-cloud-vg exists"   "sudo vgdisplay mini-cloud-vg -q"
+
+echo ""
+echo "-- Mini Cloud App --"
+check "Python venv exists"     "[ -f /home/khalid/ec2-local-cloud/mini-cloud/venv/bin/python3 ]"
+check "Database file exists"   "[ -f /home/khalid/ec2-local-cloud/mini-cloud/database/cloud.db ]"
+check "Port 5001 free"         "! lsof -i :5001 -t"
+
+echo ""
+echo "=== Results: $PASS passed, $FAIL failed ==="
+
+if [ $FAIL -gt 0 ]; then
+    echo ""
+    echo "Fix failed checks, then run: bash restart-fix.sh"
+    exit 1
+else
+    echo ""
+    echo "All checks passed. Ready to start:"
+    echo "   cd /home/khalid/ec2-local-cloud/mini-cloud"
+    echo "   source venv/bin/activate && python3 run.py"
+fi

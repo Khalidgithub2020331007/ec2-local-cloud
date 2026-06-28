@@ -1,4 +1,4 @@
-# Installation Guide — DevStack on Your Machine
+# Installation Guide — Mini Cloud on Your Machine
 ### Machine: Acer TravelMate P215-53 | Ubuntu 24.04 LTS | 8GB RAM | WiFi only
 
 ---
@@ -9,33 +9,14 @@
 CPU:       16 cores, Intel VMX enabled ✅
 KVM:       /dev/kvm exists ✅
 OS:        Ubuntu 24.04.4 LTS (Noble) ✅
-Host IP:   10.200.194.146
+Host IP:   (check with: ip addr show wlp0s20f3 | grep 'inet ')
 Interface: wlp0s20f3 (WiFi - active)
 Ethernet:  enp43s0 (unplugged - ignore)
-Docker:    Installed - must stop before DevStack
 ```
 
 ---
 
-## STEP 1 — Stop Docker (Prevents iptables Conflicts)
-
-Docker and DevStack both manage iptables/netfilter. Running both causes networking to break silently.
-
-```bash
-sudo systemctl stop docker
-sudo systemctl stop docker.socket
-sudo systemctl stop containerd
-
-# Verify they are stopped
-sudo systemctl is-active docker
-# Should output: inactive
-```
-
-> Do NOT uninstall Docker. Just stop it. You can restart it after DevStack is running (though not recommended to run both simultaneously).
-
----
-
-## STEP 2 — System Update and Dependencies
+## STEP 1 — System Update and Dependencies
 
 ```bash
 sudo apt update && sudo apt full-upgrade -y
@@ -43,15 +24,42 @@ sudo apt autoremove -y
 
 sudo apt install -y \
   git curl wget vim net-tools htop \
-  python3 python3-pip build-essential \
-  libssl-dev libffi-dev python3-dev \
-  bridge-utils qemu-kvm libvirt-daemon-system \
-  libvirt-clients cpu-checker iptables
+  python3 python3-pip python3-venv build-essential \
+  qemu-kvm libvirt-daemon-system libvirt-clients \
+  cpu-checker bridge-utils iptables dnsmasq \
+  lvm2 genisoimage haproxy websockify \
+  setfacl acl
 ```
 
 ---
 
-## STEP 3 — Add Swap Space (Critical — 8GB RAM)
+## STEP 2 — Verify KVM Support
+
+```bash
+kvm-ok
+# Expected: INFO: /dev/kvm exists — KVM acceleration can be used
+
+# Verify libvirt is running
+sudo systemctl enable --now libvirtd
+sudo systemctl is-active libvirtd
+# Expected: active
+```
+
+---
+
+## STEP 3 — Add Your User to the libvirt Group
+
+```bash
+sudo usermod -aG libvirt $USER
+sudo usermod -aG kvm $USER
+
+# Log out and back in (or use newgrp)
+newgrp libvirt
+```
+
+---
+
+## STEP 4 — Add Swap Space (Critical — 8GB RAM)
 
 ```bash
 # Check if swap already exists
@@ -73,185 +81,187 @@ free -h
 
 ---
 
-## STEP 4 — Create the `stack` User
-
-DevStack must NOT run as root. It needs its own user.
+## STEP 5 — Set Up LVM Volume Group for Block Storage
 
 ```bash
-sudo useradd -s /bin/bash -d /opt/stack -m stack
-echo "stack ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/stack
-sudo chmod +x /opt/stack
+# Create a 20GB backing file for LVM (avoids needing a spare partition)
+sudo fallocate -l 20G /var/lib/mini-cloud-lvm.img
+LOOP_DEV=$(sudo losetup -f --show /var/lib/mini-cloud-lvm.img)
+echo "Loop device: $LOOP_DEV"   # e.g. /dev/loop0
 
-# Set a password (useful for SSH login to stack user)
-sudo passwd stack
-# Enter: Stack@123 (or your choice)
+# Create the physical volume and volume group
+sudo pvcreate $LOOP_DEV
+sudo vgcreate mini-cloud-vg $LOOP_DEV
 
-# Switch to stack user
-sudo su - stack
+# Verify
+sudo vgdisplay mini-cloud-vg
 ```
 
-**From here onward, all commands run as the `stack` user.**
+> The loop device is recreated on reboot by `mini-cloud-startup.sh`. See Step 9.
 
 ---
 
-## STEP 5 — Clone DevStack
+## STEP 6 — Clone the Project
 
 ```bash
-# You are now logged in as stack user at /opt/stack
-git clone https://opendev.org/openstack/devstack -b stable/2024.2
-cd devstack
-```
-
-> `stable/2024.2` is the **Dalmatian** release — compatible with Ubuntu 24.04.
-
----
-
-## STEP 6 — Copy the Configuration File
-
-```bash
-# Copy the prepared config (from your project folder)
-cp /home/khalid/ec2-local-cloud/configs/local.conf /opt/stack/devstack/local.conf
-
-# Verify it looks correct
-head -20 /opt/stack/devstack/local.conf
+# If the project is already on disk, skip this step
+cd /home/khalid
+git clone <your-repo-url> ec2-local-cloud
+cd ec2-local-cloud/mini-cloud
 ```
 
 ---
 
-## STEP 7 — Run DevStack
+## STEP 7 — Set Up Python Virtual Environment
 
 ```bash
-cd /opt/stack/devstack
-./stack.sh
-```
+cd /home/khalid/ec2-local-cloud/mini-cloud
 
-**This will take 30–60 minutes.** It downloads, compiles, and starts all OpenStack services.
+python3 -m venv venv
+source venv/bin/activate
 
-### What to watch for during installation:
-
-```
-# These lines confirm progress:
-[Call Trace]          - Normal, shows what's running
-+functions::...       - Function calls, normal
-Creating network...   - Neutron starting up
-Starting Nova...      - Compute service starting
-```
-
-### If it fails, check the log:
-```bash
-tail -100 /opt/stack/logs/stack.sh.log
+pip install flask==3.0.0 pyjwt==2.8.0 werkzeug==3.0.1 \
+            libvirt-python==10.0.0 cryptography
 ```
 
 ---
 
-## STEP 8 — Verify Successful Installation
+## STEP 8 — Configure Passwordless Sudo for Network Operations
 
-### Expected output at the end of `stack.sh`:
+Mini cloud needs to run `ip`, `iptables`, `dnsmasq`, `virsh`, and `lvcreate` as root.
 
-```
-=========================
-DevStack Component Timing
-=========================
-...
-This is your host IP address: 10.200.194.146
-Horizon is now available at http://10.200.194.146/dashboard
-Keystone is serving at http://10.200.194.146/identity/
-The default users are: admin and demo
-The password: Admin@OpenStack1
-```
-
-### Verify all services are running:
 ```bash
-sudo systemctl list-units 'devstack@*' --all --no-pager
-```
+sudo tee /etc/sudoers.d/mini-cloud > /dev/null <<'EOF'
+khalid ALL=(ALL) NOPASSWD: /usr/sbin/ip, /usr/sbin/iptables, \
+  /usr/sbin/dnsmasq, /usr/bin/virsh, /usr/sbin/lvcreate, \
+  /usr/sbin/lvremove, /usr/sbin/lvdisplay, /usr/bin/qemu-img, \
+  /usr/bin/genisoimage, /usr/bin/setfacl, /usr/sbin/sysctl, \
+  /bin/kill, /usr/bin/systemctl
+EOF
 
-All services should show `active (running)`.
+sudo chmod 440 /etc/sudoers.d/mini-cloud
+```
 
 ---
 
-## STEP 9 — First Login
+## STEP 9 — Create the Startup Script
 
-Open your browser and go to:
+This script runs before mini-cloud on every boot to restore runtime-only state (loop device, IP forwarding, floating IP rules).
 
+```bash
+sudo tee /usr/local/bin/mini-cloud-startup.sh > /dev/null <<'EOF'
+#!/bin/bash
+set -e
+
+# Re-attach LVM loop device if missing
+if ! losetup -j /var/lib/mini-cloud-lvm.img | grep -q loop; then
+    LOOP=$(losetup -f --show /var/lib/mini-cloud-lvm.img)
+    pvscan --cache "$LOOP"
+    vgchange -ay mini-cloud-vg
+fi
+
+# Enable IP forwarding — required for NAT (floating IPs) and VM routing
+sysctl -w net.ipv4.ip_forward=1
+
+# Restore floating IP state (iptables DNAT/SNAT rules + mc-fip interface)
+/home/khalid/ec2-local-cloud/mini-cloud/venv/bin/python3 \
+    /home/khalid/ec2-local-cloud/mini-cloud/scripts/restore_fip.py
+
+echo "[mini-cloud] startup complete"
+EOF
+
+sudo chmod +x /usr/local/bin/mini-cloud-startup.sh
 ```
-http://10.200.194.146/dashboard
-```
 
-| Field | Value |
-|-------|-------|
-| Domain | Default |
-| Username | admin |
-| Password | Admin@OpenStack1 |
+Create the systemd unit:
+
+```bash
+sudo tee /etc/systemd/system/mini-cloud-startup.service > /dev/null <<'EOF'
+[Unit]
+Description=Mini Cloud pre-start (LVM loop + IP forwarding + floating IPs)
+Before=mini-cloud.service
+After=network-online.target libvirtd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/mini-cloud-startup.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable mini-cloud-startup
+```
 
 ---
 
-## STEP 10 — Load CLI Credentials
+## STEP 10 — Create the Mini Cloud systemd Service
 
 ```bash
-# Still as stack user (or open new terminal and: sudo su - stack)
-source /opt/stack/devstack/openrc admin admin
+sudo tee /etc/systemd/system/mini-cloud.service > /dev/null <<'EOF'
+[Unit]
+Description=Mini Cloud API Server
+After=libvirtd.service mini-cloud-startup.service network-online.target
+Requires=libvirtd.service mini-cloud-startup.service
 
-# Test it works
-openstack service list
-openstack server list
+[Service]
+Type=simple
+User=khalid
+WorkingDirectory=/home/khalid/ec2-local-cloud/mini-cloud
+ExecStart=/home/khalid/ec2-local-cloud/mini-cloud/venv/bin/python3 run.py
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable mini-cloud
 ```
+
+---
+
+## STEP 11 — First Run
+
+```bash
+# Run the startup script once manually (before first boot cycle)
+sudo bash /usr/local/bin/mini-cloud-startup.sh
+
+# Start mini-cloud
+cd /home/khalid/ec2-local-cloud/mini-cloud
+source venv/bin/activate
+python3 run.py
+```
+
+Expected output:
+```
+ * Running on http://0.0.0.0:5001
+ * Database initialized
+```
+
+Open browser: `http://localhost:5001`
+
+Default login: `admin` / `Admin1234`
 
 ---
 
 ## After a Reboot
 
-DevStack does not auto-start. After every reboot:
+Everything is automatic if systemd services are enabled:
 
 ```bash
-# 1. Stop docker first
-sudo systemctl stop docker docker.socket containerd
+# Verify services started
+sudo systemctl is-active mini-cloud-startup
+sudo systemctl is-active mini-cloud
+sudo systemctl is-active libvirtd
 
-# 2. Switch to stack user
-sudo su - stack
-
-# 3. Rejoin the stack
-cd /opt/stack/devstack
-./rejoin-stack.sh
-```
-
----
-
-## Troubleshooting
-
-### Stack fails with "address already in use"
-```bash
-# Something is using a port (likely Docker)
-sudo systemctl stop docker
-sudo ./unstack.sh
-./stack.sh
-```
-
-### Nova instances stuck in "spawning"
-```bash
-sudo systemctl restart devstack@n-cpu
-sudo journalctl -u devstack@n-cpu -n 50
-```
-
-### No network inside VMs / can't ping
-```bash
-# Restart Neutron agents
-sudo systemctl restart devstack@q-svc
-sudo systemctl restart devstack@q-agt
-sudo systemctl restart devstack@q-dhcp
-sudo systemctl restart devstack@q-l3
-```
-
-### Dashboard shows 500 error
-```bash
-sudo systemctl restart apache2
-```
-
-### Redo from scratch (if something is badly broken)
-```bash
-cd /opt/stack/devstack
-./unstack.sh          # stop everything
-./clean.sh            # clean database and config
-./stack.sh            # fresh start (re-runs full install, ~40 min)
+# Check the API is responding
+curl -s http://localhost:5001/api/v1/auth/health
+# Expected: {"status": "ok"}
 ```
 
 ---
@@ -260,11 +270,41 @@ cd /opt/stack/devstack
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Horizon Dashboard | http://10.200.194.146/dashboard | Web GUI |
-| Keystone API | http://10.200.194.146:5000 | Identity/Auth |
-| Nova API | http://10.200.194.146:8774 | Compute |
-| Glance API | http://10.200.194.146:9292 | Images |
-| Cinder API | http://10.200.194.146:8776 | Volumes |
-| Neutron API | http://10.200.194.146:9696 | Networking |
-| Placement API | http://10.200.194.146:8778 | Placement |
-| Nova VNC Proxy | http://10.200.194.146:6080 | Console access |
+| Mini Cloud API + Dashboard | http://localhost:5001 | Main web interface and REST API |
+| VNC WebSocket proxy | ws://localhost:6100+ | Browser-based VM console |
+
+---
+
+## Troubleshooting
+
+### libvirtd not running
+```bash
+sudo systemctl start libvirtd
+sudo systemctl status libvirtd
+```
+
+### LVM volume group missing after reboot
+```bash
+sudo losetup -f --show /var/lib/mini-cloud-lvm.img
+sudo vgchange -ay mini-cloud-vg
+sudo vgdisplay mini-cloud-vg
+```
+
+### Floating IPs not working after reboot
+```bash
+cd /home/khalid/ec2-local-cloud/mini-cloud
+source venv/bin/activate
+sudo python3 scripts/restore_fip.py
+```
+
+### VM fails to launch (permission denied)
+```bash
+# libvirt-qemu user needs ACL access to disk files
+sudo setfacl -m u:libvirt-qemu:rwx /home/khalid/ec2-local-cloud/mini-cloud/storage/instances/
+```
+
+### Port 5001 already in use
+```bash
+sudo lsof -i :5001
+kill <PID>
+```

@@ -248,6 +248,7 @@ Click **IAM** in the sidebar. Show the four tabs:
 
 ### Q1: What does libvirt do? Why not call KVM directly?
 
+<<<<<<< HEAD
 **A:** libvirt is an abstraction API that sits between our Python code and the KVM hypervisor. KVM itself is a Linux kernel module — you interact with it through `/dev/kvm` using low-level `ioctl` system calls, which is very complex to use directly. libvirt wraps all of this with a clean API: `conn.createXML(domain_xml)` to launch a VM, `domain.state()` to check its status, `domain.destroy()` to terminate it. It also handles the libvirt daemon (`libvirtd`), which runs as a system service and manages the lifecycle of VMs.
 
 ---
@@ -255,6 +256,15 @@ Click **IAM** in the sidebar. Show the four tabs:
 ### Q2: Why doesn't this project use a message queue?
 
 **A:** A message queue (like RabbitMQ or Kafka) is needed when services run on different physical machines. In a multi-node cloud, the compute service and the storage service cannot call each other directly — they send messages through a queue and pick them up when ready. Our system runs entirely on one machine, so all modules are Python functions in the same Flask process. The compute service calling storage is just `from app.storage.models import create_volume`. No network hops, no queue needed. If this were scaled to multiple servers, a message queue would be the right addition.
+=======
+**A:** libvirt is an abstraction API that sits between our Python code and the KVM hypervisor. KVM itself is a Linux kernel module — you interact with it through `/dev/kvm` using low-level `ioctl` system calls, which is very complex to use directly. libvirt wraps all of this with a clean API: `conn.createXML(domain_xml)` to launch a VM, `domain.state()` to check its status, `domain.destroy()` to terminate it. It also handles the libvirt daemon (`libvirtd`), which runs as a system service and manages the lifecycle of VMs. The compute service in a larger cloud platform uses libvirt in exactly the same way — it is the standard interface to KVM in production systems.
+
+---
+
+### Q2: Why would a larger cloud platform use RabbitMQ but your project does not?
+
+**A:** RabbitMQ is a message queue. Larger cloud platforms need it because their services run on different physical machines in a production cluster. When one service needs to tell another to create a volume, it cannot do a direct function call across machines. It sends a message to RabbitMQ, and the other service picks it up when it is ready. Our system runs entirely on one machine, so all modules are Python functions in the same Flask process. Direct calls are just `from app.storage.models import create_volume`. No network hops needed, no message queue needed. If we scaled this to multiple servers, we would add RabbitMQ (or Kafka) for the same reason a distributed cloud platform does.
+>>>>>>> 337297b6727f1aff9138a2287614f11aa31eb3c2
 
 ---
 
@@ -338,7 +348,11 @@ When the console endpoint is called, it:
 2. Starts a `websockify` process: `websockify 6100 127.0.0.1:5910`
 3. Returns `ws://localhost:6100` to the browser
 
+<<<<<<< HEAD
 The browser runs noVNC — an HTML5 VNC client that connects to the WebSocket URL and renders the VM's screen.
+=======
+The browser runs noVNC — an HTML5 VNC client that connects to the WebSocket URL and renders the VM's screen. A larger cloud dashboard uses the exact same architecture for its console feature.
+>>>>>>> 337297b6727f1aff9138a2287614f11aa31eb3c2
 
 ---
 
@@ -520,4 +534,8 @@ FastAPI would give us async I/O and automatic OpenAPI docs — worth it if this 
 | Monitoring | `/proc` reading | Prometheus + Grafana + Alertmanager |
 | API rate limiting | None | Per-IP and per-user rate limiting |
 
+<<<<<<< HEAD
 This project demonstrates that the concepts (VM launch, floating IPs, security groups, load balancing) are not mysterious — they are Linux tools orchestrated by Python.
+=======
+Going from this demo to production is essentially the architecture of a distributed cloud platform. This project demonstrates that the concepts (VM launch, floating IPs, security groups, load balancing) are not mysterious — they are Linux tools orchestrated by Python.
+>>>>>>> 337297b6727f1aff9138a2287614f11aa31eb3c2

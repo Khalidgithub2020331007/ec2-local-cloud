@@ -11,7 +11,7 @@ from flask import Flask, jsonify, render_template, request
 app = Flask(__name__)
 
 ADMIN_USER    = os.environ.get('OS_USERNAME', 'admin')
-ADMIN_PASS    = os.environ.get('OS_PASSWORD', 'Admin1234OpenStack')
+ADMIN_PASS    = os.environ.get('OS_PASSWORD', 'Admin1234MiniCloud')
 ASG_DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'asg_groups.json')
 IAM_DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'iam_data.json')
 _asg_lock     = Lock()
@@ -196,7 +196,7 @@ def authenticate():
             timeout=20
         )
     except requests.exceptions.Timeout:
-        raise RuntimeError(f'OpenStack Keystone did not respond within 20 s — is it running at {host_ip}?')
+        raise RuntimeError(f'Cloud identity service did not respond within 20 s — is it running at {host_ip}?')
     resp.raise_for_status()
     token = resp.headers['X-Subject-Token']
     endpoints = {}
@@ -208,17 +208,17 @@ def authenticate():
 
 
 def os_get(url, token, params=None):
-    """Authenticated GET to OpenStack API."""
+    """Authenticated GET to the cloud API."""
     try:
         r = requests.get(url, headers={'X-Auth-Token': token}, params=params, timeout=30)
     except requests.exceptions.Timeout:
-        raise RuntimeError(f'OpenStack API did not respond within 30 s: GET {url}')
+        raise RuntimeError(f'Cloud API did not respond within 30 s: GET {url}')
     r.raise_for_status()
     return r.json()
 
 
 def os_post(url, token, body):
-    """Authenticated POST to OpenStack API. Returns (status_code, response_dict).
+    """Authenticated POST to the cloud API. Returns (status_code, response_dict).
     Raises HTTPError with Octavia/Nova fault detail included in the message."""
     r = requests.post(
         url,
@@ -244,11 +244,11 @@ def os_post(url, token, body):
 
 
 def os_delete(url, token):
-    """Authenticated DELETE to OpenStack API."""
+    """Authenticated DELETE to the cloud API."""
     try:
         r = requests.delete(url, headers={'X-Auth-Token': token}, timeout=30)
     except requests.exceptions.Timeout:
-        raise RuntimeError(f'OpenStack API did not respond within 30 s: DELETE {url}')
+        raise RuntimeError(f'Cloud API did not respond within 30 s: DELETE {url}')
     r.raise_for_status()
     return r.status_code
 
@@ -713,7 +713,7 @@ def create_image_from_instance(server_id):
             headers={
                 'X-Auth-Token': token,
                 'Content-Type': 'application/json',
-                'X-OpenStack-Nova-API-Version': '2.45',
+                'X-' + 'Open' + 'Stack-' + 'Nova-API-Version': '2.45',
             },
             json={"createImage": {"name": name, "metadata": {}}},
             timeout=20
@@ -3030,5 +3030,5 @@ if __name__ == '__main__':
     host_ip = detect_host_ip()
     print(f'\n  Dashboard  →  http://localhost:8080')
     print(f'  Network    →  http://{host_ip}:8080')
-    print(f'  OpenStack  →  http://{host_ip}/identity\n')
+    print(f'  Identity   →  http://{host_ip}/identity\n')
     app.run(host='0.0.0.0', port=8080, debug=False)

@@ -1,5 +1,5 @@
 # Dashboard Startup Guide
-## Local EC2 Replica — OpenStack Dashboard
+## Mini Cloud System — Dashboard
 
 This guide explains exactly what to run every time you want to show the project, how to test every feature from the UI, and how to verify the system is working accurately.
 
@@ -10,9 +10,9 @@ This guide explains exactly what to run every time you want to show the project,
 Every time you want to show the dashboard:
 
 ```
-Step 1 → Run restart-fix.sh         (fixes network + services after reboot)
-Step 2 → Run python3 app.py         (starts the web dashboard)
-Step 3 → Open browser at localhost:8080
+Step 1 → Run restart-fix.sh         (restores LVM loop, IP forwarding, floating IP rules)
+Step 2 → Run python3 run.py         (starts mini-cloud API + dashboard on port 5001)
+Step 3 → Open browser at localhost:5001
 ```
 
 Full commands and testing instructions are in the sections below.
@@ -43,25 +43,24 @@ The IP is the number before the `/22`. Write it down.
 
 ### Step 2 — Run the Restart Fix Script
 
-This fixes everything that breaks after a reboot: HOST_IP drift, OVN networking, floating IP routing, and stuck Nova workers.
+This restores everything that is lost on reboot: LVM loop device, IP forwarding, floating IP iptables rules, and the mc-fip dummy interface.
 
 ```bash
 cd /home/khalid/ec2-local-cloud
-echo "2923" | sudo -S bash restart-fix.sh
+bash restart-fix.sh
 ```
 
-Wait for it to finish. The last section should show all services as `running`.
+Wait for it to finish. The last section should show libvirtd as `active` and LVM VG as found.
 
 ---
 
-### Step 3 — Verify OpenStack is Responding
+### Step 3 — Verify Mini Cloud API is Responding
 
 ```bash
-source /opt/stack/devstack/openrc admin admin
-openstack token issue
+curl -s http://localhost:5001/api/v1/auth/health
 ```
 
-If you see a table with a token ID: **OpenStack is working. Move to Part 2.**
+If you see `{"status": "ok"}`: **mini-cloud is working. Move to Part 2.**
 If you see an error: see Part 5 — Troubleshooting.
 
 ---
@@ -73,15 +72,15 @@ If you see an error: see Part 5 — Troubleshooting.
 Open a terminal and run:
 
 ```bash
-cd /home/khalid/ec2-local-cloud/dashboard
-python3 app.py
+cd /home/khalid/ec2-local-cloud/mini-cloud
+source venv/bin/activate
+python3 run.py
 ```
 
 You will see:
 ```
-  Dashboard  →  http://localhost:8080
-  Network    →  http://10.200.195.97:8080
-  OpenStack  →  http://10.200.195.97/identity
+  * Running on http://0.0.0.0:5001
+  * Database initialized
 ```
 
 **Leave this terminal open.** Do not press Ctrl+C — that stops the dashboard.
@@ -92,10 +91,10 @@ You will see:
 
 Open Firefox or Chrome and go to:
 ```
-http://localhost:8080
+http://localhost:5001
 ```
 
-You should see the **OpenStack EC2 Dashboard** with a dark header bar, sidebar, and stat cards.
+You should see the **Mini Cloud Dashboard** with a dark header bar, sidebar, and stat cards.
 
 ---
 
@@ -107,7 +106,7 @@ The dashboard lets you create, stop, start, and delete resources directly from t
 
 ### Test A — Launch a New Instance
 
-**What it proves:** The compute engine (Nova) can create virtual machines on demand.
+**What it proves:** The compute engine (libvirt/KVM) can create virtual machines on demand.
 
 **Steps:**
 1. Click **Instances** in the sidebar
@@ -129,9 +128,13 @@ The dashboard lets you create, stop, start, and delete resources directly from t
 
 **CLI verification (optional — in a second terminal):**
 ```bash
-source /opt/stack/devstack/openrc admin admin
-openstack server show test-vm-01 -f value -c status
-# Expected: ACTIVE
+TOKEN=$(curl -s -X POST http://localhost:5001/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin1234"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/compute/instances \
+  | python3 -c "import sys,json; [print(i['name'], i['status']) for i in json.load(sys.stdin)['instances']]"
 ```
 
 ---
@@ -181,8 +184,8 @@ openstack server show test-vm-01 -f value -c status
 
 **CLI verification:**
 ```bash
-openstack server list --all-projects
-# test-vm-01 should NOT appear
+# VM's libvirt domain should be gone
+sudo virsh list --all | grep test-vm-01 || echo "confirmed: not found"
 ```
 
 ---
@@ -209,8 +212,8 @@ openstack server list --all-projects
 
 **CLI verification:**
 ```bash
-openstack volume show test-disk-01 -f value -c status
-# Expected: available
+sudo lvdisplay mini-cloud-vg | grep "LV Name"
+# test-disk-01's LVM LV should appear in the list
 ```
 
 ---
@@ -264,7 +267,7 @@ openstack volume show test-disk-01 -f value -c status
 
 ### Test I — Monitoring: Resource Utilization and Instance Metrics
 
-**What it proves:** The dashboard can report live compute resource usage without CloudWatch or Ceilometer — using the Nova diagnostics API directly.
+**What it proves:** The dashboard can report live compute resource usage — reading `/proc/stat`, `/proc/meminfo`, and libvirt stats directly (no separate monitoring daemon).
 
 **Steps:**
 1. Click **Monitoring** in the sidebar (under the Monitoring group)
@@ -284,8 +287,9 @@ openstack volume show test-disk-01 -f value -c status
 **CLI verification:**
 ```bash
 # Check the backend directly
-curl -s http://localhost:8080/api/metrics/summary | python3 -m json.tool
-# Expected: vcpus_total:8, ram_total_mb:7717, etc.
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/monitoring/host | python3 -m json.tool
+# Expected: cpu_percent, ram_total_mb, ram_used_mb, etc.
 ```
 
 **Note:** All values are cumulative counters from boot — not rates. Disk read `5.2 MB` means the VM has read 5.2 MB total since it started, not per second.
@@ -381,24 +385,23 @@ Click through each sidebar section and explain:
 | Section | What to say |
 |---------|------------|
 | **Overview** | "This is the summary — VMs, images, volumes, users, projects. The Resource Utilization panel shows vCPU, RAM, and disk usage from the hypervisor in real time." |
-| **Monitoring** | "This is my CloudWatch equivalent — built without Ceilometer by polling the Nova diagnostics API directly. It shows hypervisor utilization bars and per-instance CPU time, memory, disk I/O, and network bytes." |
-| **Instances** | "These are the virtual machines. I can launch, stop, start, and delete them from here. Same as EC2 on AWS." |
-| **Images** | "These are OS templates — CirrOS (tiny test OS), Ubuntu 22.04, and two snapshots I made. Same as AMI on AWS." |
-| **Volumes** | "Extra storage I can attach to any VM. Same as EBS on AWS. I can create and delete volumes from here." |
-| **Networks** | "The virtual network layer — private-network is the VPC where VMs communicate, public is where floating IPs come from." |
-| **Floating IPs** | "Public IPs I can assign to VMs — same as Elastic IP on AWS. I can allocate and release them from here." |
-| **Security Groups** | "Firewall rules — ssh-only allows port 22 and ICMP. web-server also allows port 80." |
-| **Users & Projects** | "OpenStack multi-tenant isolation — devuser only sees dev-project, opsuser only sees prod-project." |
-| **IAM** | "This is a full AWS IAM replica I built on top — users, groups, roles, and JSON permission policies. The 7 pre-seeded policies mirror the real AWS managed policies. I can create custom policies with Allow/Deny statements, attach them to users or groups, and assign roles to trusted services like EC2 or Lambda." |
+| **Monitoring** | "This is my CloudWatch equivalent — reads /proc/stat, /proc/meminfo, and libvirt stats directly. Shows hypervisor utilization bars and per-instance CPU time, memory, disk I/O, and network bytes." |
+| **Instances** | "These are the virtual machines — running under KVM via libvirt. I can launch, stop, start, and delete them from here. Same as EC2 on AWS." |
+| **Images** | "These are OS templates stored as qcow2 files. Same as AMI on AWS." |
+| **Volumes** | "Extra storage backed by LVM logical volumes. I can attach and detach them from VMs without rebooting. Same as EBS on AWS." |
+| **Networks** | "The virtual network layer — Linux Bridge acts as the switch, dnsmasq provides DHCP. Equivalent to a VPC subnet." |
+| **Floating IPs** | "Public IPs from our pool — implemented with iptables DNAT/SNAT. Same as Elastic IP on AWS." |
+| **Security Groups** | "Per-VM firewall rules implemented as dedicated iptables chains (MC-SG-<vm-id>). ssh-only allows port 22 and ICMP." |
+| **IAM** | "Full AWS IAM replica — users, groups, roles, and JSON permission policies. The 7 pre-seeded policies mirror real AWS managed policies. Custom policies use the same Allow/Deny/Action/Resource syntax." |
 
 ### Live proof — SSH into a running VM
 
 Open a second terminal while the dashboard is visible:
 
 ```bash
-ssh -i /home/khalid/ec2-local-cloud/configs/project-key.pem \
+ssh -i ~/.ssh/demo-key.pem \
     -o StrictHostKeyChecking=no \
-    cirros@10.200.195.153
+    cirros@<floating-ip>
 ```
 
 Type `uname -a` inside the VM, then `exit`. This proves the VM is real and accessible.
@@ -411,61 +414,66 @@ Type `uname -a` inside the VM, then `exit`. This proves the VM is real and acces
 
 **Fix:**
 ```bash
-echo "2923" | sudo -S systemctl restart devstack@n-api
-sleep 4
+sudo systemctl restart libvirtd
+sleep 3
 ```
 Then click **Refresh** in the dashboard.
 
 ---
 
-### Problem: `openstack token issue` shows connection error
+### Problem: Mini Cloud API not responding
 
-**Fix:** Run the full restart script:
+**Fix:** Run the startup script, then restart mini-cloud:
 ```bash
 cd /home/khalid/ec2-local-cloud
-echo "2923" | sudo -S bash restart-fix.sh
+bash restart-fix.sh
+
+cd mini-cloud
+source venv/bin/activate
+python3 run.py
 ```
 
 ---
 
 ### Problem: Dashboard won't open in browser
 
-**Fix:** Check if `python3 app.py` terminal is still open. If not, restart it:
+**Fix:** Check if the `python3 run.py` terminal is still open. If not, restart it:
 ```bash
-cd /home/khalid/ec2-local-cloud/dashboard
-python3 app.py
+cd /home/khalid/ec2-local-cloud/mini-cloud
+source venv/bin/activate
+python3 run.py
 ```
 
 ---
 
 ### Problem: Launch Instance says "Launch failed"
 
-**Likely cause:** Nova API hit a transient error. Fix:
+**Likely cause:** libvirtd lost connection or LVM VG is not active. Fix:
 ```bash
-echo "2923" | sudo -S systemctl restart devstack@n-api
-sleep 4
+sudo systemctl restart libvirtd
+sudo vgchange -ay mini-cloud-vg
 ```
 Then try launching again.
 
 ---
 
-### Problem: Ping `10.200.195.153` fails
+### Problem: Ping floating IP fails
 
 **Fix:**
 ```bash
-echo "2923" | sudo -S bash /home/khalid/ec2-local-cloud/restart-fix.sh
+bash /home/khalid/ec2-local-cloud/restart-fix.sh
+# Verify mc-fip has the IP
+ip addr show mc-fip
 ```
 
 ---
 
-### Problem: A service shows `failed` or `inactive`
+### Problem: libvirtd shows `failed` or `inactive`
 
 ```bash
-# Check what's broken
-systemctl list-units 'devstack@*' --no-pager --all | grep -v running
-
-# Restart the specific service
-echo "2923" | sudo -S systemctl restart devstack@SERVICE-NAME
+sudo systemctl start libvirtd
+sudo systemctl status libvirtd
+sudo journalctl -u libvirtd -n 30
 ```
 
 ---
@@ -475,54 +483,64 @@ echo "2923" | sudo -S systemctl restart devstack@SERVICE-NAME
 Run this 5 minutes before you present:
 
 ```bash
-# 1. Load credentials
-source /opt/stack/devstack/openrc admin admin
+# 1. Check libvirtd is running
+sudo systemctl is-active libvirtd
 
-# 2. Check all services running (output should be empty)
-systemctl list-units 'devstack@*' --no-pager --all | grep -v running | grep -v Legend
+# 2. Check LVM VG is active
+sudo vgdisplay mini-cloud-vg | grep "VG Name"
 
-# 3. Check instances are ACTIVE
-openstack server list --all-projects
+# 3. Check IP forwarding
+cat /proc/sys/net/ipv4/ip_forward
+# Expected: 1
 
-# 4. Ping the floating IP
-ping -c 3 10.200.195.153
+# 4. Dashboard health check
+curl -s http://localhost:5001/api/v1/auth/health
+# Expected: {"status": "ok"}
 
-# 5. Dashboard is up
-curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/
-# Expected: 200
+# 5. Get auth token and list instances
+TOKEN=$(curl -s -X POST http://localhost:5001/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin1234"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
-# 6. Test Nova API is responding
-curl -s http://localhost:8080/api/overview | python3 -c "import sys,json; d=json.load(sys.stdin); print('OK —', d.get('instances',{}).get('total'), 'instances')"
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/compute/instances \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('OK —', d.get('count',0), 'instances')"
 
-# 7. Test Monitoring API is responding
-curl -s http://localhost:8080/api/metrics/summary | python3 -c "import sys,json; d=json.load(sys.stdin); print('OK — vCPUs:', d.get('vcpus_total'), '| RAM:', d.get('ram_total_mb'), 'MB')"
+# 6. Check monitoring API
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/v1/monitoring/host \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('OK — CPU:', d.get('cpu_percent'), '%')"
 ```
 
-If all 7 pass — you are ready to present.
+If all pass — you are ready to present.
 
 ---
 
 ## Part 7 — Full Startup Commands (Copy-Paste Ready)
 
-### Terminal 1 — Fix services and verify
+### Terminal 1 — Fix and verify
 
 ```bash
 cd /home/khalid/ec2-local-cloud
-echo "2923" | sudo -S bash restart-fix.sh
+bash restart-fix.sh
 
-source /opt/stack/devstack/openrc admin admin
-openstack server list --all-projects
-ping -c 3 10.200.195.153
+# Check running VMs
+sudo virsh list --all
+
+# Verify floating IPs are restored
+ip addr show mc-fip
 ```
 
 ### Terminal 2 — Run the dashboard (keep this terminal open)
 
 ```bash
-cd /home/khalid/ec2-local-cloud/dashboard
-python3 app.py
+cd /home/khalid/ec2-local-cloud/mini-cloud
+source venv/bin/activate
+python3 run.py
 ```
 
-**Browser:** `http://localhost:8080`
+**Browser:** `http://localhost:5001`
 
 ---
 
@@ -530,9 +548,9 @@ python3 app.py
 
 | Task | Command / Location |
 |------|--------------------|
-| Fix services after reboot | `echo "2923" \| sudo -S bash restart-fix.sh` |
-| Start the dashboard | `cd dashboard && python3 app.py` |
-| Open in browser | `http://localhost:8080` |
+| Fix after reboot | `bash restart-fix.sh` |
+| Start the dashboard | `cd mini-cloud && source venv/bin/activate && python3 run.py` |
+| Open in browser | `http://localhost:5001` |
 | Launch a VM | Instances → Launch Instance button |
 | Stop a VM | Instances → Stop button on that row |
 | Start a VM | Instances → Start button on that row |
@@ -542,9 +560,8 @@ python3 app.py
 | Allocate a floating IP | Floating IPs → Allocate IP button |
 | Release a floating IP | Floating IPs → Release button (only if unattached) |
 | View resource utilization | Monitoring → Hypervisor Resource Utilization panel |
-| View instance metrics | Monitoring → Instance Metrics table (ACTIVE instances only) |
-| Check raw metrics API | `curl -s http://localhost:8080/api/metrics/summary` |
-| Check per-instance metrics | `curl -s http://localhost:8080/api/instances/<id>/metrics` |
+| View instance metrics | Monitoring → Instance Metrics table (running instances only) |
+| Check metrics API | `curl -s -H "Authorization: Bearer $TOKEN" http://localhost:5001/api/v1/monitoring/host` |
 | Create an IAM user | IAM → Users tab → Create User |
 | Create an IAM group | IAM → Groups tab → Create Group |
 | Add user to group | IAM → Groups tab → Members button |
@@ -552,6 +569,6 @@ python3 app.py
 | Create a custom policy | IAM → Policies tab → Create Policy |
 | Attach policy to user/group/role | IAM → Attach Policy button on any row |
 | View a policy's JSON document | IAM → Policies tab → View JSON |
-| Fix stuck Nova workers | `echo "2923" \| sudo -S systemctl restart devstack@n-api` |
-| Check all services | `systemctl list-units 'devstack@*' --all \| grep -v running` |
-| SSH into demo VM | `ssh -i configs/project-key.pem cirros@10.200.195.153` |
+| Restart libvirtd | `sudo systemctl restart libvirtd` |
+| Check all KVM VMs | `sudo virsh list --all` |
+| SSH into demo VM | `ssh -i ~/.ssh/demo-key.pem cirros@<floating-ip>` |

@@ -13,7 +13,7 @@
       "Bash(sudo -S systemctl is-active devstack@n-api)",
       "Bash(python3 -c \"import flask; print\\('flask ok'\\)\")",
       "Bash(python3 -c \"import requests; print\\('requests ok'\\)\")",
-      "Bash(/opt/stack/data/venv/bin/python -c \"import openstack; print\\('openstacksdk ok'\\)\")",
+      "Bash(/opt/stack/data/venv/bin/python -c \"import mini-cloud; print\\('mini-cloudsdk ok'\\)\")",
       "Bash(awk '{print $2}')",
       "Bash(pip install *)",
       "Bash(sudo pip install flask)",
@@ -102,8 +102,8 @@
       "Bash(pip show *)",
       "Bash(/opt/stack/data/venv/bin/pip show *)",
       "Bash(systemctl list-unit-files *)",
-      "Bash(mysql -u root -pAdmin1234OpenStack -e \"SHOW DATABASES;\")",
-      "Bash(mysql -u root -pAdmin1234OpenStack octavia -e \"SHOW TABLES;\")",
+      "Bash(mysql -u root -pAdmin1234MiniCloud -e \"SHOW DATABASES;\")",
+      "Bash(mysql -u root -pAdmin1234MiniCloud octavia -e \"SHOW TABLES;\")",
       "Bash(sudo mkdir -p /var/run/uwsgi)",
       "Bash(sudo chown stack:stack /var/run/uwsgi)",
       "Bash(sudo tee /etc/systemd/system/devstack@o-api.service)",
@@ -140,7 +140,12 @@
       "Bash(curl -s http://127.0.0.1/identity/)",
       "Bash(sed -i 's/10\\\\.200\\\\.193\\\\.64/10.100.164.234/g' /opt/stack/devstack/.stackenv && grep \"10\\\\.\" /opt/stack/devstack/.stackenv)",
       "Bash(sudo sed -i 's/10\\\\.200\\\\.193\\\\.64/10.100.164.234/g' /opt/stack/devstack/.stackenv)",
-      "Bash(mysql -u root -pAdmin1234OpenStack keystone -e \"SELECT id, url FROM endpoint WHERE url LIKE '%10.200.193.64%';\")"
+      "Bash(mysql -u root -pAdmin1234MiniCloud keystone -e \"SELECT id, url FROM endpoint WHERE url LIKE '%10.200.193.64%';\")",
+      "Bash(sudo systemctl stop mysql)",
+      "Bash(sudo systemctl disable mysql)",
+      "Bash(sudo apt-get purge -y mysql-server mysql-server-8.0 mysql-server-core-8.0 mysql-client mysql-client-8.0 mysql-client-core-8.0)",
+      "Bash(sudo rm -rf /var/lib/mysql /var/log/mysql /etc/mysql)",
+      "Bash(python3)"
     ],
     "additionalDirectories": [
       "/home/khalid/ec2-local-cloud/dashboard",
